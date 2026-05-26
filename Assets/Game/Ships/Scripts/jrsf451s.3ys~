@@ -1,0 +1,101 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using SpaceStuff;
+
+public abstract class Turret : MonoBehaviour
+{
+    [Header("Turret")] public bool active = true;
+    public bool manual = false;
+    public LayerMask ignoreLayers;
+    [SerializeField] Transform platform;
+    [SerializeField] Transform rotatingObject;
+    [SerializeField] Vector3 minAngles;
+    [SerializeField] Vector3 maxAngles;
+    [SerializeField] float rotateSpeed = 10;
+
+    [SerializeField] float shootAngle = 1;
+    [SerializeField] float fireRate = 0.15f;
+    float fireTime = 0;
+    [SerializeField] GameObject bulletPrefab;
+    [SerializeField] GameObject shootParticles;
+    public Transform firePoint;
+    [SerializeField] float bulletSpeed = 30;
+    public Transform target { get; set; }
+    public float distanceToTarget;
+    private Vector3 lastTargetPosition;
+    private Vector3 targetVelocity;
+
+    private Vector3 lastPosition;
+    private Vector3 velocity;
+
+    [HideInInspector] public Vector3 targetDirection;
+    [HideInInspector] public bool fire = false;
+    [SerializeField] private bool showLines;
+
+    private void Update()
+    {
+        if (active)
+        {
+            if (fire)
+            {
+                fireTime += Time.deltaTime;
+                if (fireTime >= fireRate)
+                {
+                    Fire();
+                }
+            }
+            if (targetDirection != Vector3.zero)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(targetDirection, platform.up);
+                platform.rotation = rotatingObject.rotation = Quaternion.RotateTowards(rotatingObject.rotation, targetRotation, rotateSpeed);
+                platform.localEulerAngles = new Vector3(0, platform.localEulerAngles.y, 0);
+                rotatingObject.localEulerAngles = CustomMethods.Clamp(rotatingObject.localEulerAngles.FixEulers(), minAngles, maxAngles);
+                if (showLines)
+                {
+                    Debug.DrawLine(firePoint.position, firePoint.position + targetDirection * distanceToTarget, Color.green, 0.1f);
+                }
+            }
+        }
+    }
+
+    public virtual void FixedUpdate()
+    {
+        if (active)
+        {
+            if (!manual)
+            {
+                fire = false;
+                if (target != null)
+                {
+                    targetVelocity = (target.position - lastTargetPosition) / Time.fixedDeltaTime;
+                    velocity = (transform.position - lastPosition) / Time.fixedDeltaTime;
+                    Vector3 targetRelativeVelocity = targetVelocity - velocity;
+                    float bulletTime = distanceToTarget / (bulletSpeed - 1);
+
+                    targetDirection = (target.position + targetRelativeVelocity * bulletTime - rotatingObject.position).normalized;
+
+                    if (!Physics.Raycast(firePoint.position, targetDirection, out RaycastHit hit, distanceToTarget - 0.1f, ~ignoreLayers) || hit.transform == target || hit.transform.root == target)
+                    {
+                        float angleToTarget = Vector3.Angle(rotatingObject.forward, targetDirection);
+                        if(angleToTarget < shootAngle)
+                        {
+                            fire = true;
+                        }
+                    }
+                    lastTargetPosition = target.position;
+                    lastPosition = transform.position;
+                }
+            }
+        }
+    }
+
+    void Fire()
+    {
+        fireTime = 0;
+        Rigidbody bulletRigidbody = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation).GetComponent<Rigidbody>();
+        bulletRigidbody.velocity = velocity + firePoint.forward * bulletSpeed;
+        bulletRigidbody.GetComponent<TrailRenderer>().enabled = true;
+        Instantiate(shootParticles, firePoint.position, firePoint.rotation);
+    }
+}

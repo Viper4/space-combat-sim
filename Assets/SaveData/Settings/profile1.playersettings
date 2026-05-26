@@ -1,0 +1,6 @@
+{
+    "sensitivity": 50.0,
+    "fieldOfView": 60.0,
+    "targetFramerate": 60,
+    "masterVolume": 100.0
+}

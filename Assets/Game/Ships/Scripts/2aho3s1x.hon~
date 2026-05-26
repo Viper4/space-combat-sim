@@ -1,0 +1,129 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using SpaceStuff;
+
+public abstract class Turret : MonoBehaviour
+{
+    [Header("Turret")] public bool active = true;
+    public bool manual = false;
+    public LayerMask ignoreLayers;
+    [SerializeField] Transform platform;
+    [SerializeField] Transform rotatingObject;
+    [SerializeField] Vector3 minAngles;
+    [SerializeField] Vector3 maxAngles;
+    [SerializeField] float rotateSpeed = 10;
+
+    [SerializeField] float shootAngle = 1;
+    [SerializeField] float fireRate = 0.15f;
+    float fireTime = 0;
+    [SerializeField] GameObject bulletPrefab;
+    [SerializeField] GameObject shootParticles;
+    public Transform firePoint;
+    [SerializeField] float bulletSpeed = 50;
+    public Transform target { get; set; }
+    public float distanceToTarget;
+    private Vector3 lastTargetPosition;
+    private Vector3 targetVelocity;
+    private Vector3 lastTargetVelocity;
+    private Vector3 targetAcceleration;
+
+    private Vector3 lastPosition;
+    private Vector3 velocity;
+    private Vector3 lastVelocity;
+    private Vector3 acceleration;
+
+    [HideInInspector] public Vector3 targetDirection;
+    [HideInInspector] public bool fire = false;
+    [SerializeField] private bool showLines;
+
+    private Vector3 futureTargetPosition;
+
+    private void Update()
+    {
+        if (active)
+        {
+            if (fire)
+            {
+                fireTime += Time.deltaTime;
+                if (fireTime >= fireRate)
+                {
+                    Fire();
+                }
+            }
+            if (Mathf.Abs(targetDirection.x) > 0.01f || Mathf.Abs(targetDirection.y) > 0.01f || Mathf.Abs(targetDirection.z) > 0.01f)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(targetDirection, platform.up);
+                platform.rotation = rotatingObject.rotation = Quaternion.RotateTowards(rotatingObject.rotation, targetRotation, rotateSpeed);
+                platform.localEulerAngles = new Vector3(0, platform.localEulerAngles.y, 0);
+                rotatingObject.localEulerAngles = CustomMethods.Clamp(rotatingObject.localEulerAngles.FixEulers(), minAngles, maxAngles);
+                if (showLines)
+                {
+                    Debug.DrawLine(firePoint.position, futureTargetPosition, Color.green, 0.1f);
+                }
+            }
+        }
+    }
+
+    public virtual void FixedUpdate()
+    {
+        if (active)
+        {
+            if (!manual)
+            {
+                fire = false;
+                if (target != null)
+                {
+                    //Debug.Log("Error: " + Vector3.Distance(futureTargetPosition, target.position));
+                    targetVelocity = (target.position - lastTargetPosition) / Time.fixedDeltaTime;
+                    targetAcceleration = (targetVelocity - lastTargetVelocity) / Time.fixedDeltaTime;
+                    velocity = (transform.position - lastPosition) / Time.fixedDeltaTime;
+                    acceleration = (velocity - lastVelocity) / Time.fixedDeltaTime;
+                    print($"Target velocity: {targetVelocity} | Target acceleration: {targetAcceleration} | Velocity: {velocity} | Acceleration: {acceleration}");
+                    Vector3 relativePosition = target.position - transform.position;
+                    Vector3 relativeVelocity = targetVelocity - velocity;
+                    Vector3 relativeAcceleration = targetAcceleration - acceleration;
+                    Vector3 targetDir = relativePosition.normalized;
+                    float targetRelativeDot = Vector3.Dot(relativeVelocity, targetDirection);
+                    Debug.Log(targetRelativeDot);
+                    if(targetRelativeDot > bulletSpeed)
+                    {
+                        targetDirection = targetDir;
+                        return;
+                    }
+                    float bulletTime = distanceToTarget / bulletSpeed;
+                    for (int i = 0; i < 20; i++)
+                    {
+                        Vector3 predictedRelativePosition = relativePosition + (relativeVelocity * bulletTime) + (0.5f * bulletTime * bulletTime * relativeAcceleration);
+                        bulletTime = predictedRelativePosition.magnitude / bulletSpeed;
+                    }
+
+                    futureTargetPosition = target.position + (relativeVelocity * bulletTime) + (0.5f * bulletTime * bulletTime * relativeAcceleration);
+                    targetDirection = (futureTargetPosition - transform.position).normalized;
+
+                    if (!Physics.Raycast(firePoint.position, targetDirection, out RaycastHit hit, distanceToTarget - 0.1f, ~ignoreLayers) || hit.transform == target || hit.transform.root == target)
+                    {
+                        float angleToTarget = Vector3.Angle(firePoint.forward, targetDirection);
+                        if(angleToTarget < shootAngle)
+                        {
+                            fire = true;
+                        }
+                    }
+                    lastTargetPosition = target.position;
+                    lastTargetVelocity = targetVelocity;
+                    lastPosition = transform.position;
+                    lastVelocity = velocity;
+                }
+            }
+        }
+    }
+
+    void Fire()
+    {
+        fireTime = 0;
+        Rigidbody bulletRigidbody = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation).GetComponent<Rigidbody>();
+        bulletRigidbody.velocity = velocity + firePoint.forward * bulletSpeed;
+        bulletRigidbody.GetComponent<TrailRenderer>().enabled = true;
+        Instantiate(shootParticles, firePoint.position, firePoint.rotation);
+    }
+}

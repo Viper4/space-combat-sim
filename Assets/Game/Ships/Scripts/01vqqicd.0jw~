@@ -1,0 +1,90 @@
+using SpaceStuff;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+[RequireComponent(typeof(Ship))]
+public class TurretSystem : MonoBehaviour
+{
+    private Ship ship;
+
+    [SerializeField] private Transform[] turretPoints;
+    [HideInInspector] public Turret[] turrets;
+    [SerializeField] private GameObject turretCrosshairPrefab;
+
+    public bool manualControl = false;
+
+    [SerializeField] private Image mainCrosshair;
+    [SerializeField] private Color normalColor;
+    [SerializeField] private Color hoverColor;
+    [SerializeField] private Color triggerColor;
+    private bool triggerHeld = false;
+    [SerializeField] private Color turretNormalColor;
+    [SerializeField] private Color turretBlockedColor;
+
+    [SerializeField] private LayerMask targetLayers;
+
+    private void Start()
+    {
+        ship = GetComponent<Ship>();
+
+        turrets = new Turret[turretPoints.Length];
+        for (int i = 0; i < turretPoints.Length; i++)
+        {
+            turrets[i] = turretPoints[i].GetChild(0).GetComponent<Turret>();
+            Instantiate(turretCrosshairPrefab, ship.combatUI);
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        if (manualControl)
+        {
+            //mainCrosshair.transform.localPosition = new Vector2(-joystick.direction.z * ship.combatUI.rect.width * 0.5f, -joystick.direction.x * ship.combatUI.rect.height * 0.5f);
+            Vector3 crosshairDirection = mainCrosshair.transform.position - ship.pilotCamera.transform.position;
+
+            if (Physics.Raycast(mainCrosshair.transform.position, crosshairDirection, out RaycastHit hit, Mathf.Infinity, targetLayers))
+            {
+                if (hit.transform.HasTag("RadarTarget"))
+                {
+
+                }
+                Debug.DrawLine(mainCrosshair.transform.position, hit.point, Color.green, 0.1f);
+                if (!triggerHeld)
+                    mainCrosshair.color = hoverColor;
+            }
+            else
+            {
+                if (!triggerHeld)
+                    mainCrosshair.color = normalColor;
+            }
+
+            for (int i = 0; i < turrets.Length; i++)
+            {
+                Turret turret = turrets[i];
+                turret.targetDirection = hit.point - turret.firePoint.position;
+                Transform turretCrosshair = ship.combatUI.GetChild(i + 1);
+                Vector3 turretHitPoint;
+                if (turret.GetObstruction(out RaycastHit turretHit))
+                {
+                    if (turretHit.transform != transform)
+                        turretCrosshair.GetComponent<Image>().color = turretNormalColor;
+                    else
+                        turretCrosshair.GetComponent<Image>().color = turretBlockedColor;
+                    turretHitPoint = turretHit.point;
+                }
+                else
+                {
+                    turretCrosshair.GetComponent<Image>().color = turretNormalColor;
+                    turretHitPoint = turret.firePoint.position + turret.firePoint.forward * 1000;
+                }
+
+                if (RectTransformUtility.ScreenPointToWorldPointInRectangle(ship.combatUI, ship.pilotCamera.WorldToScreenPoint(turretHitPoint), ship.pilotCamera, out Vector3 turretCrosshairPos))
+                {
+                    turretCrosshair.position = turretCrosshairPos;
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,98 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Torpedo : MonoBehaviour
+{
+    [SerializeField] private Transform target;
+    [SerializeField] private float propulsionForce = 1000;
+    [SerializeField] private float translationForce = 50;
+    [SerializeField] private float rotationForce = 100;
+    private Rigidbody _rigidbody;
+    private PIDController rotationPID;
+    private PIDController translationPID;
+    [SerializeField] private float p, i, d;
+    private bool active;
+    [SerializeField] private ParticleSystem rocketParticles;
+
+    [SerializeField] private LayerMask ignoreLayers;
+    [SerializeField] private ParticleSystem explosionParticles;
+    [SerializeField] private float explosionRadius = 15f;
+    [SerializeField] private float explosionForce = 100f;
+
+    private void FixedUpdate()
+    {
+        if (active)
+        {
+            if (target != null)
+            {
+                Vector3 targetDirection = target.position - transform.position;
+                Vector3 rotationError = targetDirection - transform.forward;
+                float torqueX = Mathf.Clamp(rotationPID.GetOutput(rotationError.x, Time.fixedDeltaTime), -rotationForce, rotationForce);
+                float torqueY = Mathf.Clamp(rotationPID.GetOutput(rotationError.y, Time.fixedDeltaTime), -rotationForce, rotationForce);
+                float torqueZ = Mathf.Clamp(rotationPID.GetOutput(rotationError.z, Time.fixedDeltaTime), -rotationForce, rotationForce);
+                _rigidbody.AddTorque(new Vector3(torqueX, torqueY, torqueZ) * rotationForce, ForceMode.Acceleration);
+
+                Vector3 velocityError = targetDirection - _rigidbody.velocity.normalized;
+                float forceX = Mathf.Clamp(translationPID.GetOutput(velocityError.x, Time.fixedDeltaTime), -translationForce, translationForce);
+                float forceY = Mathf.Clamp(translationPID.GetOutput(velocityError.x, Time.fixedDeltaTime), -translationForce, translationForce);
+                float forceZ = Mathf.Clamp(translationPID.GetOutput(velocityError.x, Time.fixedDeltaTime), -translationForce, translationForce);
+                _rigidbody.AddForce(new Vector3(forceX, forceY, forceZ));
+
+                if (rotationError.sqrMagnitude < 2)
+                    _rigidbody.AddForce(transform.forward * propulsionForce, ForceMode.Acceleration);                    
+            }
+            else
+            {
+                if (rocketParticles.isPlaying)
+                    rocketParticles.Stop();
+                _rigidbody.AddForce(transform.forward * propulsionForce, ForceMode.Acceleration);
+            }
+        }
+    }
+
+    public void Activate(Rigidbody rigidbody, Transform target, float delay)
+    {
+        _rigidbody = rigidbody;
+        this.target = target;
+        rotationPID = new PIDController(p, i, d);
+        translationPID = new PIDController(p, i, d);
+        StartCoroutine(ActivateRoutine(delay));
+    }
+
+    private IEnumerator ActivateRoutine(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        rocketParticles.Play();
+        active = true;
+        GetComponent<Collider>().enabled = true;
+    }
+
+    public void Detonate()
+    {
+        Instantiate(explosionParticles, transform.position, transform.rotation);
+        Collider[] colliders = new Collider[16];
+        int hits = Physics.OverlapSphereNonAlloc(transform.position, explosionRadius, colliders, ~ignoreLayers);
+        for (int i = 0; i < hits; i++)
+        {
+            if(colliders[i].TryGetComponent<Rigidbody>(out var otherRB))
+            {
+                otherRB.AddExplosionForce(explosionForce, transform.position, explosionRadius, 0, ForceMode.Impulse);
+            }
+        }
+        Destroy(gameObject);
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        Detonate();
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if(other.transform == target)
+        {
+            Detonate();
+        }
+    }
+}

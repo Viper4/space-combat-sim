@@ -1,0 +1,116 @@
+using SpaceStuff;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.XR;
+
+public class TrackingTurret : Turret
+{
+    [SerializeField, Header("Gun Turret")] private string[] targetTags;
+    [SerializeField] private string torpedoTag;
+    private HashSet<string> targetTagsSet = new HashSet<string>();
+
+    private List<Rigidbody> targets = new List<Rigidbody>();
+
+    [SerializeField] private float torpedoRange = 20f;
+
+    private Rigidbody target;
+    private float distanceToTarget;
+    private Vector3 lastTargetVelocity;
+    private Vector3 targetAcceleration;
+
+    private Vector3 lastVelocity;
+    private Vector3 acceleration;
+
+    private Vector3 futureTargetPosition;
+
+    private void Start()
+    {
+        foreach(string tag in targetTags)
+        {
+            targetTagsSet.Add(tag);
+        }
+    }
+
+    private void SelectTarget()
+    {
+        Rigidbody closestTarget = null;
+        float closestSqrDst = float.MaxValue;
+        for (int i = 0; i < targets.Count; i++)
+        {
+            if (targets[i] == null)
+            {
+                targets.RemoveAt(i);
+                i--;
+                continue;
+            }
+            float sqrDst = (targets[i].position - transform.position).sqrMagnitude;
+            if (sqrDst < closestSqrDst && (!targets[i].transform.HasTag(torpedoTag) || sqrDst > torpedoRange * torpedoRange))
+            {
+                closestTarget = targets[i];
+                closestSqrDst = sqrDst;
+            }
+        }
+        target = closestTarget;
+        distanceToTarget = Mathf.Sqrt(closestSqrDst);
+    }
+
+    protected virtual void FixedUpdate()
+    {
+        if (active)
+        {
+            if (!manual)
+            {
+                fire = false;
+                if (targets.Count > 0)
+                {
+                    SelectTarget();
+
+                    // Weird problem with Unity seems like FixedUpdate isn't getting called consistently
+                    // keeps alternating between -0.02 and -0.6 velocity
+                    targetAcceleration = (target.velocity - lastTargetVelocity) / Time.fixedDeltaTime;
+                    acceleration = (attachedRB.velocity - lastVelocity) / Time.fixedDeltaTime;
+                    print($"Target velocity: {target.velocity} | Target acceleration: {targetAcceleration} | Velocity: {attachedRB.velocity} | Acceleration: {acceleration}");
+                    Vector3 relativePosition = target.position - firePoint.position;
+                    Vector3 relativeVelocity = target.velocity - attachedRB.velocity;
+                    Vector3 relativeAcceleration = targetAcceleration - acceleration;
+
+                    float bulletTime = distanceToTarget / projectileSpeed;
+                    for (int i = 0; i < 8; i++)
+                    {
+                        Vector3 predictedRelativePosition = relativePosition + (relativeVelocity * bulletTime) + (0.5f * bulletTime * bulletTime * relativeAcceleration);
+                        bulletTime = predictedRelativePosition.magnitude / projectileSpeed;
+                    }
+
+                    futureTargetPosition = target.position + (relativeVelocity * bulletTime) + (0.5f * bulletTime * bulletTime * relativeAcceleration);
+                    targetDirection = (futureTargetPosition - origin.position).normalized;
+
+                    if (!Physics.Raycast(firePoint.position, targetDirection, out RaycastHit hit, distanceToTarget - 0.1f, ~ignoreLayers) || hit.transform == target)
+                        fire = true;
+                    
+                    lastTargetVelocity = target.velocity;
+                    lastVelocity = attachedRB.velocity;
+                }                
+            }
+        }
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.attachedRigidbody != attachedRB)
+        {
+            if (targetTagsSet.Contains(other.transform.tag))
+            {
+                targets.Add(other.attachedRigidbody);
+            }
+        }
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (targetTagsSet.Contains(other.transform.tag))
+        {
+            targets.Remove(other.attachedRigidbody);
+        }
+    }
+}
