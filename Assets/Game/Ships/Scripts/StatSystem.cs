@@ -27,6 +27,11 @@ public class StatSystem : MonoBehaviour
     private float lastDamageTime = 0;
     [SerializeField] private float damageCooldown = 0.5f;
 
+    private void Start()
+    {
+        UpdateUI();
+    }
+
     private void UpdateUI()
     {
         if (healthBars.Count > 0)

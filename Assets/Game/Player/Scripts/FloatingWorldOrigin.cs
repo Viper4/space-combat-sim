@@ -1,7 +1,8 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using SpaceStuff;
+using Unity.Collections;
 
+[RequireComponent(typeof(ScaledTransform))]
 public class FloatingWorldOrigin : MonoBehaviour
 {
     public static FloatingWorldOrigin Instance { get; private set; }
@@ -9,14 +10,17 @@ public class FloatingWorldOrigin : MonoBehaviour
     public Vector3d worldOriginPosition { get; private set; }
     public TransformChange cameraTC; // Use camera to update scaled space objects since camera can move slightly as child of origin
 
-    [SerializeField] private float shiftThreshold = 500;
+    [SerializeField] private float shiftThreshold = 1500;
+
+    private ScaledTransform scaledTransform;
 
     private void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            ShiftOrigin();
+            scaledTransform = GetComponent<ScaledTransform>();
+            ShiftOrigin(transform.position.ToVector3d());
         }
         else
         {
@@ -24,36 +28,20 @@ public class FloatingWorldOrigin : MonoBehaviour
         }
     }
 
-    void FixedUpdate()
+    public bool OverShiftThreshold()
     {
-        if (transform.position.sqrMagnitude > shiftThreshold * shiftThreshold)
-        {
-            ShiftOrigin();
-        }
+        return (scaledTransform.realPosition - worldOriginPosition).sqrMagnitude > shiftThreshold * shiftThreshold;
     }
 
-    private void ShiftOrigin()
+    public Vector3d GetOffset()
     {
-        foreach (GameObject rootObject in SceneManager.GetActiveScene().GetRootGameObjects())
-        {
-            if (rootObject == gameObject || rootObject.CompareTag("IgnoreFloatingOrigin"))
-                continue;
+        return scaledTransform.realPosition - worldOriginPosition;
+    }
 
-            if (rootObject.TryGetComponent<ScaledTransform>(out var rootScaledTransform))
-            {
-                if (!rootScaledTransform.inScaledSpace)
-                {
-                    rootObject.transform.position -= transform.position;
-                }
-            }
-            else
-            {
-                rootObject.transform.position -= transform.position;
-            }
-        }
-        // Define new origin position by adding current offset (transform.position) to world origin
-        worldOriginPosition += transform.position.ToVector3d();
-        //worldOrigin.SetPositionSilent(worldOrigin.realPosition + worldOrigin.transform.position.ToVector3d());
+    public void ShiftOrigin(Vector3d shift)
+    {
+        // Define new origin position by adding offset to world origin
+        worldOriginPosition += shift;
         transform.position = Vector3.zero;
         Debug.Log($"Shifted floating origin {transform.name} to {worldOriginPosition}");
     }

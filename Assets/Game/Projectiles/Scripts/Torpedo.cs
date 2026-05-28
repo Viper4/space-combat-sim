@@ -9,7 +9,7 @@ public class Torpedo : Projectile
 
     [Header("Torpedo")] public Transform target;
     public string team;
-    private Rigidbody targetRB;
+    private DoubleRigidbody targetRB;
     [SerializeField] private float propulsionForce = 1000f;
     [SerializeField] private float rotateSpeed = 20f;
     [SerializeField] private float moveAngleThreshold = 5f; 
@@ -28,12 +28,6 @@ public class Torpedo : Projectile
     private Vector3 acceleration;
 
     private Vector3 futureTargetPosition;
-
-    protected override void Start()
-    {
-        base.Start();
-        doubleRigidbody.OnScaledCollisionEnter += (_, x) => Detonate(x.contactPoint.ToVector3());
-    }
 
     private void FixedUpdate()
     {
@@ -196,22 +190,16 @@ public class Torpedo : Projectile
         Destroy(gameObject);
     }
 
-    private void OnCollisionEnter(Collision collision)
+    protected override void OnCollide(ScaledSpacePhysics.CollisionInfo collisionInfo)
     {
-        Detonate(collision.GetContact(0).point);
+        Detonate(collisionInfo.contactPoint.ToVector3());
     }
 
-    private void OnTriggerEnter(Collider other)
+    protected override void OnTrigger(Transform other, DoubleRigidbody otherDoubleRB)
     {
-        if (doubleRigidbody.scaledTransform.inScaledSpace)
-            return;
-        if (!other.isTrigger)
+        if (other == target || otherDoubleRB == targetRB)
         {
-            // Within range of target, detonate
-            if (other.transform == target || (targetRB != null && other.attachedRigidbody == targetRB))
-            {
-                Detonate(transform.position);
-            }
+            Detonate(transform.position);
         }
     }
 }

@@ -36,7 +36,7 @@ Transform:
   m_GameObject: {fileID: 6316366540338611349}
   serializedVersion: 2
   m_LocalRotation: {x: 6.123234e-17, y: -3.7493994e-33, z: 6.123234e-17, w: -1}
-  m_LocalPosition: {x: 0, y: 0, z: -0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -116,14 +116,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
   _isKinematic: 0
   speedThreshold: -1
-  velocity:
-    x: 0
-    y: 0
-    z: 0
-  angularVelocity:
-    x: 0
-    y: 0
-    z: 0
+  trackTrigger: 0
   scaledTriggerRadius: 10
 --- !u!114 &6577287821693102537
 MonoBehaviour:
@@ -235,7 +228,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 463356234
+  GlobalObjectIdHash: 3724786077
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -261,20 +254,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
-  id: 0
-  scaledTransform: {fileID: 0}
   doubleRigidbody: {fileID: 0}
-  attachedRB: {fileID: 1613615964272944648}
   team: 
   radarIcon: {fileID: 0}
-  direction: {x: 0, y: 0, z: 0}
-  arrivalTime: 0
-  distance: 0
-  speed: 0
   originalHUDColor: {r: 0, g: 0, b: 0, a: 0}
   originalRadarColor: {r: 0, g: 0, b: 0, a: 0}
   originalRadarEmission: {r: 0, g: 0, b: 0, a: 0}
   turretsTargeting: 0
+  useScaleForBounds: 0
+  boundsRenderers: []
 --- !u!114 &4633688431431094526
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -296,6 +284,7 @@ MonoBehaviour:
     y: 1
     z: 1
   minScreenPixelSize: 3
+  visible: 1
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 1000

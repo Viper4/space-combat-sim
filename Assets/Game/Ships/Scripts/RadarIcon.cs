@@ -17,18 +17,21 @@ public class RadarIcon : MonoBehaviour
 
     private Color baseColor;
 
-    void LateUpdate()
+    private bool permanent = false;
+
+    private void LateUpdate()
     {
         killTimer -= Time.deltaTime;
-        if (killTimer <= 0)
+        if (!permanent && killTimer <= 0)
         {
             Destroy(gameObject);
         }
         text3D.transform.rotation = Quaternion.LookRotation(text3D.transform.position - Camera.main.transform.position, Camera.main.transform.up);
     }
 
-    public void Init(Vector3 position, Quaternion rotation, Color baseColor, Color emission, string text)
+    public void Init(Vector3 position, Quaternion rotation, Color baseColor, Color emission, string text, bool permanent)
     {
+        this.permanent = permanent;
         this.baseColor = baseColor;
         modelMeshRenderer = model.GetComponent<MeshRenderer>();
         Material clonedMaterial = Instantiate(modelMeshRenderer.sharedMaterial);
@@ -55,21 +58,6 @@ public class RadarIcon : MonoBehaviour
         {
             lineRenderer.SetPosition(0, new Vector3(0, -transform.localPosition.y, 0));
             lineRenderer.SetPosition(1, Vector3.zero);
-            /*float sqrMagnitude = linePositions.Count > 0 ? (linePositions[^1] - transform.localPosition).sqrMagnitude : 999f;
-            if (sqrMagnitude > sqrNewLinePosThreshold)
-            {
-                linePositions.Add(transform.localPosition);
-                if (linePositions.Count > maxLinePositions)
-                {
-                    linePositions.RemoveAt(0);
-                }
-                lineRenderer.positionCount = linePositions.Count + 1;
-            }
-            for (int i = 0; i < linePositions.Count; i++)
-            {
-                lineRenderer.SetPosition(i, linePositions[i] - transform.localPosition);
-            }
-            lineRenderer.SetPosition(linePositions.Count, Vector3.zero);*/
         }
 
         if (text3D != null)
@@ -88,27 +76,6 @@ public class RadarIcon : MonoBehaviour
         {
             lineRenderer.SetPosition(0, new Vector3(0, -transform.localPosition.y, 0));
             lineRenderer.SetPosition(1, Vector3.zero);
-            /*
-            // Move vertices back by displacement
-            for (int i = 0; i < linePositions.Count; i++)
-            {
-                linePositions[i] += displacement;
-            }
-            float sqrMagnitude = linePositions.Count > 0 ? (linePositions[^1] - transform.localPosition).sqrMagnitude : 999f;
-            if (sqrMagnitude > sqrNewLinePosThreshold)
-            {
-                linePositions.Add(transform.localPosition);
-                if (linePositions.Count > maxLinePositions)
-                {
-                    linePositions.RemoveAt(0);
-                }
-                lineRenderer.positionCount = linePositions.Count + 1;
-            }
-            for (int i = 0; i < linePositions.Count; i++)
-            {
-                lineRenderer.SetPosition(i, linePositions[i] - transform.localPosition);
-            }
-            lineRenderer.SetPosition(linePositions.Count, Vector3.zero);*/
         }
 
         if (text3D != null)

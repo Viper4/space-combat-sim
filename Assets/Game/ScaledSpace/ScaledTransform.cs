@@ -1,10 +1,9 @@
 using SpaceStuff;
 using UnityEngine;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System;
 
-[RequireComponent(typeof(TransformChange)), RequireComponent(typeof(DoubleRigidbody))]
+[RequireComponent(typeof(TransformChange), typeof(DoubleRigidbody))]
 public class ScaledTransform : MonoBehaviour
 {
     private DoubleRigidbody doubleRigidbody;
@@ -20,8 +19,6 @@ public class ScaledTransform : MonoBehaviour
         set
         {
             _realPosition = value;
-            if (!inScaledSpace)
-                transform.position = _realPosition.ToVector3(); // Need to update manually
             UpdateTransform();
         }
     }
@@ -40,7 +37,7 @@ public class ScaledTransform : MonoBehaviour
     }
     [SerializeField, Tooltip("Tracked colliders/renderers are disabled at screen sizes below this")] private float minScreenPixelSize = 3f;
     
-    private bool trackedComponentsActive = true;
+    [HideInInspector] public bool visible = true;
     private Collider[] trackedColliders;
     private Renderer[] trackedRenderers;
     private int[] originalColliderLayers;
@@ -58,7 +55,7 @@ public class ScaledTransform : MonoBehaviour
         transformChange = GetComponent<TransformChange>();
 
         ResetVisualComponents(true);
-        SetTrackedComponentsActive(trackedComponentsActive);
+        SetTrackedComponentsActive(visible);
     }
 
     private void OnValidate()
@@ -117,6 +114,14 @@ public class ScaledTransform : MonoBehaviour
                 inScaledSpace = true;
                 SwitchToWorldSpace();
             }
+            if (doubleRigidbody.active)
+            {
+                SwitchToDoubleRigidbody();
+            }
+            else
+            {
+                SwitchToRigidbody();
+            }
         }
     }
 
@@ -132,22 +137,23 @@ public class ScaledTransform : MonoBehaviour
         {
             trackedRenderers[i].enabled = value;
         }
-        trackedComponentsActive = value;
+        visible = value;
     }
 
-    private float GetSquareScreenSize(double sqrCameraDistance)
+    /// <summary>
+    /// Returns the square of the size of the object assumed to be a sphere with radius=max(realScale.x, realScale.y, realScale.z) on screen in pixels based on its given square distance from the camera's realPosition.
+    /// </summary>
+    /// <param name="sqrCameraDistance">Square distance from the camera in the actual world (using realPosition)</param>
+    /// <returns>Pixel size squared</returns>
+    public float GetSquarePixelSize(double sqrCameraDistance)
     {
         // screenSize ≈ objectRadius / (distance * tan(FOV/2))
         if (sqrCameraDistance <= 0)
             return 1.0f;
         double radius = Math.Max(Math.Max(_realScale.x, _realScale.y), _realScale.z);
         double tan = Math.Tan(Camera.main.fieldOfView * Mathf.Deg2Rad * 0.5);
-        return (float)(radius * radius / (sqrCameraDistance * tan * tan));
-    }
-
-    private float GetSquarePixelSize(float sqrScreenSize)
-    {
-        return sqrScreenSize * Screen.height * Screen.height;
+        double sqrScreenSize = radius * radius / (sqrCameraDistance * tan * tan);
+        return (float)(sqrScreenSize * Screen.height * Screen.height);
     }
 
     private void UpdateTransformEditor()
@@ -170,18 +176,28 @@ public class ScaledTransform : MonoBehaviour
     private void UpdateTransform()
     {
         Vector3d originPosition = FloatingWorldOrigin.Instance.worldOriginPosition;
+        if (FloatingWorldOrigin.Instance.transform == transform)
+        {
+            if (FloatingWorldOrigin.Instance.OverShiftThreshold())
+                return; // Let ScaledSpacePhysics handle origin shift, don't update origin's transform.position to outside of shiftThreshold
+            UpdateInWorldSpace(originPosition);
+            return;
+        }
+
         double sqrDistance = (_realPosition - originPosition).sqrMagnitude;
         if (inScaledSpace)
         {
-            UpdateInScaledSpace(originPosition);
             if (sqrDistance < worldSpaceThreshold * worldSpaceThreshold)
                 SwitchToWorldSpace();
+            else
+                UpdateInScaledSpace(originPosition);
         }
         else
         {
-            UpdateInWorldSpace(originPosition);
             if (sqrDistance > scaledSpaceThreshold * scaledSpaceThreshold)
                 SwitchToScaledSpace();
+            else
+                UpdateInWorldSpace(originPosition);
         }
     }
 
@@ -193,17 +209,17 @@ public class ScaledTransform : MonoBehaviour
         Vector3d realCamPos = originPosition + renderCamPos;
         Vector3d offset = _realPosition - realCamPos; // Unscaled offset from camera to object
 
-        float sqrPixelSize = GetSquarePixelSize(GetSquareScreenSize(offset.sqrMagnitude));
+        float sqrPixelSize = GetSquarePixelSize(offset.sqrMagnitude);
         if (sqrPixelSize < minScreenPixelSize * minScreenPixelSize)
         {
-            if (trackedComponentsActive)
+            if (visible)
                 SetTrackedComponentsActive(false);
             transform.position = Vector3.zero; // Reduce risk of floating point errors
             return;
         }
         else
         {
-            if (!trackedComponentsActive)
+            if (!visible)
                 SetTrackedComponentsActive(true);
         }
 
@@ -213,9 +229,18 @@ public class ScaledTransform : MonoBehaviour
 
     private void UpdateInWorldSpace(Vector3d originPosition)
     {
-        // In world space, we use regular ridigbody and transform, so need to update ScaledTransform's position and scale to match
-        _realPosition = originPosition + transform.position.ToVector3d();
-        _realScale = transform.localScale.ToVector3d();
+        if (doubleRigidbody == null || doubleRigidbody.active)
+        {
+            // Assume Editor changes realPosition (doubleRigidbody == null) and DoubleRigidbody changes realPosition with velocity
+            transform.position = (_realPosition - originPosition).ToVector3();
+            transform.localScale = _realScale.ToVector3();
+        }
+        else
+        {
+            // Rigidbody changes transform.position with linearVelocity
+            _realPosition = originPosition + transform.position.ToVector3d();
+            _realScale = transform.localScale.ToVector3d();
+        }
     }
 
     public void SwitchToDoubleRigidbody()
@@ -253,7 +278,7 @@ public class ScaledTransform : MonoBehaviour
     {
         if (!gameObject.activeSelf || !inScaledSpace)
             return;
-        if (!trackedComponentsActive)
+        if (!visible)
             SetTrackedComponentsActive(true);
         inScaledSpace = false;
         doubleRigidbody.active = false;
@@ -268,5 +293,10 @@ public class ScaledTransform : MonoBehaviour
             trackedRenderers[i].gameObject.layer = originalRendererLayers[i];
         }
         FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateTransform; // ScaledTransform and Transform match so dont need to maintain illusion
+    }
+
+    public Renderer[] GetTrackedRenderers()
+    {
+        return (Renderer[])trackedRenderers.Clone();
     }
 }

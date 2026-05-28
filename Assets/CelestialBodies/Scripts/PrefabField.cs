@@ -9,7 +9,6 @@ public class PrefabField : MonoBehaviour
     [SerializeField] GameObject prefab;
     [SerializeField] bool parent;
     [SerializeField] int numberOfObjects = 10;
-    [SerializeField] int groupSize = 1;
     [SerializeField] [Range(0.0f, 1.0f)] float hollowStrength;
 
     void Start()
@@ -22,11 +21,6 @@ public class PrefabField : MonoBehaviour
             else
                 Instantiate(prefab, RandomPositionInCollider(), Random.rotation);
         }
-    }
-
-    void Update()
-    {
-        
     }
 
     /// <summary>

@@ -60,6 +60,7 @@ MonoBehaviour:
     y: 1
     z: 1
   minScreenPixelSize: 3
+  visible: 1
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 100
@@ -103,7 +104,7 @@ MonoBehaviour:
   generationSettings: {fileID: 11400000, guid: 0be72f32df323dc4fb7839601af70aec, type: 2}
   gravity: 0
   gravitySettingsFoldout: 1
-  gravitySettings: {fileID: 11400000, guid: fdf0ca84f16763142aaa2bf5de91eff5, type: 2}
+  gravitySettings: {fileID: 0}
   systemCenter: {fileID: 0}
   scaledTransform: {fileID: 0}
 --- !u!54 &6356004437463594846
@@ -146,16 +147,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _isKinematic: 0
-  attachedRigidbody: {fileID: 6356004437463594846}
   speedThreshold: 500
-  velocity:
-    x: 0
-    y: 0
-    z: 0
-  angularVelocity:
-    x: 0
-    y: 0
-    z: 0
+  trackTrigger: 0
+  scaledTriggerRadius: 1
 --- !u!114 &4194929419073694645
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -208,17 +202,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
-  id: 0
-  scaledTransform: {fileID: 7448112571900520497}
-  physicsHandler: {fileID: 6170339221104728975}
-  attachedRB: {fileID: 6356004437463594846}
+  doubleRigidbody: {fileID: 0}
   team: 
   radarIcon: {fileID: 0}
-  direction: {x: 0, y: 0, z: 0}
-  arrivalTime: 0
-  distance: 0
-  speed: 0
   originalHUDColor: {r: 0, g: 0, b: 0, a: 0}
   originalRadarColor: {r: 0, g: 0, b: 0, a: 0}
   originalRadarEmission: {r: 0, g: 0, b: 0, a: 0}
   turretsTargeting: 0
+  useScaleForBounds: 1
+  boundsRenderers: []

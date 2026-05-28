@@ -879,7 +879,7 @@ namespace SpaceStuff
         }
     }
 
-    public static class CustomMethods
+    public static class SpaceMath
     {
         private const double kilo = 1e3;
         private const double mega = 1e6;
@@ -895,6 +895,11 @@ namespace SpaceStuff
 
         private const float epsilon = 0.0001f;
 
+        /// <summary>
+        /// Normalizes an angle in degrees to the range [-180, 180].
+        /// </summary>
+        /// <param name="angle">Angle in degrees</param>
+        /// <returns>Normalized angle in degrees</returns>
         public static float NormalizeAngle(float angle)
         {
             // Convert from (-infinity, infinity) to [-180, 180]
@@ -909,6 +914,11 @@ namespace SpaceStuff
             return angle;
         }
 
+        /// <summary>
+        /// Normalizes Euler angles to the range [-180, 180] for each axis.
+        /// </summary>
+        /// <param name="eulerAngles">Euler angles in degrees</param>
+        /// <returns>Normalized Euler angles in degrees</returns>
         public static Vector3 NormalizeEulerAngles(this Vector3 eulerAngles)
         {
             float x = NormalizeAngle(eulerAngles.x);
@@ -917,16 +927,37 @@ namespace SpaceStuff
             return new Vector3(x, y, z);
         }
 
+        /// <summary>
+        /// Clamps each component of a vector between the corresponding components of min and max.
+        /// </summary>
+        /// <param name="vector">The vector to clamp</param>
+        /// <param name="min">The minimum values for each component</param>
+        /// <param name="max">The maximum values for each component</param>
+        /// <returns>The clamped vector</returns>
         public static Vector3 Clamp(Vector3 vector, Vector3 min, Vector3 max)
         {
             return new Vector3(Mathf.Clamp(vector.x, min.x, max.x), Mathf.Clamp(vector.y, min.y, max.y), Mathf.Clamp(vector.z, min.z, max.z));
         }
 
+        /// <summary>
+        /// Clamps each component of a vector between min and max.
+        /// </summary>
+        /// <param name="vector">The vector to clamp</param>
+        /// <param name="min">The minimum value for each component</param>
+        /// <param name="max">The maximum value for each component</param>
+        /// <returns>The clamped vector</returns>
         public static Vector3 Clamp(Vector3 vector, float min, float max)
         {
             return new Vector3(Mathf.Clamp(vector.x, min, max), Mathf.Clamp(vector.y, min, max), Mathf.Clamp(vector.z, min, max));
         }
 
+        /// <summary>
+        /// Wraps each component of a vector between the corresponding components of min and max.
+        /// </summary>
+        /// <param name="vector">The vector to wrap</param>
+        /// <param name="min">The minimum values for each component</param>
+        /// <param name="max">The maximum values for each component</param>
+        /// <returns>The wrapped vector</returns>
         public static Vector3 WrapClamp(Vector3 vector, Vector3 min, Vector3 max)
         {
             Vector3 returnVector = vector;
@@ -957,6 +988,13 @@ namespace SpaceStuff
             return returnVector;
         }
 
+        /// <summary>
+        /// Wraps each component of a vector between min and max.
+        /// </summary>
+        /// <param name="vector">The vector to wrap</param>
+        /// <param name="min">The minimum value for each component</param>
+        /// <param name="max">The maximum value for each component</param>
+        /// <returns>The wrapped vector</returns>
         public static Vector3 WrapClamp(Vector3 vector, float min, float max)
         {
             Vector3 returnVector = vector;
@@ -987,78 +1025,97 @@ namespace SpaceStuff
             return returnVector;
         }
 
-        public static float normalize(float value, float min, float max)
+        /// <summary>
+        /// Normalizes a value to the range [0, 1] based on the provided minimum and maximum values.
+        /// </summary>
+        /// <param name="value">The value to normalize</param>
+        /// <param name="min">The minimum value</param>
+        /// <param name="max">The maximum value</param>
+        /// <returns>The normalized value</returns>
+        public static float Normalize(float value, float min, float max)
         {
             return (value - min) / (max - min);
         }
 
-        // Assuming units in meters
+        /// <summary>
+        /// Formats a distance in meters to the largest appropriate unit (m, km, Mm, Gm, AU, or ly) with the specified number of decimal places.
+        /// </summary>
+        /// <param name="distance">Distance in meters</param>
+        /// <param name="decimals">Number of decimal places to display</param>
+        /// <returns>Formatted distance string</returns>
         public static string DistanceToFormattedString(double distance, int decimals = 0)
         {
             double decimalOffset = Math.Pow(10, decimals);
-            if(distance >= lightYear)
+
+            if (distance < kilo)
             {
-                return (Math.Round(distance / lightYear * decimalOffset) / decimalOffset).ToString() + "ly";
+                return (Math.Truncate(distance * decimalOffset) / decimalOffset).ToString() + "m";
             }
-            else if(distance >= astronomicalUnit)
+            else if (distance < mega)
             {
-                return (Math.Round(distance / astronomicalUnit * decimalOffset) / decimalOffset).ToString() + "AU";
+                return (Math.Truncate(distance / kilo * decimalOffset) / decimalOffset).ToString() + "km";
             }
-            else if (distance >= giga)
+            else if (distance < giga)
             {
-                return (Math.Round(distance / giga * decimalOffset) / decimalOffset).ToString() + "Gm";
+                return (Math.Truncate(distance / giga * decimalOffset) / decimalOffset).ToString() + "Gm";
             }
-            else if(distance >= mega)
+            else if (distance < astronomicalUnit)
             {
-                return (Math.Round(distance / mega * decimalOffset) / decimalOffset).ToString() + "Mm";
+                return (Math.Truncate(distance / astronomicalUnit * decimalOffset) / decimalOffset).ToString() + "au";
             }
-            else if(distance >= kilo)
-            {
-                return (Math.Round(distance / kilo * decimalOffset) / decimalOffset).ToString() + "km";
-            }
-            return (Math.Round(distance * decimalOffset) / decimalOffset).ToString() + "m";
+
+            return (Math.Truncate(distance / lightYear * decimalOffset) / decimalOffset).ToString() + "ly";
         }
 
-        // Assuming units in m/s
+        /// <summary>
+        /// Formats a speed in meters per second to the largest appropriate unit (m/s, km/s, Mm/s, or c) with the specified number of decimal places.
+        /// </summary>
+        /// <param name="speed">Speed in meters per second</param>
+        /// <param name="decimals">Number of decimal places to display</param>
+        /// <returns>Formatted speed string</returns>
         public static string SpeedToFormattedString(double speed, int decimals = 0)
         {
             double decimalOffset = Math.Pow(10, decimals);
+            double absSpeed = Math.Abs(speed);
 
-            if (Math.Abs(speed) >= c)
+            if (absSpeed < kilo)
             {
-                return (Math.Round(speed / c * decimalOffset) / decimalOffset).ToString() + "c";
+                return (Math.Truncate(speed * decimalOffset) / decimalOffset).ToString() + "m/s";
             }
-            else if (Math.Abs(speed) >= mega)
+            else if (absSpeed < 0.01 * c)
             {
-                return (Math.Round(speed / mega * decimalOffset) / decimalOffset).ToString() + "Mm/s";
+                return (Math.Truncate(speed / kilo * decimalOffset) / decimalOffset).ToString() + "km/s";
             }
-            else if (Math.Abs(speed) >= kilo)
-            {
-                return (Math.Round(speed / kilo * decimalOffset) / decimalOffset).ToString() + "km/s";
-            }
-            return (Math.Round(speed * decimalOffset) / decimalOffset).ToString() + "m/s";
+
+            return (Math.Truncate(speed / c * decimalOffset) / decimalOffset).ToString() + "c";
         }
 
+        /// <summary>
+        /// Formats a time in seconds to the largest appropriate unit (seconds, minutes, hours, days, or years) with the specified number of decimal places.
+        /// </summary>
+        /// <param name="seconds"></param>
+        /// <param name="decimals">Number of decimal places to display</param>
+        /// <returns>Formatted time string</returns>
         public static string SecondsToFormattedString(double seconds, int decimals = 0)
         {
             double decimalOffset = Math.Pow(10, decimals);
             if(seconds >= year)
             {
-                return (Math.Round(seconds / year * decimalOffset) / decimalOffset).ToString() + " years";
+                return (Math.Round(seconds / year * decimalOffset) / decimalOffset).ToString() + "years";
             }
             else if(seconds >= day)
             {
-                return (Math.Round(seconds / day * decimalOffset) / decimalOffset).ToString() + " days";
+                return (Math.Round(seconds / day * decimalOffset) / decimalOffset).ToString() + "days";
             }
             else if(seconds >= hour)
             {
-                return (Math.Round(seconds / hour * decimalOffset) / decimalOffset).ToString() + " hours";
+                return (Math.Round(seconds / hour * decimalOffset) / decimalOffset).ToString() + "hours";
             }
             else if(seconds >= minute)
             {
-                return (Math.Round(seconds / minute * decimalOffset) / decimalOffset).ToString() + " minutes";
+                return (Math.Round(seconds / minute * decimalOffset) / decimalOffset).ToString() + "minutes";
             }
-            return (Math.Round(seconds * decimalOffset) / decimalOffset).ToString() + " seconds";
+            return (Math.Round(seconds * decimalOffset) / decimalOffset).ToString() + "seconds";
         }
 
         public static Vector3d ToVector3d(this Vector3 vector)
@@ -1126,6 +1183,13 @@ namespace SpaceStuff
             return result;
         }
 
+        /// <summary>
+        /// Calculates the time it will take for an object to arrive at a target given its current closing speed, closing acceleration, and distance to the target.
+        /// </summary>
+        /// <param name="closingAcceleration"></param>
+        /// <param name="closingSpeed"></param>
+        /// <param name="distance"></param>
+        /// <returns>The time in seconds it will take for the object to arrive at the target, or -1 if it can never arrive.</returns>
         public static float CalculateArrivalTime(float closingAcceleration, float closingSpeed, float distance)
         {
             // 0 = (1/2)At^2 + Vt + dst
@@ -1163,6 +1227,260 @@ namespace SpaceStuff
                 arrival = Mathf.Min(arrival, t2);
 
             return float.IsInfinity(arrival) ? -1f : arrival;
+        }
+    }
+
+    /// <summary>
+    /// Struct representing a quadrilateral defined by four 2D points in clockwise order.
+    /// </summary>
+    public struct Quadrilateral
+    {
+        private static readonly Quadrilateral zeroQuad = new Quadrilateral(Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
+
+        /// <summary>
+        /// Bottom left corner
+        /// </summary>
+        public Vector2 p1;
+        /// <summary>
+        /// Top left corner
+        /// </summary>
+        public Vector2 p2;
+        /// <summary>
+        /// Top right corner
+        /// </summary>
+        public Vector2 p3;
+        /// <summary>
+        /// Bottom right corner
+        /// </summary>
+        public Vector2 p4;
+
+        public Quadrilateral(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4)
+        {
+            this.p1 = p1;
+            this.p2 = p2;
+            this.p3 = p3;
+            this.p4 = p4;
+        }
+
+        public static Quadrilateral zero
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return zeroQuad;
+            }
+        }
+    }
+
+    public static class SpaceGeometry
+    {
+        public static bool QuadrilateralIsZero(Quadrilateral quad)
+        {
+            return quad.p1 == Vector2.zero && quad.p2 == Vector2.zero && quad.p3 == Vector2.zero && quad.p4 == Vector2.zero;
+        }
+
+        /// <summary>
+        /// Gets the world axis-aligned bounding box of a set of renderers relative to a camera.
+        /// </summary>
+        /// <param name="renderers"></param>
+        /// <param name="camera"></param>
+        /// <returns>The axis-aligned bounding box.</returns>
+        public static Quadrilateral GetAxisAlignedBoundingBox(Renderer[] renderers, Camera camera)
+        {
+            if (renderers.Length == 0)
+            {
+                return Quadrilateral.zero;
+            }
+
+            Vector3 min = renderers[0].bounds.min;
+            Vector3 max = renderers[0].bounds.max;
+
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                Bounds bounds = renderers[i].bounds;
+                min = Vector3.Min(min, bounds.min);
+                max = Vector3.Max(max, bounds.max);
+            }
+
+            Vector2 minScreen = camera.WorldToScreenPoint(min);
+            Vector2 maxScreen = camera.WorldToScreenPoint(max);
+
+            return new Quadrilateral(
+                minScreen, 
+                new Vector2(minScreen.x, maxScreen.y), 
+                maxScreen, 
+                new Vector2(maxScreen.x, minScreen.y)
+            );
+        }
+
+        /// <summary>
+        /// Rotates a set of points by a given angle counterclockwise in radians around the pivot point.
+        /// </summary>
+        /// <param name="points">2D points to rotate</param>
+        /// <param name="pivot">The point to rotate around</param>
+        /// <param name="angle">Angle in radians</param>
+        /// <returns>Array of rotated points.</returns>
+        public static Vector2[] RotatePoints(Vector2[] points, Vector2 pivot, float angle)
+        {
+            Vector2[] rotatedPoints = new Vector2[points.Length];
+            float cos = Mathf.Cos(angle);
+            float sin = Mathf.Sin(angle);
+            for (int i = 0; i < points.Length; i++)
+            {
+                Vector2 point = points[i] - pivot;
+                rotatedPoints[i] = new Vector2(point.x * cos - point.y * sin, point.x * sin + point.y * cos) + pivot;
+            }
+            return rotatedPoints;
+        }
+
+        /// <summary>
+        /// Rotates a quadrilateral by a given angle counterclockwise in radians around the pivot point.
+        /// </summary>
+        /// <param name="quad">Quadrilateral to rotate</param>
+        /// <param name="pivot">The point to rotate around</param>
+        /// <param name="angle">Angle in radians</param>
+        /// <returns>Rotated quadrilateral.</returns>
+        public static Quadrilateral RotateQuadrilateral(Quadrilateral quad, Vector2 pivot, float angle)
+        {
+            Vector2[] points = new Vector2[4] { quad.p1, quad.p2, quad.p3, quad.p4 };
+            Vector2[] rotatedPoints = RotatePoints(points, pivot, angle);
+            return new Quadrilateral(rotatedPoints[0], rotatedPoints[1], rotatedPoints[2], rotatedPoints[3]);
+        }
+
+        /// <summary>
+        /// Gets the minimum bounding box of a set of renderers relative to a camera, rotated to better fit the renderers. This is more expensive than GetAxisAlignedBoundingBox but can provide a tighter fit.
+        /// </summary>
+        /// <param name="renderers"></param>
+        /// <param name="camera"></param>
+        /// <returns>The minimum rotated bounding box in 2D space.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Quadrilateral GetMinimumBoundingBox(Renderer[] renderers, Camera camera)
+        {
+            if (renderers.Length == 0)
+                return Quadrilateral.zero;
+
+            Vector3[] corners = new Vector3[8];
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+            Vector2 max = new Vector2(float.MinValue, float.MinValue);
+            bool visible = false;
+            Matrix4x4 viewProjection = camera.projectionMatrix * camera.worldToCameraMatrix;
+            foreach (Renderer renderer in renderers)
+            {
+                Bounds localBounds = renderer.localBounds;
+                Vector3 boundsMin = localBounds.min;
+                Vector3 boundsMax = localBounds.max;
+
+                corners[0] = new Vector3(boundsMin.x, boundsMin.y, boundsMin.z);
+                corners[1] = new Vector3(boundsMin.x, boundsMin.y, boundsMax.z);
+                corners[2] = new Vector3(boundsMin.x, boundsMax.y, boundsMin.z);
+                corners[3] = new Vector3(boundsMin.x, boundsMax.y, boundsMax.z);
+                corners[4] = new Vector3(boundsMax.x, boundsMin.y, boundsMin.z);
+                corners[5] = new Vector3(boundsMax.x, boundsMin.y, boundsMax.z);
+                corners[6] = new Vector3(boundsMax.x, boundsMax.y, boundsMin.z);
+                corners[7] = new Vector3(boundsMax.x, boundsMax.y, boundsMax.z);
+
+                Matrix4x4 localToClip = viewProjection * renderer.localToWorldMatrix;
+
+                for (int i = 0; i < 8; i++)
+                {
+                    Vector4 clip = localToClip * new Vector4(
+                        corners[i].x,
+                        corners[i].y,
+                        corners[i].z,
+                        1f
+                    );
+
+                    if (clip.w <= 0) // Point is behind the camera
+                        continue;
+
+                    visible = true;
+
+                    float invW = 1f / clip.w;
+                    Vector2 screen = new Vector2(
+                        (clip.x * invW * 0.5f + 0.5f) * camera.pixelWidth,
+                        (clip.y * invW * 0.5f + 0.5f) * camera.pixelHeight
+                    );
+
+                    min = Vector2.Min(min, screen);
+                    max = Vector2.Max(max, screen);
+                }
+            }
+
+            if (!visible)
+                return Quadrilateral.zero;
+
+            return new Quadrilateral(
+                min,
+                new Vector2(min.x, max.y),
+                max,
+                new Vector2(max.x, min.y)
+            );
+        }
+
+        /// <summary>
+        /// Gets the minimum bounding box of an ellipsoid defined by its center, scale, and rotation relative to a camera.
+        /// </summary>
+        /// <param name="center"></param>
+        /// <param name="scale"></param>
+        /// <param name="rotation"></param>
+        /// <param name="camera"></param>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Quadrilateral GetEllipsoidBoundingBox(Vector3 center, Vector3 scale, Quaternion rotation, Camera camera)
+        {
+            Vector3 right = rotation * Vector3.right * scale.x;
+            Vector3 up = rotation * Vector3.up * scale.y;
+            Vector3 forward = rotation * Vector3.forward * scale.z;
+
+            Vector3[] corners =
+            {
+                center - right - up - forward,
+                center - right - up + forward,
+                center - right + up - forward,
+                center - right + up + forward,
+                center + right - up - forward,
+                center + right - up + forward,
+                center + right + up - forward,
+                center + right + up + forward
+            };
+
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+            Vector2 max = new Vector2(float.MinValue, float.MinValue);
+            bool visible = false;
+            Matrix4x4 viewProjection = camera.projectionMatrix * camera.worldToCameraMatrix;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector4 clip = viewProjection * new Vector4(
+                    corners[i].x,
+                    corners[i].y,
+                    corners[i].z,
+                    1f
+                );
+
+                if (clip.w <= 0) // Point is behind the camera
+                    continue;
+
+                visible = true;
+
+                float invW = 1f / clip.w;
+                Vector2 screen = new Vector2(
+                    (clip.x * invW * 0.5f + 0.5f) * camera.pixelWidth,
+                    (clip.y * invW * 0.5f + 0.5f) * camera.pixelHeight
+                );
+
+                min = Vector2.Min(min, screen);
+                max = Vector2.Max(max, screen);
+            }
+
+            if (!visible)
+                return Quadrilateral.zero;
+
+            return new Quadrilateral(
+                min,
+                new Vector2(min.x, max.y),
+                max,
+                new Vector2(max.x, min.y)
+            );
         }
     }
 }

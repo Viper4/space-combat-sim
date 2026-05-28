@@ -68,6 +68,8 @@ GameObject:
   - component: {fileID: 7669569056236028977}
   - component: {fileID: -1175703920567001825}
   - component: {fileID: 4011333338206696670}
+  - component: {fileID: 6248478014903184728}
+  - component: {fileID: 5997540040479759170}
   m_Layer: 0
   m_Name: Earth-Like Planet
   m_TagString: CelestialBody
@@ -113,6 +115,7 @@ MonoBehaviour:
     y: 6371000
     z: 6371000
   minScreenPixelSize: 3
+  visible: 1
   scaledSpaceLayer: 3
   inScaledSpace: 1
   scaleFactor: 1000000
@@ -199,16 +202,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _isKinematic: 0
-  attachedRigidbody: {fileID: 7669569056236028977}
   speedThreshold: 500
-  velocity:
-    x: 0
-    y: 0
-    z: 0
-  angularVelocity:
-    x: 0
-    y: 0
-    z: 0
+  trackTrigger: 0
+  scaledTriggerRadius: 1
 --- !u!114 &4011333338206696670
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -223,6 +219,53 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TransformChange
   trackPosition: 1
   trackRotation: 0
+--- !u!114 &6248478014903184728
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4255873868048831807}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 881799977
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
+--- !u!114 &5997540040479759170
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4255873868048831807}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd05b432c58d5ad41be439478d9c0ad3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
+  ShowTopMostFoldoutHeaderGroup: 1
+  doubleRigidbody: {fileID: 0}
+  team: 
+  radarIcon: {fileID: 0}
+  originalHUDColor: {r: 0, g: 0, b: 0, a: 0}
+  originalRadarColor: {r: 0, g: 0, b: 0, a: 0}
+  originalRadarEmission: {r: 0, g: 0, b: 0, a: 0}
+  turretsTargeting: 0
+  useScaleForBounds: 1
+  boundsRenderers: []
 --- !u!1001 &6213586387416295118
 PrefabInstance:
   m_ObjectHideFlags: 0

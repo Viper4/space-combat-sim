@@ -65,6 +65,7 @@ MonoBehaviour:
     y: 695700000
     z: 695700000
   minScreenPixelSize: 3
+  visible: 1
   scaledSpaceLayer: 3
   inScaledSpace: 1
   scaleFactor: 100000000
@@ -86,7 +87,7 @@ MeshRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2675124551879334190}
   m_Enabled: 1
-  m_CastShadows: 1
+  m_CastShadows: 0
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
   m_StaticShadowCaster: 0
@@ -187,14 +188,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _isKinematic: 0
   speedThreshold: 500
-  velocity:
-    x: 0
-    y: 0
-    z: 0
-  angularVelocity:
-    x: 0
-    y: 0
-    z: 0
+  trackTrigger: 0
+  scaledTriggerRadius: 1
 --- !u!114 &1084746199370567776
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -295,20 +290,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
-  id: 0
-  scaledTransform: {fileID: 8042605825554430832}
   doubleRigidbody: {fileID: 0}
-  attachedRB: {fileID: 3226591562496017464}
   team: 
   radarIcon: {fileID: 0}
-  direction: {x: 0, y: 0, z: 0}
-  arrivalTime: 0
-  distance: 0
-  speed: 0
   originalHUDColor: {r: 0, g: 0, b: 0, a: 0}
   originalRadarColor: {r: 0, g: 0, b: 0, a: 0}
   originalRadarEmission: {r: 0, g: 0, b: 0, a: 0}
   turretsTargeting: 0
+  useScaleForBounds: 1
+  boundsRenderers: []
 --- !u!1 &7089161551974816913
 GameObject:
   m_ObjectHideFlags: 0

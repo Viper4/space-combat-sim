@@ -17,15 +17,17 @@ public class Ship : RadarTarget
     [SerializeField] private GameObject pilotUI;
 
     public Animator UIAnimator;
+    [SerializeField] private Transform velocityDirectionPivot;
     [SerializeField] private TextMeshProUGUI speedText;
     [SerializeField] private TextMeshProUGUI fuelText;
     [SerializeField] private TextMeshProUGUI healthText;
     [SerializeField] private Slider fuelSlider;
     [SerializeField] private Slider healthSlider;
-    [SerializeField] private Transform velocityDirectionPivot;
 
     [SerializeField] private float enginePower = 50f;
+    [SerializeField] private float engineLaunchPower = 50f;
     [SerializeField] private float thrusterPower = 10f;
+    private bool launchMode = false;
 
     [SerializeField, Tooltip("Thruster distance from ship's x axis (Pitch)")] private float thrusterRadiusX = 5f;
     [SerializeField, Tooltip("Thruster distance from ship's y axis (Yaw)")] private float thrusterRadiusY = 5f;
@@ -35,7 +37,7 @@ public class Ship : RadarTarget
 
     private bool autoStabilizeRot = false;
     private bool autoStabilizePos = false;
-    private Vector3 stableLocalVelocity;
+    private Vector3 stableVelocity;
     private Vector3 stableLocalAngularVelocity;
     [SerializeField, Range(0, 1000)] private float P, I, D;
     private PIDController xRotatePID;
@@ -92,7 +94,7 @@ public class Ship : RadarTarget
     {
         if (isPilot && (IsOwner || GameManager.Instance.offlineMode))
         {
-            speedText.text = "Speed: " + CustomMethods.SpeedToFormattedString(doubleRigidbody.velocity.magnitude, 2);
+            speedText.text = "SPD " + SpaceMath.SpeedToFormattedString(doubleRigidbody.velocity.magnitude, 2);
             if (doubleRigidbody.velocity != Vector3d.zero)
                 velocityDirectionPivot.rotation = Quaternion.LookRotation(doubleRigidbody.velocity.ToVector3(), transform.up);
         }
@@ -104,29 +106,30 @@ public class Ship : RadarTarget
         if (isPilot && (IsOwner || GameManager.Instance.offlineMode))
         {
             // Translation inputs
-            Vector3 newMove = GameManager.Instance.inputActions.Player.Move.ReadValue<Vector3>();
-            moving = newMove.x != 0 || newMove.y != 0 || newMove.z != 0;
+            Vector3 desiredMove = GameManager.Instance.inputActions.Player.Move.ReadValue<Vector3>();
+            desiredMove = Vector3.ClampMagnitude(desiredMove, 1f); // Prevent from moving faster than max force allows
+            moving = desiredMove.x != 0 || desiredMove.y != 0 || desiredMove.z != 0;
 
-            double forceX = newMove.x * thrusterPower;
-            double forceY = newMove.y * thrusterPower;
-            double forceZ = Mathf.Max(0, newMove.z) * enginePower + Mathf.Min(0, newMove.z) * thrusterPower; // Engine can only move ship forward
+            double forceX = desiredMove.x * thrusterPower;
+            double forceY = desiredMove.y * thrusterPower;
+            double forceZ = desiredMove.z * thrusterPower;
+            // Engine can only move ship forward so use engine for +z and thrusters for -z
+            if (desiredMove.z > 0)
+            {
+                if (launchMode)
+                    forceZ = desiredMove.z * engineLaunchPower;
+                else
+                    forceZ = desiredMove.z * enginePower;
+            }
             doubleRigidbody.AddRelativeForce(new Vector3d(forceX, forceY, forceZ), ForceMode.Force);
 
-            if (newMove.z > 0)
+            if (desiredMove.z > 0)
             {
                 rocketTrail.gameObject.SetActive(true);
-                // if (!rocketTrail.isPlaying)
-                // {
-                //     rocketTrail.Play();
-                // }
             }
             else
             {
                 rocketTrail.gameObject.SetActive(false);
-                // if (rocketTrail.isPlaying)
-                // {
-                //     rocketTrail.Stop();
-                // }
             }
 
             // Rotation inputs for pitch and roll
@@ -134,8 +137,8 @@ public class Ship : RadarTarget
             if (Cursor.lockState == CursorLockMode.Locked) // Dont rotate ship while player is using mouse to interact with switches/UI
             {
                 lookDelta = GameManager.Instance.inputActions.Player.Look.ReadValue<Vector2>();
-                Vector2 desiredLook = GameManager.Instance.playerSettings.sensitivity * GameManager.Instance.sensitivityScale * Time.fixedDeltaTime * lookDelta;
-
+                Vector2 desiredLook = GameManager.Instance.playerSettings.sensitivity * GameManager.Instance.sensitivityScale * lookDelta;
+                desiredLook = Vector2.ClampMagnitude(desiredLook, 1f); // Prevent from rotating faster than max torque allows
                 Vector3d torque = new Vector3d(-desiredLook.y * thrusterTorque.x, 0, 0);
                 if (rollMode)
                     torque.z = -desiredLook.x * thrusterTorque.z;
@@ -156,13 +159,18 @@ public class Ship : RadarTarget
                 Vector3 desired = new Vector3(tx, ty, tz);
                 desired = Vector3.ClampMagnitude(desired, 1f);
 
-                Vector3d localTorque = new Vector3d(desired.x * thrusterTorque.x, desired.y * thrusterTorque.y, desired.z * thrusterTorque.z);
+                Vector3d localTorque = new Vector3d(
+                    desired.x * thrusterTorque.x, 
+                    desired.y * thrusterTorque.y, 
+                    desired.z * thrusterTorque.z
+                );
 
                 doubleRigidbody.AddRelativeTorque(localTorque, ForceMode.Force);
             }
             if (autoStabilizePos && !moving)
             {
-                Vector3 localVelocity = transform.InverseTransformDirection(velocity);
+                Vector3 localVelocity = transform.InverseTransformDirection(doubleRigidbody.velocity.ToVector3());
+                Vector3 stableLocalVelocity = transform.InverseTransformDirection(stableVelocity);
                 Vector3 error = localVelocity - stableLocalVelocity;
 
                 float fx = -xMovePID.GetOutput(error.x, Time.fixedDeltaTime);
@@ -172,7 +180,19 @@ public class Ship : RadarTarget
                 desired = Vector3.ClampMagnitude(desired, 1f);
 
                 // Use engine to go forward (+z) and thrusters to go backward (-z)
-                Vector3d localForce = new Vector3d(desired.x * thrusterPower, desired.y * thrusterPower, desired.z > 0 ? desired.z * enginePower : desired.z * thrusterPower);
+                Vector3d localForce = new Vector3d(
+                    desired.x * thrusterPower, 
+                    desired.y * thrusterPower, 
+                    desired.z * thrusterPower
+                );
+
+                if (desired.z > 0)
+                {
+                    if (launchMode)
+                        localForce.z = desired.z * engineLaunchPower;
+                    else
+                        localForce.z = desired.z * enginePower;
+                }
 
                 doubleRigidbody.AddRelativeForce(localForce, ForceMode.Force);
             }
@@ -195,19 +215,19 @@ public class Ship : RadarTarget
             shields.Damage(damageAmount, collisionPoint);
         else
             statSystem.Damage(damageAmount);
-        Debug.Log($"{transform.name} collided with {collision.transform.name}");
+        Debug.Log($"Collided with {collision.gameObject.name} at speed {collision.relativeVelocity.magnitude:F2}, taking {damageAmount:F2} damage");
     }
 
     public void SetStableConfiguration(int state)
     {
         if (state == 0)
         {
-            stableLocalVelocity = Vector3.zero;
+            stableVelocity = Vector3.zero;
             stableLocalAngularVelocity = Vector3.zero;
         }
         else
         {
-            stableLocalVelocity = transform.InverseTransformDirection(doubleRigidbody.velocity.ToVector3());
+            stableVelocity = doubleRigidbody.velocity.ToVector3();
             stableLocalAngularVelocity = transform.InverseTransformDirection(doubleRigidbody.angularVelocity.ToVector3());
         }
     }
@@ -225,5 +245,10 @@ public class Ship : RadarTarget
     public void ToggleRollYaw(int state)
     {
         rollMode = state == 0;
+    }
+
+    public void ToggleLaunchMode(int state)
+    {
+        launchMode = state == 1;
     }
 }

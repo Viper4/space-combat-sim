@@ -2,10 +2,10 @@ using UnityEngine;
 using SpaceStuff;
 using System;
 
-[RequireComponent(typeof(Rigidbody)), RequireComponent(typeof(ScaledTransform))]
+[RequireComponent(typeof(Rigidbody), typeof(ScaledTransform))]
 public class DoubleRigidbody : MonoBehaviour
 {
-    public static float speedLimit = 1000;
+    public static float speedLimit = 2.99792458e8f; // Speed of light in m/s, used to prevent overflow in velocity calculations
 
     private bool _active;
     public bool active
@@ -20,16 +20,16 @@ public class DoubleRigidbody : MonoBehaviour
             {
                 if (value)
                 {
-                    velocity = attachedRigidbody.linearVelocity.ToVector3d();
-                    angularVelocity = attachedRigidbody.angularVelocity.ToVector3d();
+                    _velocity = attachedRigidbody.linearVelocity.ToVector3d();
+                    _angularVelocity = attachedRigidbody.angularVelocity.ToVector3d();
                     attachedRigidbody.isKinematic = true;
                     scaledTransform.SwitchToDoubleRigidbody();
                 }
                 else
                 {
                     attachedRigidbody.isKinematic = false;
-                    attachedRigidbody.linearVelocity = velocity.ToVector3();
-                    attachedRigidbody.angularVelocity = angularVelocity.ToVector3();
+                    attachedRigidbody.linearVelocity = _velocity.ToVector3();
+                    attachedRigidbody.angularVelocity = _angularVelocity.ToVector3();
                     scaledTransform.SwitchToRigidbody();
                 }
             }
@@ -55,13 +55,50 @@ public class DoubleRigidbody : MonoBehaviour
     public Rigidbody attachedRigidbody {get; private set;}
     [SerializeField, Tooltip("Switch to rigidbody if speed is below this threshold, DoubleRigidbody if above")] private float speedThreshold = -1;
 
-    public Vector3d velocity;
-    public Vector3d angularVelocity;
+    [SerializeField] private Vector3d _velocity;
+    public Vector3d velocity
+    {
+        get
+        {
+            return _velocity;
+        }
+        set
+        {
+            if (value.sqrMagnitude > speedLimit * speedLimit)
+                return;
+
+            _velocity = value;
+            if (!_active)
+            {
+                attachedRigidbody.linearVelocity = value.ToVector3();
+            }
+        }
+    }
+
+    [SerializeField] private Vector3d _angularVelocity;
+    public Vector3d angularVelocity
+    {
+        get
+        {
+            return _angularVelocity;
+        }
+        set
+        {
+            if (value.sqrMagnitude > speedLimit * speedLimit)
+                return;
+
+            _angularVelocity = value;
+            if (!_active)
+            {
+                attachedRigidbody.angularVelocity = value.ToVector3();
+            }
+        }
+    }
 
     /// <summary>
     /// Event fired when this RB enters collision with another RB in scaled space
     /// </summary>
-    public event Action<DoubleRigidbody, ScaledSpacePhysics.CollisionInfo> OnScaledCollisionEnter;
+    public event Action<ScaledSpacePhysics.CollisionInfo> OnScaledCollisionEnter;
     
     /// <summary>
     /// Event fired when this RB exits collision with another RB in scaled space
@@ -89,32 +126,37 @@ public class DoubleRigidbody : MonoBehaviour
 
     private void OnEnable()
     {
-        if (ScaledSpacePhysics.Instance != null)
-            ScaledSpacePhysics.Instance.RegisterDoubleRigidbody(this);
+        ScaledSpacePhysics.Instance.RegisterDoubleRigidbody(this);
     }
 
     private void OnDisable()
     {
-        if (ScaledSpacePhysics.Instance != null)
-            ScaledSpacePhysics.Instance.UnregisterDoubleRigidbody(this);
+        ScaledSpacePhysics.Instance.UnregisterDoubleRigidbody(this);
     }
 
-    void FixedUpdate()
+    public void PhysicsStep(float deltaTime)
     {
         if (_isKinematic)
             return;
-
+        
         if (_active)
         {
-            scaledTransform.realPosition += velocity * Time.fixedDeltaTime;
-            Quaternion deltaRotation = Quaternion.Euler(Mathf.Rad2Deg * Time.fixedDeltaTime * angularVelocity.ToVector3());
-            transform.rotation *= deltaRotation;
-            Debug.Log($"DoubleRigidbody: {angularVelocity}, delta: {deltaRotation}");
+            scaledTransform.realPosition += _velocity * deltaTime;
+
+            double angularSpeed = _angularVelocity.magnitude;
+            double angle = angularSpeed * deltaTime;
+
+            if (angle > 0.000001)
+            {
+                Vector3 axis = (_angularVelocity / angularSpeed).ToVector3();
+                Quaternion delta = Quaternion.AngleAxis((float)(angle * Mathf.Rad2Deg), axis);
+                transform.rotation = delta * transform.rotation;
+            }
 
             // Can only use rigidbody when speed is below threshold and in world space
             if (speedThreshold != -1 && !scaledTransform.inScaledSpace)
             {
-                double sqrSpeed = velocity.sqrMagnitude;
+                double sqrSpeed = _velocity.sqrMagnitude;
                 if (sqrSpeed < speedThreshold * speedThreshold)
                 {
                     active = false;
@@ -124,8 +166,8 @@ public class DoubleRigidbody : MonoBehaviour
         else
         {
             Vector3 rigidbodyVelocity = attachedRigidbody.linearVelocity;
-            velocity = rigidbodyVelocity.ToVector3d();
-            angularVelocity = attachedRigidbody.angularVelocity.ToVector3d();
+            _velocity = rigidbodyVelocity.ToVector3d();
+            _angularVelocity = attachedRigidbody.angularVelocity.ToVector3d();
             if (speedThreshold != -1 && !scaledTransform.inScaledSpace)
             {
                 float sqrSpeed = rigidbodyVelocity.sqrMagnitude;
@@ -146,13 +188,13 @@ public class DoubleRigidbody : MonoBehaviour
         {
             Vector3d newVelocity = forceMode switch
             {
-                ForceMode.Impulse => velocity + (force / attachedRigidbody.mass),
-                ForceMode.VelocityChange => velocity + force,
-                ForceMode.Acceleration => velocity + (force * Time.fixedDeltaTime),
-                _ => velocity + (force * (Time.fixedDeltaTime / attachedRigidbody.mass)),
+                ForceMode.Impulse => _velocity + (force / attachedRigidbody.mass),
+                ForceMode.VelocityChange => _velocity + force,
+                ForceMode.Acceleration => _velocity + (force * Time.fixedDeltaTime),
+                _ => _velocity + (force * (Time.fixedDeltaTime / attachedRigidbody.mass)),
             };
             if (newVelocity.sqrMagnitude < speedLimit * speedLimit)
-                velocity = newVelocity;
+                _velocity = newVelocity;
         }
         else
         {
@@ -185,15 +227,31 @@ public class DoubleRigidbody : MonoBehaviour
 
         if (_active)
         {
-            Vector3d newVelocity = forceMode switch
+            Quaternion tensorRot = transform.rotation * attachedRigidbody.inertiaTensorRotation;
+            Vector3 localTorque = Quaternion.Inverse(tensorRot) * torque.ToVector3();
+            Vector3 inertia = attachedRigidbody.inertiaTensor;
+
+            Vector3 localAngularAccel = forceMode switch
             {
-                ForceMode.Impulse => angularVelocity + (torque / attachedRigidbody.mass),
-                ForceMode.VelocityChange => angularVelocity + torque,
-                ForceMode.Acceleration => angularVelocity + (torque * Time.fixedDeltaTime),
-                _ => angularVelocity + (torque * (Time.fixedDeltaTime / attachedRigidbody.mass)),
+                ForceMode.Impulse => new Vector3(
+                    localTorque.x / inertia.x,
+                    localTorque.y / inertia.y,
+                    localTorque.z / inertia.z),
+                ForceMode.VelocityChange => localTorque,
+                ForceMode.Acceleration => localTorque * Time.fixedDeltaTime,
+                _ => new Vector3(
+                    localTorque.x * Time.fixedDeltaTime / inertia.x, 
+                    localTorque.y * Time.fixedDeltaTime / inertia.y, 
+                    localTorque.z * Time.fixedDeltaTime / inertia.z)
             };
+            Vector3 worldAngularAccel = tensorRot * localAngularAccel;
+
+            Vector3d newVelocity = _angularVelocity + worldAngularAccel.ToVector3d();
+
             if (newVelocity.sqrMagnitude < speedLimit * speedLimit)
-                angularVelocity = newVelocity;
+            {
+                _angularVelocity = newVelocity;
+            }
         }
         else
         {
@@ -292,39 +350,10 @@ public class DoubleRigidbody : MonoBehaviour
     {
         if (_active) // This only happens when other collision's rigidbody isKinematic=false
         {
-            // Get contact information
-            ContactPoint contact = collision.GetContact(0);
-            Vector3 contactNormal = contact.normal;
-            Vector3 contactPoint = contact.point;
-            
-            // Get relativeVelocity with other rigidbody
-            Rigidbody otherRigidbody = collision.rigidbody;
-            Vector3 relativeVelocity = velocity.ToVector3();
-            if (otherRigidbody != null)
-            {
-                if (otherRigidbody.TryGetComponent<DoubleRigidbody>(out var otherDoubleRigidbody))
-                {
-                    relativeVelocity -= otherDoubleRigidbody.velocity.ToVector3();
-                }
-                else
-                {
-                    relativeVelocity -= otherRigidbody.linearVelocity;
-                }  
-            }
-            
-            // Project onto contact normal
-            float velocityAlongNormal = Vector3.Dot(relativeVelocity, contactNormal);
-            
-            // Don't resolve if velocities are separating
-            if (velocityAlongNormal > 0)
-                return;
-            
-            // Calculate impulse magnitude (simplified elastic collision with equal mass assumption)
-            float impulseMagnitude = -(1 + ScaledSpacePhysics.Instance.restitution) * velocityAlongNormal / 2f;
-            
-            // Apply impulse force and torque in one call
-            Vector3d impulse = (contactNormal * impulseMagnitude).ToVector3d();
-            AddForceAtPosition(impulse, contactPoint.ToVector3d(), ForceMode.Impulse);
+            DoubleRigidbody otherDoubleRB = null;
+            if (collision.rigidbody != null)
+                otherDoubleRB = collision.rigidbody.GetComponent<DoubleRigidbody>();
+            ScaledSpacePhysics.Instance.ResolveCollision(this, otherDoubleRB, collision);
         }
     }
 
@@ -337,9 +366,9 @@ public class DoubleRigidbody : MonoBehaviour
     /// <summary>
     /// Internal method called by ScaledSpacePhysics to raise collision enter event
     /// </summary>
-    internal void RaiseCollisionEnter(DoubleRigidbody other, ScaledSpacePhysics.CollisionInfo collision)
+    internal void RaiseCollisionEnter(ScaledSpacePhysics.CollisionInfo collision)
     {
-        OnScaledCollisionEnter?.Invoke(other, collision);
+        OnScaledCollisionEnter?.Invoke(collision);
     }
 
     /// <summary>
@@ -364,5 +393,14 @@ public class DoubleRigidbody : MonoBehaviour
     internal void RaiseTriggerExit(DoubleRigidbody other)
     {
         OnScaledTriggerExit?.Invoke(other);
+    }
+
+    private void OnDestroy()
+    {
+        // Clear all event listeners
+        OnScaledCollisionEnter = null;
+        OnScaledCollisionExit = null;
+        OnScaledTriggerEnter = null;
+        OnScaledTriggerExit = null;
     }
 }

@@ -1,30 +1,30 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 using SpaceStuff;
+using UnityEngine;
 
 public class Bullet : Projectile
 {
     [SerializeField] private float damageAmount = 10;
 
-    private void OnCollisionEnter(Collision collision)
+    protected override void OnCollide(ScaledSpacePhysics.CollisionInfo collisionInfo)
     {
-        switch(collision.transform.tag)
+        switch(collisionInfo.transformB.tag)
         {
             case "Ship":
-                Ship ship = collision.transform.GetComponent<Ship>();
+                Ship ship = collisionInfo.transformB.GetComponent<Ship>();
                 ship.statSystem.Damage(damageAmount);
                 
                 //ship.PlayBulletEffect(collision.GetContact(0).point, );
                 break;
             case "Torpedo":
-                collision.transform.GetComponent<Torpedo>().Detonate(collision.GetContact(0).point);
+                collisionInfo.transformB.GetComponent<Torpedo>().Detonate(collisionInfo.contactPoint.ToVector3());
                 break;
             case "Shields":
-                collision.transform.GetComponent<Shields>().Damage(damageAmount, collision.GetContact(0).point);
+                collisionInfo.transformB.GetComponent<Shields>().Damage(damageAmount, collisionInfo.contactPoint.ToVector3());
                 break;
             default:
-                if (collision.transform.TryGetComponent<StatSystem>(out var statSystem))
+                if (collisionInfo.transformB.TryGetComponent<StatSystem>(out var statSystem))
                 {
                     statSystem.Damage(damageAmount);
                 }

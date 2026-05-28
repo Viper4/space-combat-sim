@@ -68,6 +68,8 @@ GameObject:
   - component: {fileID: 7915033456189830094}
   - component: {fileID: 7695821888860447494}
   - component: {fileID: 8320035156069566036}
+  - component: {fileID: 9133573074674958829}
+  - component: {fileID: 1587936259041496733}
   m_Layer: 0
   m_Name: Hell Planet
   m_TagString: CelestialBody
@@ -112,6 +114,7 @@ MonoBehaviour:
     y: 1
     z: 1
   minScreenPixelSize: 3
+  visible: 1
   scaledSpaceLayer: 3
   inScaledSpace: 1
   scaleFactor: 1000000
@@ -198,16 +201,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _isKinematic: 0
-  attachedRigidbody: {fileID: 7915033456189830094}
   speedThreshold: 500
-  velocity:
-    x: 0
-    y: 0
-    z: 0
-  angularVelocity:
-    x: 0
-    y: 0
-    z: 0
+  trackTrigger: 0
+  scaledTriggerRadius: 1
 --- !u!114 &8320035156069566036
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -222,3 +218,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TransformChange
   trackPosition: 1
   trackRotation: 0
+--- !u!114 &9133573074674958829
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3884325996069740028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 1155242835
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
+--- !u!114 &1587936259041496733
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3884325996069740028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd05b432c58d5ad41be439478d9c0ad3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
+  ShowTopMostFoldoutHeaderGroup: 1
+  doubleRigidbody: {fileID: 0}
+  team: 
+  radarIcon: {fileID: 0}
+  originalHUDColor: {r: 0, g: 0, b: 0, a: 0}
+  originalRadarColor: {r: 0, g: 0, b: 0, a: 0}
+  originalRadarEmission: {r: 0, g: 0, b: 0, a: 0}
+  turretsTargeting: 0
+  useScaleForBounds: 1
+  boundsRenderers: []

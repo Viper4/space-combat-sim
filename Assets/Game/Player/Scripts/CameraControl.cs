@@ -9,7 +9,6 @@ public class CameraControl : MonoBehaviour
     [SerializeField] private float lerpSpeed = 5f;
     [SerializeField] private float slerpSpeed = 10f;
 
-
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {

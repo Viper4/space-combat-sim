@@ -14,7 +14,9 @@ public class TurretSystem : MonoBehaviour
 
     [SerializeField] private Transform[] turretPoints;
     [HideInInspector] public Turret[] turrets;
-    [SerializeField] private GameObject turretCrosshair;
+    [SerializeField] private GameObject turretCrosshairPrefab;
+    private Transform[] turretCrosshairs;
+    private Image[] turretCrosshairImages;
 
     public bool manualControl = false;
 
@@ -23,17 +25,20 @@ public class TurretSystem : MonoBehaviour
     [SerializeField] private Color crosshairTriggerColor;
     private bool triggerHeld = false;
     [SerializeField] private Color turretNormalColor;
+    [SerializeField] private Color turretHoverColor;
     [SerializeField] private Color turretBlockedColor;
 
     [SerializeField] private Color targetingHUDColor;
 
-    private List<RadarTarget> targetsInRange = new List<RadarTarget>();
+    private List<uint> targetsInRange = new List<uint>();
 
     private void Start()
     {
         ship = GetComponent<Ship>();
 
         turrets = new Turret[turretPoints.Length];
+        turretCrosshairs = new Transform[turretPoints.Length];
+        turretCrosshairImages = new Image[turretPoints.Length];
         if (ship.shields != null)
         {
             Collider shieldCollider = ship.shields.colliderObject.GetComponent<Collider>();
@@ -41,7 +46,9 @@ public class TurretSystem : MonoBehaviour
             {
                 turrets[i] = turretPoints[i].GetChild(0).GetComponent<Turret>();
                 turrets[i].IgnoreCollider(shieldCollider);
-                Instantiate(turretCrosshair, _HUDSystem.combatPanel);
+                GameObject newCrosshair = Instantiate(turretCrosshairPrefab, _HUDSystem.combatPanel);
+                turretCrosshairs[i] = newCrosshair.transform;
+                turretCrosshairImages[i] = newCrosshair.GetComponent<Image>();
             }
         }
         else
@@ -49,7 +56,9 @@ public class TurretSystem : MonoBehaviour
             for (int i = 0; i < turretPoints.Length; i++)
             {
                 turrets[i] = turretPoints[i].GetChild(0).GetComponent<Turret>();
-                Instantiate(turretCrosshair, _HUDSystem.combatPanel);
+                GameObject newCrosshair = Instantiate(turretCrosshairPrefab, _HUDSystem.combatPanel);
+                turretCrosshairs[i] = newCrosshair.transform;
+                turretCrosshairImages[i] = newCrosshair.GetComponent<Image>();
             }
         }
     }
@@ -58,42 +67,44 @@ public class TurretSystem : MonoBehaviour
     {
         if (manualControl)
         {
-            Vector3 crosshairDirection = _HUDSystem.mainCrosshair.transform.position - ship.pilotPoint.position;
+            if (_HUDSystem.combatHudActive)
+            {
+                Vector3 crosshairDirection = _HUDSystem.mainCrosshair.transform.position - ship.pilotPoint.position;
 
-            if (Physics.Raycast(_HUDSystem.mainCrosshair.transform.position, crosshairDirection, out RaycastHit hit, Mathf.Infinity, ~ship.ignoreLayers))
-            {
-                if (!triggerHeld)
-                    _HUDSystem.mainCrosshair.color = crosshairHoverColor;
-            }
-            else
-            {
-                if (!triggerHeld)
-                    _HUDSystem.mainCrosshair.color = crosshairNormalColor;
-            }
-
-            for (int i = 0; i < turrets.Length; i++)
-            {
-                Turret turret = turrets[i];
-                turret.aimDirection = hit.point - turret.firePoint.position;
-                Transform turretCrosshair = _HUDSystem.combatPanel.GetChild(i + 1);
-                Vector3 turretHitPoint;
-                if (turret.GetObstruction(out RaycastHit turretHit))
+                if (Physics.Raycast(_HUDSystem.mainCrosshair.transform.position, crosshairDirection, out RaycastHit hit, Mathf.Infinity, ~ship.ignoreLayers))
                 {
-                    if (turretHit.transform != transform)
-                        turretCrosshair.GetComponent<Image>().color = turretNormalColor;
-                    else
-                        turretCrosshair.GetComponent<Image>().color = turretBlockedColor;
-                    turretHitPoint = turretHit.point;
+                    if (!triggerHeld)
+                        _HUDSystem.mainCrosshair.color = crosshairHoverColor;
                 }
                 else
                 {
-                    turretCrosshair.GetComponent<Image>().color = turretNormalColor;
-                    turretHitPoint = turret.firePoint.position + turret.firePoint.forward * 1000;
+                    if (!triggerHeld)
+                        _HUDSystem.mainCrosshair.color = crosshairNormalColor;
                 }
 
-                if (RectTransformUtility.ScreenPointToWorldPointInRectangle(_HUDSystem.combatPanel, Camera.main.WorldToScreenPoint(turretHitPoint), Camera.main, out Vector3 turretCrosshairPos))
+                for (int i = 0; i < turrets.Length; i++)
                 {
-                    turretCrosshair.position = turretCrosshairPos;
+                    Turret turret = turrets[i];
+                    turret.aimDirection = hit.point - turret.firePoint.position;
+                    Vector3 turretHitPoint;
+                    if (turret.GetObstruction(out RaycastHit turretHit))
+                    {
+                        if (turretHit.transform != transform)
+                            turretCrosshairImages[i].color = turretHoverColor;
+                        else
+                            turretCrosshairImages[i].color = turretBlockedColor;
+                        turretHitPoint = turretHit.point;
+                    }
+                    else
+                    {
+                        turretCrosshairImages[i].color = turretNormalColor;
+                        turretHitPoint = turret.firePoint.position + turret.firePoint.forward * 5000;
+                    }
+
+                    if (RectTransformUtility.ScreenPointToWorldPointInRectangle(_HUDSystem.combatPanel, Camera.main.WorldToScreenPoint(turretHitPoint), Camera.main, out Vector3 turretCrosshairPos))
+                    {
+                        turretCrosshairs[i].position = turretCrosshairPos;
+                    }
                 }
             }
         }
@@ -101,61 +112,95 @@ public class TurretSystem : MonoBehaviour
         {
             for (int i = targetsInRange.Count - 1; i >= 0; i--)
             {
-                if (targetsInRange[i] == null)
+                uint targetID = targetsInRange[i];
+                if (!RadarRegistry.TryGet(targetsInRange[i], out var radarTarget))
                 {
                     targetsInRange.RemoveAt(i);
                     continue;
                 }
-                uint targetID = targetsInRange[i].GetID();
 
-                if (targetsInRange[i].turretsTargeting <= 0)
+                if (radarTarget.turretsTargeting <= 0)
                 {
                     if (_HUDSystem.TryGetValue(targetID, out HUDObject targetHUDObject))
                     {
                         targetHUDObject.SetTargetText("");
-                        targetHUDObject.SetColor(targetsInRange[i].originalHUDColor);
+                        targetHUDObject.SetColor(radarTarget.originalHUDColor);
                     }
-                    if (targetsInRange[i].radarIcon != null)
-                        targetsInRange[i].radarIcon.SetColor(targetsInRange[i].originalRadarColor, targetsInRange[i].originalRadarEmission);
+                    if (radarTarget.radarIcon != null)
+                        radarTarget.radarIcon.SetColor(radarTarget.originalRadarColor, radarTarget.originalRadarEmission);
                     continue;
                 }
 
-                /*Vector3 relativeVelocity = ship.velocity - targetsInRange[i].velocity;
-                Vector3 relativeAcceleration = ship.acceleration - targetsInRange[i].acceleration;
-                float closingSpeed = Vector3.Dot(relativeVelocity, targetsInRange[i].direction);
-                float closingAcceleration = Vector3.Dot(relativeAcceleration, targetsInRange[i].direction);
+                /*Vector3 relativeVelocity = ship.velocity - radarTarget.velocity;
+                Vector3 relativeAcceleration = ship.acceleration - radarTarget.acceleration;
+                float closingSpeed = Vector3.Dot(relativeVelocity, radarTarget.direction);
+                float closingAcceleration = Vector3.Dot(relativeAcceleration, radarTarget.direction);
 
-                float arrivalTime = CustomMethods.CalculateArrivalTime(closingAcceleration, closingSpeed, targetsInRange[i].distance);
+                float arrivalTime = CustomMethods.CalculateArrivalTime(closingAcceleration, closingSpeed, radarTarget.distance);
                 string ETA = arrivalTime < 0 ? "Never" : CustomMethods.SecondsToFormattedString(arrivalTime, 2);
-                string details = "Distance: " + CustomMethods.DistanceToFormattedString(targetsInRange[i].distance, 2) +
-                    "\nSpeed: " + CustomMethods.SpeedToFormattedString(targetsInRange[i].velocity.magnitude, 2) +
+                string details = "Distance: " + CustomMethods.DistanceToFormattedString(radarTarget.distance, 2) +
+                    "\nSpeed: " + CustomMethods.SpeedToFormattedString(radarTarget.velocity.magnitude, 2) +
                     "\nClosing Speed: " + CustomMethods.SpeedToFormattedString(closingSpeed, 2) +
                     "\nETA: " + ETA;*/
 
                 if (_HUDSystem.TryGetValue(targetID, out HUDObject _targetHUDObject))
                 {
-                    //_HUDSystem.UpdateObject(targetID, targetsInRange[i].transform, targetsInRange[i].transform.name, details);
-                    _targetHUDObject.SetTargetText(targetsInRange[i].turretsTargeting.ToString());
-                    if (targetsInRange[i].originalHUDColor == Color.clear)
-                        targetsInRange[i].originalHUDColor = _targetHUDObject.GetColor();
+                    //_HUDSystem.UpdateObject(targetID, radarTarget.transform, radarTarget.transform.name, details);
+                    _targetHUDObject.SetTargetText(radarTarget.turretsTargeting.ToString());
+                    if (radarTarget.originalHUDColor == Color.clear)
+                        radarTarget.originalHUDColor = _targetHUDObject.GetColor();
 
                     _targetHUDObject.SetColor(targetingHUDColor);
                 }
                 /*else
                 {
-                    HUDObject newHUDObject = _HUDSystem.CreateObject(targetID, targetsInRange[i].transform, targetsInRange[i].transform.name, details);
-                    newHUDObject.SetTargetText(targetsInRange[i].turretsTargeting.ToString());
-                    if (targetsInRange[i].originalHUDColor == Color.clear)
-                        targetsInRange[i].originalHUDColor = newHUDObject.GetColor();
+                    HUDObject newHUDObject = _HUDSystem.CreateObject(targetID, radarTarget.transform, radarTarget.transform.name, details);
+                    newHUDObject.SetTargetText(radarTarget.turretsTargeting.ToString());
+                    if (radarTarget.originalHUDColor == Color.clear)
+                        radarTarget.originalHUDColor = newHUDObject.GetColor();
                     newHUDObject.SetColor(targetingHUDColor);
                 }*/
 
-                if (targetsInRange[i].originalRadarColor == Color.clear)
+                if (radarTarget.originalRadarColor == Color.clear)
                 {
-                    targetsInRange[i].originalRadarColor = targetsInRange[i].radarIcon.GetColor();
-                    targetsInRange[i].originalRadarEmission = targetsInRange[i].radarIcon.GetEmission();
+                    radarTarget.originalRadarColor = radarTarget.radarIcon.GetColor();
+                    radarTarget.originalRadarEmission = radarTarget.radarIcon.GetEmission();
                 }
-                targetsInRange[i].radarIcon.SetColor(targetingHUDColor, targetingHUDColor);
+                radarTarget.radarIcon.SetColor(targetingHUDColor, targetingHUDColor);
+            }
+
+            if (_HUDSystem.combatHudActive)
+            {
+                for (int i = 0; i < turrets.Length; i++)
+                {
+                    Turret turret = turrets[i];
+                    Vector3 turretHitPoint;
+                    if (turret.GetObstruction(out RaycastHit turretHit))
+                    {
+                        if (turretHit.transform != transform)
+                            turretCrosshairImages[i].color = turretHoverColor;
+                        else
+                            turretCrosshairImages[i].color = turretBlockedColor;
+                        turretHitPoint = turretHit.point;
+                    }
+                    else
+                    {
+                        turretCrosshairImages[i].color = turretNormalColor;
+                        turretHitPoint = turret.firePoint.position + turret.firePoint.forward * 1000;
+                    }
+
+                    Vector3 screenHit = Camera.main.WorldToScreenPoint(turretHitPoint);
+                    if (screenHit.z <= 0)
+                    {
+                        turretCrosshairImages[i].color = Color.clear;
+                        continue;
+                    }
+
+                    if (RectTransformUtility.ScreenPointToWorldPointInRectangle(_HUDSystem.combatPanel, screenHit, Camera.main, out Vector3 turretCrosshairPos))
+                    {
+                        turretCrosshairs[i].position = turretCrosshairPos;
+                    }
+                }
             }
         }
     }
@@ -196,11 +241,12 @@ public class TurretSystem : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!other.isTrigger && other.TryGetComponent<RadarTarget>(out var otherRadarTarget))
+        if (!other.isTrigger && other.TryGetComponent<RadarTarget>(out var otherRadarTarget) && otherRadarTarget.GetID() != ship.GetID())
         {
             if (otherRadarTarget.team == ship.team)
                 return;
-            targetsInRange.Add(otherRadarTarget);
+            uint targetID = otherRadarTarget.GetID();
+            targetsInRange.Add(targetID);
             for (int i = 0; i < turrets.Length; i++)
             {
                 turrets[i].AddTarget(otherRadarTarget);
@@ -212,7 +258,8 @@ public class TurretSystem : MonoBehaviour
     {
         if (!other.isTrigger && other.TryGetComponent<RadarTarget>(out var otherRadarTarget))
         {
-            targetsInRange.Remove(otherRadarTarget);
+            uint targetID = otherRadarTarget.GetID();
+            targetsInRange.Remove(targetID);
             for (int i = 0; i < turrets.Length; i++)
             {
                 turrets[i].RemoveTarget(otherRadarTarget);

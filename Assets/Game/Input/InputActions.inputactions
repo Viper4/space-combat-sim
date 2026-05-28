@@ -88,7 +88,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "HUDToggle",
+                    "name": "RadarHUDToggle",
                     "type": "Button",
                     "id": "44cdc14d-42ba-4bf6-b0e0-2b474720e963",
                     "expectedControlType": "",
@@ -100,6 +100,15 @@
                     "name": "RadarToggle",
                     "type": "Button",
                     "id": "3987e0c6-1758-4609-b4ae-bed7a6d93450",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "CombatHUDToggle",
+                    "type": "Button",
+                    "id": "67cc0592-9e27-45c1-947a-fb2b7364199f",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -127,6 +136,15 @@
                     "name": "RollYawToggle",
                     "type": "Button",
                     "id": "7e9867c2-f9cc-41b4-a1a9-3dec220faa3a",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "LaunchModeToggle",
+                    "type": "Button",
+                    "id": "26676464-9fd1-441a-8773-49ff3925f524",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -405,7 +423,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "HUDToggle",
+                    "action": "RadarHUDToggle",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -439,6 +457,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "ShieldToggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "9f8e22a7-71b2-4669-bd51-78e123191d48",
+                    "path": "<Keyboard>/l",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LaunchModeToggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f29b7c6a-3294-4447-b3c4-8739e6503c18",
+                    "path": "<Keyboard>/g",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "CombatHUDToggle",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

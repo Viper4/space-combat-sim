@@ -5,13 +5,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-[RequireComponent(typeof(ScaledTransform))]
+[RequireComponent(typeof(ScaledTransform)), RequireComponent(typeof(DoubleRigidbody))]
 public class CelestialBody : MonoBehaviour
 {
     private const float v = 4 / 3 * Mathf.PI;
 
     private CelestialBodyGenerator generator;
-    private Rigidbody _rigidbody;
     private DoubleRigidbody doubleRigidbody;
 
     [HideInInspector] public bool generationSettingsFoldout;
@@ -27,9 +26,12 @@ public class CelestialBody : MonoBehaviour
 
     private List<DoubleRigidbody> thingsInGravity = new List<DoubleRigidbody>();
 
+    private bool initialized;
+
     private void Start()
     {
         scaledTransform = GetComponent<ScaledTransform>();
+        doubleRigidbody = GetComponent<DoubleRigidbody>();
         if (TryGetComponent(out generator))
         {
             if(!generationSettings.random)
@@ -111,29 +113,27 @@ public class CelestialBody : MonoBehaviour
         else
             transform.localScale = scale;
 
-        if (TryGetComponent(out _rigidbody))
+        if(generationSettings.calculateMass)
+            doubleRigidbody.attachedRigidbody.mass = generationSettings.density * v * scale.x * scale.x * scale.x;
+        if(systemCenter != null)
         {
-            doubleRigidbody = GetComponent<DoubleRigidbody>();
-            if(generationSettings.calculateMass)
-                _rigidbody.mass = generationSettings.density * v * scale.x * scale.x * scale.x;
-            if(systemCenter != null)
-            {
-                StartCoroutine(SetOrbitalVelocity());
-            }
-            Vector3 min = generationSettings.initialAngularVelocityRange[0];
-            Vector3 max = generationSettings.initialAngularVelocityRange[1];
-
-            _rigidbody.angularVelocity = new Vector3(Random.Range(min.x, max.x), Random.Range(min.y, max.y), Random.Range(min.z, max.z));
+            StartCoroutine(SetOrbitalVelocity());
         }
+        Vector3 min = generationSettings.initialAngularVelocityRange[0];
+        Vector3 max = generationSettings.initialAngularVelocityRange[1];
+
+        doubleRigidbody.angularVelocity = new Vector3d(Random.Range(min.x, max.x), Random.Range(min.y, max.y), Random.Range(min.z, max.z));
         if (TryGetComponent<SpaceLight>(out var spaceLight))
         {
             spaceLight.Init(scale.x);
         }
+
+        initialized = true;
     }
 
     public bool Initialized()
     {
-        return scale != Vector3.zero;
+        return initialized;
     }
 
     /* shipMass * g = (shipMass * v^2) / distance
@@ -148,15 +148,7 @@ public class CelestialBody : MonoBehaviour
         double g = systemCenter.CalculateGravityAcceleration(scaledTransform.realPosition);
         double distance = Vector3d.Distance(scaledTransform.realPosition, systemCenter.scaledTransform.realPosition);
         Vector3d orbitVelocity = Math.Sqrt(distance * g) * perpendicular;
-
-        if (doubleRigidbody != null && doubleRigidbody.active)
-        {
-            doubleRigidbody.velocity = orbitVelocity;
-        }
-        else
-        {
-            _rigidbody.linearVelocity = orbitVelocity.ToVector3();
-        }
+        doubleRigidbody.velocity = orbitVelocity;
     }
 
     private void FixedUpdate()

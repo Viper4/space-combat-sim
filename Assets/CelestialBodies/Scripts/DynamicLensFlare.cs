@@ -61,7 +61,7 @@ public class DynamicLensFlare : MonoBehaviour
                 else
                 {
                     samples[sampleIndex] = 1;
-                    Debug.DrawRay(ray.origin, ray.direction * 9999f, Color.red, Time.fixedDeltaTime);
+                    Debug.DrawLine(ray.origin, hit.point, Color.red, Time.fixedDeltaTime);
                 }
             }
             else

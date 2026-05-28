@@ -6,6 +6,7 @@ public class HoverInteractable : MonoBehaviour
 {
     [SerializeField] private Transform meshTransform;
 
+    [SerializeField] private bool clickable = true;
     private bool hovered = false;
     [SerializeField, Tooltip("0 to maxState states inclusive")] private int maxState = 1;
     private int state = 0;
@@ -74,7 +75,7 @@ public class HoverInteractable : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (hovered && GameManager.Instance.inputActions.UI.Click.WasPressedThisFrame())
+        if (clickable && hovered && GameManager.Instance.inputActions.UI.Click.WasPressedThisFrame())
         {
             Interact(default);
         }

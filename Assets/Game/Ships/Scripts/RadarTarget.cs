@@ -2,64 +2,60 @@ using UnityEngine;
 using SpaceStuff;
 using Unity.Netcode;
 
+[RequireComponent(typeof(DoubleRigidbody))]
 public class RadarTarget : NetworkBehaviour
 {
-    public uint id;
+    private uint id;
 
-    [Header("RadarTarget")] public ScaledTransform scaledTransform;
-    public DoubleRigidbody doubleRigidbody;
-    public Rigidbody attachedRB;
-    public string team;
+    [HideInInspector] public DoubleRigidbody doubleRigidbody;
+    [Header("RadarTarget")] public string team;
 
     // Assuming only one radar
-    [HideInInspector] public RadarIcon radarIcon;
-    [HideInInspector] public Vector3 direction;
-    [HideInInspector] public float arrivalTime;
-    [HideInInspector] public float distance;
-    [HideInInspector] public float speed;
+    [HideInInspector] public RadarIcon radarIcon;    
     [HideInInspector] public Color originalHUDColor;
     [HideInInspector] public Color originalRadarColor;
     [HideInInspector] public Color originalRadarEmission;
     [HideInInspector] public uint turretsTargeting;
 
-    public Vector3 velocity { get; private set; }
-    private Vector3 lastVelocity;
-    public Vector3 acceleration { get; private set; }
-    private bool calculateAcceleration = true;
+    private Metrics metrics;
+    private Vector3d lastVelocity;
     private float inverseFixedDeltaTime;
+
+    public bool useScaleForBounds;
+    /// <summary>
+    /// Renderers to use when calculating this radar target's bounds. Set in editor. If empty, will default to all renderers tracked by the ScaledTransform.
+    /// </summary>
+    public Renderer[] boundsRenderers;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     protected virtual void Start()
     {
-        if(scaledTransform == null)
-            TryGetComponent(out scaledTransform);
-        if(doubleRigidbody == null)
-            TryGetComponent(out doubleRigidbody);
-        if(attachedRB == null)
-            TryGetComponent(out attachedRB);
+        doubleRigidbody = GetComponent<DoubleRigidbody>();
 
-        if (attachedRB == null && doubleRigidbody == null)
-            calculateAcceleration = false;
+        if (!useScaleForBounds && (boundsRenderers == null || boundsRenderers.Length == 0))
+        {
+            boundsRenderers = doubleRigidbody.scaledTransform.GetTrackedRenderers();
+        }
 
         inverseFixedDeltaTime = 1f / Time.fixedDeltaTime;
+        metrics = new Metrics
+        {
+            acceleration = Vector3d.zero,
+            direction = Vector3.zero,
+            distance = -1f,
+            speed = 0f,
+            arrivalTime = -1f
+        };
 
         id = RadarRegistry.Register(this);
     }
 
     protected virtual void FixedUpdate()
     {
-        if ((IsOwner || GameManager.Instance.offlineMode) && calculateAcceleration)
+        if (IsOwner || GameManager.Instance.offlineMode)
         {
-            if (doubleRigidbody != null)
-            {
-                velocity = attachedRB.linearVelocity;
-            }
-            else if (attachedRB != null)
-            {
-                velocity = doubleRigidbody.velocity.ToVector3();
-            }
-            acceleration = (velocity - lastVelocity) * inverseFixedDeltaTime;
-            lastVelocity = velocity;
+            metrics.acceleration = (doubleRigidbody.velocity - lastVelocity) * inverseFixedDeltaTime;
+            lastVelocity = doubleRigidbody.velocity;
         }
     }
 
@@ -72,5 +68,42 @@ public class RadarTarget : NetworkBehaviour
     public uint GetID()
     {
         return id;
+    }
+
+    /// <summary>
+    /// Returns the current metrics of this radar target. Metrics should be relative to the Owner's ship
+    /// </summary>
+    /// <returns></returns>
+    public Metrics GetMetrics()
+    {
+        return metrics;
+    }
+
+    /// <summary>
+    /// Updates the metrics of this radar target. 
+    /// Should be called by the Owner's ship after calculating relative metrics for this target like in the Radar.
+    /// </summary>
+    /// <param name="direction"></param>
+    /// <param name="distance"></param>
+    /// <param name="speed"></param>
+    /// <param name="closingSpeed"></param>
+    /// <param name="arrivalTime"></param>
+    public void UpdateMetrics(Vector3 direction, float distance, float speed, float closingSpeed, float arrivalTime)
+    {
+        metrics.direction = direction;
+        metrics.distance = distance;
+        metrics.speed = speed;
+        metrics.closingSpeed = closingSpeed;
+        metrics.arrivalTime = arrivalTime;
+    }
+
+    public struct Metrics
+    {
+        public Vector3d acceleration;
+        public Vector3 direction;
+        public float distance;
+        public float speed;
+        public float closingSpeed;
+        public float arrivalTime;
     }
 }

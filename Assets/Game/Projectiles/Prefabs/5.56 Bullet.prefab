@@ -279,17 +279,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
   _isKinematic: 0
-  attachedRigidbody: {fileID: 7224114103417245678}
-  lowerVelocityThreshold: 450
-  upperVelocityThreshold: 550
-  velocity:
-    x: 0
-    y: 0
-    z: 0
-  angularVelocity:
-    x: 0
-    y: 0
-    z: 0
+  speedThreshold: -1
+  trackTrigger: 0
+  scaledTriggerRadius: 1
 --- !u!114 &9008321704609613152
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -306,8 +298,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 36
   destroyDelay: 10
-  shieldRippleDuration: 1
-  shieldRippleMagnitude: 1
   damageAmount: 10
 --- !u!114 &9044496995838638813
 MonoBehaviour:
@@ -321,19 +311,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 660b2028be04cb445a20efd3df3e65c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScaledTransform
-  inScaledSpace: 0
-  _position:
+  _realPosition:
     x: 0
-    y: 0
-    z: 0
-  _scale:
+    y: 0.6000000238418579
+    z: 6.599999904632568
+  _realScale:
     x: 1
     y: 1
     z: 1
+  minScreenPixelSize: 3
+  visible: 1
+  scaledSpaceLayer: 3
+  inScaledSpace: 0
   scaleFactor: 1000
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
-  scaledSpaceLayer: 3
 --- !u!114 &4843936539018863421
 MonoBehaviour:
   m_ObjectHideFlags: 0

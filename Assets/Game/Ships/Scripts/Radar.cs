@@ -10,8 +10,9 @@ public class Radar : MonoBehaviour
 
     public bool active = true;
     [SerializeField] private float[] radarRanges;
-    [SerializeField] private int rangeIndex = 0;
-    private List<RadarTarget> targetsInRange = new List<RadarTarget>();
+    private int rangeIndex = 0;
+    [SerializeField] private float[] iconRadii;
+    private List<uint> targetsInTrigger = new List<uint>();
     [SerializeField] private SphereCollider triggerCollider;
 
     [SerializeField] private GameObject iconParent;
@@ -24,8 +25,12 @@ public class Radar : MonoBehaviour
     [SerializeField] private Color hostileShipEmission;
 
     [SerializeField] private GameObject pointIcon;
-    [SerializeField] private Color projectileColor;
-    [SerializeField] private Color projectileEmission;
+
+    [SerializeField] private Color friendlyProjectileColor;
+    [SerializeField] private Color friendlyProjectileEmission;
+    [SerializeField] private Color hostileProjectileColor;
+    [SerializeField] private Color hostileProjectileEmission;
+
     [SerializeField] private Color celestialBodyColor;
     [SerializeField] private Color celestialBodyEmission;
 
@@ -35,7 +40,9 @@ public class Radar : MonoBehaviour
     {
         if(ship != null)
         {
-            targetsInRange.Add(ship);
+            RadarIcon newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
+            newIcon.Init(iconParent.transform.position, transform.rotation, friendlyShipColor, friendlyShipEmission, "", true);
+            ship.radarIcon = newIcon;
         }
     }
 
@@ -43,80 +50,169 @@ public class Radar : MonoBehaviour
     {
         if (active)
         {
-            for (int i = targetsInRange.Count - 1; i >= 0; i--)
+            for (int i = targetsInTrigger.Count - 1; i >= 0; i--)
             {
-                RadarTarget radarTarget = targetsInRange[i];
-                if (radarTarget == null)
+                uint targetID = targetsInTrigger[i];
+                if (targetID == ship.GetID())
                 {
-                    targetsInRange.RemoveAt(i);
+                    targetsInTrigger.RemoveAt(i);
+                    continue;
+                }
+                if (!RadarRegistry.TryGet(targetID, out var radarTarget))
+                {
+                    targetsInTrigger.RemoveAt(i);
                     continue;
                 }
 
-                if (radarTarget.scaledTransform != null && radarTarget.scaledTransform.inScaledSpace)
+                if (radarTarget.doubleRigidbody.scaledTransform != null)
                 {
-                    double sqrDistance = (radarTarget.scaledTransform.realPosition - ship.scaledTransform.realPosition).sqrMagnitude;
+                    double sqrDistance = (radarTarget.doubleRigidbody.scaledTransform.realPosition - ship.doubleRigidbody.scaledTransform.realPosition).sqrMagnitude;
                     if (sqrDistance > (radarRanges[rangeIndex] * radarRanges[rangeIndex]))
                     {
-                        targetsInRange.RemoveAt(i);
                         continue;
                     }
                 }
 
-                uint targetID = radarTarget.GetID();
-                if (targetID == ship.GetID())
+                Vector3d relativePosition;
+                // Floating world origin only updates scaled transform's position on origin shifts, so need to calculate offset manually
+                if (radarTarget.doubleRigidbody.scaledTransform != null)
                 {
-                    if (hologramActive)
-                    {
-                        if (ship.radarIcon != null)
-                        {
-                            ship.radarIcon.UpdateIcon(iconParent.transform.position, "You");
-                        }
-                        else
-                        {
-                            RadarIcon newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
-                            newIcon.Init(iconParent.transform.position, transform.rotation, friendlyShipColor, friendlyShipEmission, "You");
-                            ship.radarIcon = newIcon;
-                        }
-                        //ship.radarIcon.model.rotation = transform.rotation;
-                    }
+                    relativePosition = radarTarget.doubleRigidbody.scaledTransform.realPosition - ship.doubleRigidbody.scaledTransform.realPosition;
                 }
-                else 
+                else
                 {
-                    Vector3d relativePosition;
-                    // Floating world origin only updates scaled transform's position on origin shifts, so need to calculate offset manually
-                    if (radarTarget.scaledTransform != null)
+                    relativePosition = radarTarget.transform.position.ToVector3d() - ship.doubleRigidbody.scaledTransform.realPosition;
+                }
+                double distance = relativePosition.magnitude;
+                Vector3 direction = (relativePosition / distance).ToVector3();
+
+                RadarTarget.Metrics shipMetrics = ship.GetMetrics();
+                RadarTarget.Metrics targetMetrics = radarTarget.GetMetrics();
+
+                Vector3 relativeVelocity = ship.doubleRigidbody.velocity.ToVector3() - radarTarget.doubleRigidbody.velocity.ToVector3();
+                Vector3 relativeAcceleration = shipMetrics.acceleration.ToVector3() - targetMetrics.acceleration.ToVector3();
+                // Positive closing => getting closer, Negative closing => moving away
+                float closingSpeed = Vector3.Dot(relativeVelocity, direction);
+                float closingAcceleration = Vector3.Dot(relativeAcceleration, direction);
+
+                float arrivalTime = SpaceMath.CalculateArrivalTime(closingAcceleration, closingSpeed, (float)distance);
+
+                // Update metrics for use in other places like the HUD
+                float speed = (float)radarTarget.doubleRigidbody.velocity.magnitude;
+                radarTarget.UpdateMetrics(direction, (float)distance, speed, closingSpeed, arrivalTime);
+
+                string ETA = arrivalTime < 0.0001f ? "Never" : SpaceMath.SecondsToFormattedString(arrivalTime, 2);
+                string details = "<b>" + radarTarget.name + "</b>" +
+                    "\nDST " + SpaceMath.DistanceToFormattedString(distance, 2) +
+                    "\nSPD " + SpaceMath.SpeedToFormattedString(speed, 2) +
+                    "\nREL " + SpaceMath.SpeedToFormattedString(closingSpeed, 2) +
+                    "\nETA " + ETA;
+
+                if (hologramActive)
+                {
+                    // Display on radar hologram
+                    Vector3 offset = direction * (float)(distance / radarRanges[rangeIndex] * 0.5);
+                    offset.x *= hologramScale.x;
+                    offset.y *= hologramScale.y;
+                    offset.z *= hologramScale.z;
+                    Vector3 iconScale = 2 * iconRadii[rangeIndex] * Vector3.one;
+
+                    if (radarTarget.radarIcon != null)
                     {
-                        relativePosition = radarTarget.scaledTransform.realPosition - ship.scaledTransform.realPosition;
+                        radarTarget.radarIcon.UpdateIcon(iconParent.transform.position + offset, radarTarget.transform.rotation, radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, 2));
+                        if (radarTarget.transform.CompareTag("CelestialBody"))
+                        {
+                            Vector3d realScale = radarTarget.doubleRigidbody.scaledTransform.realScale;
+                            iconScale = new Vector3(
+                                (float)(realScale.x / radarRanges[rangeIndex] * hologramScale.x),
+                                (float)(realScale.y / radarRanges[rangeIndex] * hologramScale.y),
+                                (float)(realScale.z / radarRanges[rangeIndex] * hologramScale.z)
+                            );
+                        }
+                        radarTarget.radarIcon.model.localScale = iconScale;
                     }
                     else
                     {
-                        relativePosition = radarTarget.transform.position.ToVector3d() - ship.scaledTransform.realPosition;
+                        RadarIcon newIcon;
+                        Color iconColor;
+                        Color iconEmission;
+                        switch (radarTarget.transform.tag)
+                        {
+                            case "Ship":
+                                newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
+                                if (radarTarget.team == ship.team)
+                                {
+                                    iconColor = friendlyShipColor;
+                                    iconEmission = friendlyShipEmission;
+                                }
+                                else
+                                {
+                                    iconColor = hostileShipColor;
+                                    iconEmission = hostileShipEmission;
+                                }
+                                break;
+                            case "Projectile":
+                                newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
+                                if (radarTarget.team == ship.team)
+                                {
+                                    iconColor = friendlyProjectileColor;
+                                    iconEmission = friendlyProjectileEmission;
+                                }
+                                else
+                                {
+                                    iconColor = hostileProjectileColor;
+                                    iconEmission = hostileProjectileEmission;
+                                }
+                                break;
+                            case "Torpedo":
+                                newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
+                                if (radarTarget.team == ship.team)
+                                {
+                                    iconColor = friendlyProjectileColor;
+                                    iconEmission = friendlyProjectileEmission;
+                                }
+                                else
+                                {
+                                    iconColor = hostileProjectileColor;
+                                    iconEmission = hostileProjectileEmission;
+                                }
+                                break;
+                            case "CelestialBody":
+                                newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
+                                iconColor = celestialBodyColor;
+                                iconEmission = celestialBodyEmission;
+                                Vector3d realScale = radarTarget.doubleRigidbody.scaledTransform.realScale;
+                                iconScale = new Vector3(
+                                    (float)(realScale.x / radarRanges[rangeIndex] * hologramScale.x),
+                                    (float)(realScale.y / radarRanges[rangeIndex] * hologramScale.y),
+                                    (float)(realScale.z / radarRanges[rangeIndex] * hologramScale.z)
+                                );
+                                break;
+                            default:
+                                newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
+                                iconColor = Color.white;
+                                iconEmission = Color.white;
+                                break;
+                        }
+                        newIcon.model.localScale = iconScale;
+
+                        newIcon.Init(
+                            iconParent.transform.position + offset, 
+                            radarTarget.transform.rotation, 
+                            iconColor, 
+                            iconEmission, 
+                            radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, 2),
+                            false
+                        );
+                        radarTarget.radarIcon = newIcon;
                     }
-                    double distance = relativePosition.magnitude;
-                    Vector3 direction = (relativePosition / distance).ToVector3();
+                }
 
-                    Vector3 relativeVelocity = ship.velocity - radarTarget.velocity;
-                    Vector3 relativeAcceleration = ship.acceleration - radarTarget.acceleration;
-                    float closingSpeed = Vector3.Dot(relativeVelocity, direction);
-                    float closingAcceleration = Vector3.Dot(relativeAcceleration, direction);
-
-                    float arrivalTime = CustomMethods.CalculateArrivalTime(closingAcceleration, closingSpeed, (float)distance);
-
-                    // Update metrics for use in other places like the HUD
-                    radarTarget.direction = direction;
-                    radarTarget.arrivalTime = arrivalTime;
-                    radarTarget.distance = (float)distance;
-                    radarTarget.speed = radarTarget.velocity.magnitude;
-
-                    string ETA = arrivalTime < 0.001f ? "Never" : CustomMethods.SecondsToFormattedString(arrivalTime, 2);
-                    string details = "Distance: " + CustomMethods.DistanceToFormattedString(distance, 2) +
-                        "\nSpeed: " + CustomMethods.SpeedToFormattedString(radarTarget.speed, 2) +
-                        "\nClosing Speed: " + CustomMethods.SpeedToFormattedString(closingSpeed, 2) +
-                        "\nETA: " + ETA;
-
-                    if (!_HUDSystem.UpdateObject(targetID, radarTarget.transform, radarTarget.transform.name, details))
+                if (_HUDSystem.radarHudActive)
+                {
+                    if (!_HUDSystem.UpdateObject(targetID, radarTarget, details))
                     {
-                        HUDObject newHUDObject = _HUDSystem.CreateObject(targetID, radarTarget.transform, radarTarget.transform.name, details);
+                        HUDObject newHUDObject = _HUDSystem.CreateObject(targetID, radarTarget, details);
                         switch (radarTarget.transform.tag)
                         {
                             case "Ship":
@@ -130,77 +226,31 @@ public class Radar : MonoBehaviour
                                 }
                                 break;
                             case "Projectile":
-                                newHUDObject.SetColor(projectileColor);
+                                if (radarTarget.team == ship.team)
+                                {
+                                    newHUDObject.SetColor(friendlyProjectileColor);
+                                }
+                                else
+                                {
+                                    newHUDObject.SetColor(hostileProjectileColor);
+                                }
                                 break;
                             case "Torpedo":
-                                newHUDObject.SetColor(projectileColor);
+                                if (radarTarget.team == ship.team)
+                                {
+                                    newHUDObject.SetColor(friendlyProjectileColor);
+                                }
+                                else
+                                {
+                                    newHUDObject.SetColor(hostileProjectileColor);
+                                }
                                 break;
                             case "CelestialBody":
                                 newHUDObject.SetColor(celestialBodyColor);
                                 break;
-                        }
-                    }
-                            
-                    if(hologramActive)
-                    {
-                        // Display on radar hologram
-                        Vector3 offset = direction * (float)(distance / radarRanges[rangeIndex] * 0.5);
-                        offset.x *= hologramScale.x;
-                        offset.y *= hologramScale.y;
-                        offset.z *= hologramScale.z;
-
-                        Debug.DrawRay(ship.transform.position, direction * (float)distance, Color.green, Time.fixedDeltaTime);
-
-                        if (radarTarget.radarIcon != null)
-                        {
-                            radarTarget.radarIcon.UpdateIcon(iconParent.transform.position + offset, radarTarget.transform.rotation, radarTarget.transform.name + "\n" + CustomMethods.DistanceToFormattedString(distance, 2));
-                        }
-                        else
-                        {
-                            RadarIcon newIcon;
-                            Color iconColor = friendlyShipColor;
-                            Color iconEmission = friendlyShipEmission;
-                            switch (radarTarget.transform.tag)
-                            {
-                                case "Ship":
-                                    newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                    if (radarTarget.team == ship.team)
-                                    {
-                                        iconColor = friendlyShipColor;
-                                        iconEmission = friendlyShipEmission;
-                                    }
-                                    else
-                                    {
-                                        iconColor = hostileShipColor;
-                                        iconEmission = hostileShipEmission;
-                                    }
-                                    break;
-                                case "Projectile":
-                                    newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                    iconColor = projectileColor;
-                                    iconEmission = projectileEmission;
-                                    break;
-                                case "Torpedo":
-                                    newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                    iconColor = projectileColor;
-                                    iconEmission = projectileEmission;
-                                    break;
-                                case "CelestialBody":
-                                    newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                    float iconRadius = (float)ship.scaledTransform.realScale.x / radarRanges[rangeIndex];
-                                    if (iconRadius < 0.01f)
-                                        iconRadius = 0.01f;
-                                    newIcon.model.localScale = new Vector3(iconRadius, iconRadius, iconRadius);
-                                    iconColor = celestialBodyColor;
-                                    iconEmission = celestialBodyEmission;
-                                    break;
-                                default:
-                                    newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                    break;
-                            }
-
-                            newIcon.Init(iconParent.transform.position + offset, radarTarget.transform.rotation, iconColor, iconEmission, radarTarget.transform.name + "\n" + CustomMethods.DistanceToFormattedString(distance, 2));
-                            radarTarget.radarIcon = newIcon;
+                            default:
+                                newHUDObject.SetColor(Color.white);
+                                break;
                         }
                     }
                 }
@@ -227,25 +277,14 @@ public class Radar : MonoBehaviour
                 break;
         }
         triggerCollider.radius = radarRanges[rangeIndex];
+        ship.radarIcon.model.localScale = 2 * iconRadii[rangeIndex] * Vector3.one;
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!other.isTrigger && other.attachedRigidbody.TryGetComponent(out RadarTarget otherRadarTarget))
+        if (!other.isTrigger && other.attachedRigidbody.TryGetComponent(out RadarTarget otherRadarTarget) && !targetsInTrigger.Contains(otherRadarTarget.GetID()))
         {
-            if (otherRadarTarget.scaledTransform != null && otherRadarTarget.scaledTransform.inScaledSpace)
-            {
-                double sqrDistance = (otherRadarTarget.scaledTransform.realPosition - ship.scaledTransform.realPosition).sqrMagnitude;
-                Debug.Log($"Scaled space radar hit: {other.name} dst: {sqrDistance}");
-                if (sqrDistance <= (radarRanges[rangeIndex] * radarRanges[rangeIndex]))
-                {
-                    targetsInRange.Add(otherRadarTarget);
-                }
-            }
-            else
-            {
-                targetsInRange.Add(otherRadarTarget);
-            }
+            targetsInTrigger.Add(otherRadarTarget.GetID());
         }
     }
 
@@ -253,7 +292,7 @@ public class Radar : MonoBehaviour
     {
         if (!other.isTrigger && other.attachedRigidbody.TryGetComponent(out RadarTarget otherRadarTarget))
         {
-            targetsInRange.Remove(otherRadarTarget);
+            targetsInTrigger.Remove(otherRadarTarget.GetID());
         }
     }
 }

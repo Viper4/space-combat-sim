@@ -4,11 +4,13 @@ using UnityEngine;
 using SpaceStuff;
 using System;
 
+[RequireComponent(typeof(MeshRenderer), typeof(ScaledTransform), typeof(TransformChange))]
 public class SpaceLight : MonoBehaviour
 {
     private const double sigma = 5.67e-8;
 
     private ScaledTransform scaledTransform;
+    private TransformChange transformChange;
     private Material materialClone;
 
     [SerializeField] private Light scaledLight;
@@ -27,13 +29,14 @@ public class SpaceLight : MonoBehaviour
     private void Start()
     {
         scaledTransform = GetComponent<ScaledTransform>();
+        transformChange = GetComponent<TransformChange>();
         materialClone = GetComponent<MeshRenderer>().material;
 
         temperature = UnityEngine.Random.Range(minTemperature, maxTemperature);
-        float t = (temperature - minTemperature) / (maxTemperature - minTemperature);
+        float t = SpaceMath.Normalize(temperature, minTemperature, maxTemperature);
         mainColor = temperatureGradient.Evaluate(t);
         float cellTemperature = Mathf.Clamp(cellTemperatureOffset + temperature, minTemperature, maxTemperature);
-        cellColor = temperatureGradient.Evaluate((cellTemperature - minTemperature) / (maxTemperature - minTemperature));
+        cellColor = temperatureGradient.Evaluate(SpaceMath.Normalize(cellTemperature, minTemperature, maxTemperature));
         scaledLight.color = mainColor;
         worldLight.color = mainColor;
 
@@ -47,12 +50,12 @@ public class SpaceLight : MonoBehaviour
 
     private void OnEnable()
     {
-        FloatingWorldOrigin.Instance.cameraTC.OnPositionChange += UpdateLight;
+        transformChange.OnPositionChange += UpdateLight;
     }
 
     private void OnDisable()
     {
-        FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateLight;
+        transformChange.OnPositionChange -= UpdateLight;
     }
 
     private void OnDestroy()

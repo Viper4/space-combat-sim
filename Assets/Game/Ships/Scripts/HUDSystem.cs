@@ -1,67 +1,87 @@
 using System.Collections;
 using System.Collections.Generic;
+using SpaceStuff;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class HUDSystem : MonoBehaviour
 {
-    public Transform HUDPivot;
-    [SerializeField] private GameObject HUDObjectPrefab;
-    [SerializeField] private GameObject HUDObjectParent;
+    public bool radarHudActive = false;
+    public bool combatHudActive = false;
+    [SerializeField] private GameObject radarHudObjectPrefab;
+    [SerializeField] private GameObject radarHudParent;
     [SerializeField] private float HUDDistance = 1.5f;
     public RectTransform combatPanel;
     public Image mainCrosshair;
 
     private Dictionary<uint, HUDObject> radarIDHUDPair = new Dictionary<uint, HUDObject>();
 
-    public HUDObject CreateObject(uint ID, Vector3 position, Bounds bounds, string name, string details)
+    private Vector3 CalculateHUDPosition(Vector3d realPosition, string tag)
     {
-        HUDObject newHUDObject = Instantiate(HUDObjectPrefab, HUDObjectParent.transform).GetComponent<HUDObject>();
-        newHUDObject.Init(this, position, bounds, ID, name, details);
+        Vector3d camRealPos = FloatingWorldOrigin.Instance.worldOriginPosition + Camera.main.transform.position.ToVector3d();
+        Vector3 direction = (realPosition - camRealPos).normalized.ToVector3();
+        var distanceOffset = tag switch
+        {
+            "Projectile" => -0.2f, // Projectiles highest priority
+            "Ship" => -0.1f,
+            _ => 0.0f,
+        };
+        Vector3 position = Camera.main.transform.position + direction * (HUDDistance + distanceOffset);
+        return position;
+    }
+
+    public HUDObject CreateObject(uint ID, RadarTarget target, string details)
+    {
+        Vector3 position = CalculateHUDPosition(target.doubleRigidbody.scaledTransform.realPosition, target.tag);
+        HUDObject newHUDObject = Instantiate(radarHudObjectPrefab, radarHudParent.transform).GetComponent<HUDObject>();
+        if (!target.doubleRigidbody.scaledTransform.visible)
+        {
+            newHUDObject.Init(this, position, ID, details);
+            return newHUDObject;
+        }
+
+        Quadrilateral quad;
+        if (target.useScaleForBounds)
+        {
+            // Use ellipse based on lossy scale of target's transform and its rotation
+            quad = SpaceGeometry.GetEllipsoidBoundingBox(target.transform.position, target.transform.lossyScale, target.transform.rotation, Camera.main);
+        }
+        else
+        {
+            // Calculate bounding box based on renderers
+            quad = SpaceGeometry.GetMinimumBoundingBox(target.boundsRenderers, Camera.main);
+        }
+        newHUDObject.Init(this, position, quad, ID, details);
         return newHUDObject;
     }
 
-    public HUDObject CreateObject(uint ID, Transform target, string name, string details)
-    {
-        Bounds bounds = target.TryGetComponent<MeshRenderer>(out var colliderRenderer) ? colliderRenderer.bounds : new Bounds() { center = target.position, size = Vector3.zero };
-        foreach (Transform child in target)
-        {
-            if (child.TryGetComponent<MeshRenderer>(out var childRenderer))
-            {
-                bounds.Encapsulate(childRenderer.bounds);
-            }
-        }
-        Vector3 position = HUDPivot.position + (target.position - HUDPivot.position).normalized * HUDDistance;
-        return CreateObject(ID, position, bounds, name, details);
-    }
-
-    public bool UpdateObject(uint ID, Vector3 position, Bounds bounds, string name, string details)
+    public bool UpdateObject(uint ID, RadarTarget target, string details)
     {
         if (radarIDHUDPair.TryGetValue(ID, out HUDObject HUDObject))
         {
-            HUDObject.UpdateObject(position, bounds, name, details);
-            return true;
-        }
-        return false;
-    }
+            Vector3 position = CalculateHUDPosition(target.doubleRigidbody.scaledTransform.realPosition, target.tag);
 
-    public bool UpdateObject(uint ID, Transform target, string name, string details)
-    {
-        if (radarIDHUDPair.TryGetValue(ID, out HUDObject HUDObject))
-        {
-            Bounds bounds = target.TryGetComponent<MeshRenderer>(out var colliderRenderer) ? colliderRenderer.bounds : new Bounds() { center = target.position, size = Vector3.zero };
-            foreach (Transform child in target)
+            if (!target.doubleRigidbody.scaledTransform.visible)
             {
-                if (child.TryGetComponent<MeshRenderer>(out var childRenderer))
-                {
-                    bounds.Encapsulate(childRenderer.bounds);
-                }
+                HUDObject.UpdateObject(position, details);
+                return true;
             }
-            Vector3 position = HUDPivot.position + (target.position - HUDPivot.position).normalized * HUDDistance;
-            HUDObject.UpdateObject(position, bounds, name, details);
+
+            Quadrilateral quad;
+            if (target.useScaleForBounds)
+            {
+                // Use ellipse based on lossy scale of target's transform and its rotation
+                quad = SpaceGeometry.GetEllipsoidBoundingBox(target.transform.position, target.transform.lossyScale, target.transform.rotation, Camera.main);
+            }
+            else
+            {
+                // Calculate bounding box based on renderers
+                quad = SpaceGeometry.GetMinimumBoundingBox(target.boundsRenderers, Camera.main);
+            }
+
+            HUDObject.UpdateObject(position, quad, details);
             return true;
         }
-
         return false;
     }
 
@@ -80,8 +100,15 @@ public class HUDSystem : MonoBehaviour
         radarIDHUDPair.Remove(ID);
     }
 
-    public void ToggleHUD(int state)
+    public void ToggleRadarHUD(int state)
     {
-        HUDPivot.gameObject.SetActive(state == 1);
+        radarHudActive = state == 1;
+        radarHudParent.SetActive(radarHudActive);
+    }
+
+    public void ToggleCombatHUD(int state)
+    {
+        combatHudActive = state == 1;
+        combatPanel.gameObject.SetActive(combatHudActive);
     }
 }
