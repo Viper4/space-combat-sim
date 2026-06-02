@@ -26,7 +26,7 @@ public class SpaceLight : MonoBehaviour
     private Color cellColor;
     private double luminosity;
 
-    private void Start()
+    private void Awake()
     {
         scaledTransform = GetComponent<ScaledTransform>();
         transformChange = GetComponent<TransformChange>();

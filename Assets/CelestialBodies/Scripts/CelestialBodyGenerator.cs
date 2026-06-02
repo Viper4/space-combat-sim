@@ -108,12 +108,14 @@ public class CelestialBodyGenerator : MonoBehaviour
         }
     }
 
-    public void UpdateQuadTrees(Camera camera)
+    public bool UpdateQuadTrees(Camera camera)
     {
+        bool generated = false;
         foreach (TerrainChunk rootChunk in rootChunks)
         {
-            rootChunk.UpdateTree(camera, transform, colorGenerator);
+            generated |= rootChunk.UpdateTree(camera, transform, colorGenerator);
         }
+        return generated;
     }
 
     public void GenerateCelestialBody()

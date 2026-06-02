@@ -172,7 +172,8 @@ public class TerrainChunk
             sqrDistance = chunkObject == null ? (parent.TransformPoint(shapeGenerator.CalculatePointOnSphere(GetPointOnCubeSphere(new Vector2(0.5f, 0.5f)))) - camera.transform.position).sqrMagnitude : chunkObject.meshRenderer.bounds.SqrDistance(camera.transform.position);
         if (camera != null && detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < width * width)
         {
-            if (chunkObject != null)
+            // Camera is close enough to this chunk that we need to increase the LOD so generate children with higher LOD in this chunk
+            if (chunkObject != null && chunkObject.gameObject.activeSelf)
                 chunkObject.gameObject.SetActive(false);
             children = new TerrainChunk[4];
             float nextWidth = width * 0.5f;
@@ -190,6 +191,7 @@ public class TerrainChunk
         }
         else
         {
+            // Just use this chunk's LOD
             if (chunkObject == null)
             {
                 GameObject meshGO = new GameObject("Mesh (" + detailLevel + " LOD)");
@@ -199,7 +201,8 @@ public class TerrainChunk
                 chunkObject.gameObject.layer = parent.gameObject.layer;
             }
 
-            chunkObject.gameObject.SetActive(true);
+            if (!chunkObject.gameObject.activeSelf)
+                chunkObject.gameObject.SetActive(true);
             chunkObject.meshRenderer.sharedMaterial = colorGenerator.materialInstance;
             chunkObject.meshFilter.sharedMesh = new Mesh();
             if (camera != null)
@@ -210,17 +213,22 @@ public class TerrainChunk
         }
     }
 
-    /* 
-     * Doesn't generate chunks already created and enables mesh depending on if mesh is visible by camera
-     */
-    public void UpdateTree(Camera camera, Transform parent, ColorGenerator colorGenerator)
+    /// <summary>
+    /// Generates/activates higher LOD child chunks if the camera is close enough, otherwise it just generates/activates this chunk
+    /// </summary>
+    /// <param name="camera"></param>
+    /// <param name="parent"></param>
+    /// <param name="colorGenerator"></param>
+    /// <returns>Whether the chunk generated new chunks</returns>
+    public bool UpdateTree(Camera camera, Transform parent, ColorGenerator colorGenerator)
     {
         float sqrDistance = 0;
         if (camera != null)
             sqrDistance = chunkObject == null ? (parent.TransformPoint(shapeGenerator.CalculatePointOnSphere(GetPointOnCubeSphere(new Vector2(0.5f, 0.5f)))) - camera.transform.position).sqrMagnitude : chunkObject.meshRenderer.bounds.SqrDistance(camera.transform.position);
         if (camera != null && detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < width * width)
         {
-            if(chunkObject != null)
+            // Camera is close enough to this chunk that we need to increase the LOD so generate children with higher LOD in this chunk
+            if(chunkObject != null && chunkObject.gameObject.activeSelf)
                 chunkObject.gameObject.SetActive(false);
             if (children == null || children.Length == 0)
             {
@@ -234,13 +242,16 @@ public class TerrainChunk
                 children[3] = new TerrainChunk(shapeGenerator, localPosition - nextLocalRight - nextLocalForward, nextWidth, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Bottom left
             }
 
+            bool generated = false;
             foreach (TerrainChunk chunk in children)
             {
-                chunk.UpdateTree(camera, parent, colorGenerator);
+                generated |= chunk.UpdateTree(camera, parent, colorGenerator);
             }
+            return generated;
         }
         else
         {
+            // Just use this chunk's LOD
             if (chunkObject == null)
             {
                 GameObject meshGO = new GameObject("Mesh (" + detailLevel + " LOD)");
@@ -252,8 +263,11 @@ public class TerrainChunk
                 chunkObject.meshRenderer.sharedMaterial = colorGenerator.materialInstance;
                 ConstructMesh(camera);
                 UpdateUVs(colorGenerator);
+                return true;
             }
-            chunkObject.gameObject.SetActive(true);
+            if (!chunkObject.gameObject.activeSelf)
+                chunkObject.gameObject.SetActive(true);
+            return false;
         }
     }
 }

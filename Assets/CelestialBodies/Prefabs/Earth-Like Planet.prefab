@@ -1,58 +1,5 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &3334133699443777332
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 4483094006726610593}
-  - component: {fileID: 7328788019517309976}
-  m_Layer: 0
-  m_Name: Trigger
-  m_TagString: CelestialBody
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &4483094006726610593
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3334133699443777332}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 5661668052468481612}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &7328788019517309976
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3334133699443777332}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 10000
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &4255873868048831807
 GameObject:
   m_ObjectHideFlags: 0
@@ -91,7 +38,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 7238547481394330862}
-  - {fileID: 4483094006726610593}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2216603855058342242
@@ -203,7 +149,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _isKinematic: 0
   speedThreshold: 500
+  _velocity:
+    x: 0
+    y: 0
+    z: 0
+  _angularVelocity:
+    x: 0
+    y: 0
+    z: 0
+  hGridLevel: -1
   trackTrigger: 0
+  scaledColliderRadius: -1
   scaledTriggerRadius: 1
 --- !u!114 &4011333338206696670
 MonoBehaviour:
@@ -257,13 +213,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
-  doubleRigidbody: {fileID: 0}
   team: 
   radarIcon: {fileID: 0}
-  originalHUDColor: {r: 0, g: 0, b: 0, a: 0}
-  originalRadarColor: {r: 0, g: 0, b: 0, a: 0}
-  originalRadarEmission: {r: 0, g: 0, b: 0, a: 0}
   turretsTargeting: 0
+  stealthDistance: -1
   useScaleForBounds: 1
   boundsRenderers: []
 --- !u!1001 &6213586387416295118

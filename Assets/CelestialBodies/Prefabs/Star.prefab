@@ -35,13 +35,12 @@ Transform:
   m_GameObject: {fileID: 2675124551879334190}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.6, z: 1506.6}
-  m_LocalScale: {x: 6.957, y: 6.957, z: 6.957}
+  m_LocalPosition: {x: 0, y: 0.6, z: 756.6}
+  m_LocalScale: {x: 3.4785, y: 3.4785, z: 3.4785}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3139933348503820221}
   - {fileID: 8120683167609297409}
-  - {fileID: 7093771797177738901}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &8042605825554430832
@@ -68,7 +67,7 @@ MonoBehaviour:
   visible: 1
   scaledSpaceLayer: 3
   inScaledSpace: 1
-  scaleFactor: 100000000
+  scaleFactor: 200000000
   worldSpaceThreshold: 4900
   scaledSpaceThreshold: 5100
 --- !u!33 &3203808644395471499
@@ -140,6 +139,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ecefe1d978853f4f91e593a040236b7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  originalLayer: 0
   generationSettingsFoldout: 1
   generationSettings: {fileID: 11400000, guid: c034087e7fb231f459408539279ada2f, type: 2}
   gravity: 1
@@ -188,8 +188,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _isKinematic: 0
   speedThreshold: 500
+  _velocity:
+    x: 0
+    y: 0
+    z: 0
+  _angularVelocity:
+    x: 0
+    y: 0
+    z: 0
+  hGridLevel: -1
   trackTrigger: 0
-  scaledTriggerRadius: 1
+  scaledColliderRadius: -1
+  scaledTriggerRadius: -1
 --- !u!114 &1084746199370567776
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -290,13 +300,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
-  doubleRigidbody: {fileID: 0}
   team: 
   radarIcon: {fileID: 0}
-  originalHUDColor: {r: 0, g: 0, b: 0, a: 0}
-  originalRadarColor: {r: 0, g: 0, b: 0, a: 0}
-  originalRadarEmission: {r: 0, g: 0, b: 0, a: 0}
   turretsTargeting: 0
+  stealthDistance: -1
   useScaleForBounds: 1
   boundsRenderers: []
 --- !u!1 &7089161551974816913
@@ -582,59 +589,6 @@ MonoBehaviour:
   scaleRange: {x: 3, y: 0}
   distanceRange: {x: 1000000, y: 2e+11}
   temperatureScale: 0.0005
---- !u!1 &8388508233591826155
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 7093771797177738901}
-  - component: {fileID: 4871436841714204185}
-  m_Layer: 0
-  m_Name: Trigger
-  m_TagString: CelestialBody
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &7093771797177738901
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8388508233591826155}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4191834479830750107}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &4871436841714204185
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8388508233591826155}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 5000
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &9151316676979116272
 GameObject:
   m_ObjectHideFlags: 0

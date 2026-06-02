@@ -148,7 +148,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _isKinematic: 0
   speedThreshold: 500
+  _velocity:
+    x: 0
+    y: 0
+    z: 0
+  _angularVelocity:
+    x: 0
+    y: 0
+    z: 0
+  hGridLevel: -1
   trackTrigger: 0
+  scaledColliderRadius: -1
   scaledTriggerRadius: 1
 --- !u!114 &4194929419073694645
 MonoBehaviour:
@@ -202,12 +212,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
-  doubleRigidbody: {fileID: 0}
   team: 
   radarIcon: {fileID: 0}
-  originalHUDColor: {r: 0, g: 0, b: 0, a: 0}
-  originalRadarColor: {r: 0, g: 0, b: 0, a: 0}
-  originalRadarEmission: {r: 0, g: 0, b: 0, a: 0}
   turretsTargeting: 0
+  stealthDistance: -1
   useScaleForBounds: 1
   boundsRenderers: []

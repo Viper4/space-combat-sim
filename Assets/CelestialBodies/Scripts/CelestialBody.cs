@@ -12,6 +12,7 @@ public class CelestialBody : MonoBehaviour
 
     private CelestialBodyGenerator generator;
     private DoubleRigidbody doubleRigidbody;
+    [SerializeField] private int originalLayer;
 
     [HideInInspector] public bool generationSettingsFoldout;
     public GenerationSettings generationSettings;
@@ -23,8 +24,6 @@ public class CelestialBody : MonoBehaviour
     private float surfaceGravity;
     public CelestialBody systemCenter;
     [HideInInspector] public ScaledTransform scaledTransform;
-
-    private List<DoubleRigidbody> thingsInGravity = new List<DoubleRigidbody>();
 
     private bool initialized;
 
@@ -43,7 +42,7 @@ public class CelestialBody : MonoBehaviour
                     generator.GenerateRandomCelestialBody();
                 else
                     generator.GenerateCelestialBody();
-                scaledTransform.ResetVisualComponents(true);
+                scaledTransform.ResetVisualComponents(originalLayer);
             }
         }
         else
@@ -88,6 +87,8 @@ public class CelestialBody : MonoBehaviour
 
         if (gravity)
         {
+            ScaledSpacePhysics.Instance.PrePhysicsStep += ApplyGravity;
+
             if (generationSettings.scaleRange[0] == Vector3.zero)
             {
                 // No scale range specified, so pick random gravity
@@ -108,10 +109,7 @@ public class CelestialBody : MonoBehaviour
             }
         }
 
-        if (scaledTransform.inScaledSpace)
-            scaledTransform.realScale = scale.ToVector3d();
-        else
-            transform.localScale = scale;
+        scaledTransform.realScale = scale.ToVector3d();
 
         if(generationSettings.calculateMass)
             doubleRigidbody.attachedRigidbody.mass = generationSettings.density * v * scale.x * scale.x * scale.x;
@@ -153,31 +151,24 @@ public class CelestialBody : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (gravity || !generationSettings.simple)
+        if (!generationSettings.simple)
         {
-            for (int i = 0; i < thingsInGravity.Count; i++)
+            if (generator.UpdateQuadTrees(Camera.main))
             {
-                if (thingsInGravity[i] == doubleRigidbody)
-                    continue;
-
-                Transform otherTransform = thingsInGravity[i].transform;
-                if (!scaledTransform.inScaledSpace && !generationSettings.simple && otherTransform == FloatingWorldOrigin.Instance.transform)
-                {
-                    generator.UpdateQuadTrees(Camera.main);
-                    scaledTransform.ResetVisualComponents(true);
-                }
-                if (gravity)
-                {
-                    ScaledTransform otherScaledTransform = thingsInGravity[i].GetComponent<ScaledTransform>();
-                    Vector3d gravityDirection = (scaledTransform.realPosition - otherScaledTransform.realPosition).normalized;
-                    double acceleration = CalculateGravityAcceleration(otherScaledTransform.realPosition);
-                    //if (otherScaledTransform.transform == FloatingWorldOrigin.Instance.transform)
-                    //    Debug.Log($"{name} gravity: {acceleration}");
-
-                    thingsInGravity[i].AddForce(gravityDirection * acceleration, ForceMode.Acceleration);
-                }
+                scaledTransform.ResetVisualComponents(originalLayer);
             }
         }
+    }
+
+    public void ApplyGravity(DoubleRigidbody other)
+    {
+        if (other == doubleRigidbody || !gravity)
+            return;
+
+        Vector3d gravityDirection = (scaledTransform.realPosition - other.scaledTransform.realPosition).normalized;
+        double acceleration = CalculateGravityAcceleration(other.scaledTransform.realPosition);
+
+        other.AddGravity(gravityDirection * acceleration);
     }
 
     /* surfaceGravity = bodyMass / radius^2
@@ -190,25 +181,8 @@ public class CelestialBody : MonoBehaviour
         return surfaceGravity * scale.x * scale.x / (scaledTransform.realPosition - point).sqrMagnitude;
     }
 
-    private void OnTriggerEnter(Collider other)
+    private void OnDestroy()
     {
-        if (!gravity || (gravitySettings.affectedLayers.value & (1 << other.gameObject.layer)) == 0)
-            return;
-        Rigidbody otherRigidbody = other.attachedRigidbody;
-        if (otherRigidbody != null && otherRigidbody.TryGetComponent(out DoubleRigidbody otherDoubleRigidbody) && !thingsInGravity.Contains(otherDoubleRigidbody))
-        {
-            thingsInGravity.Add(otherDoubleRigidbody);
-        }
-    }
-
-    private void OnTriggerExit(Collider other)
-    {
-        if (!gravity || (gravitySettings.affectedLayers.value & (1 << other.gameObject.layer)) == 0)
-            return;
-        Rigidbody otherRigidbody = other.attachedRigidbody;
-        if (otherRigidbody != null && otherRigidbody.TryGetComponent(out DoubleRigidbody otherDoubleRigidbody))
-        {
-            thingsInGravity.Remove(otherDoubleRigidbody);
-        }
+        ScaledSpacePhysics.Instance.PrePhysicsStep -= ApplyGravity;
     }
 }
