@@ -142,7 +142,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
   _isKinematic: 0
-  speedThreshold: 5000
+  speedThreshold: 1000
   _velocity:
     x: 0
     y: 0
@@ -153,7 +153,7 @@ MonoBehaviour:
     z: 0
   hGridLevel: -1
   trackTrigger: 1
-  scaledColliderRadius: 0.25
+  scaledColliderRadius: 0.3
   scaledTriggerRadius: 10
 --- !u!114 &6577287821693102537
 MonoBehaviour:
@@ -177,7 +177,7 @@ MonoBehaviour:
   thrusterForce: 100
   damping: 32
   rocketParticles: {fileID: 4901987813079629749}
-  explosionParticles: {fileID: 3982350210874365300, guid: 38256d267e02f9045b36a61ca4903a4d, type: 3}
+  explosionPrefab: {fileID: 3982350210874365306, guid: 38256d267e02f9045b36a61ca4903a4d, type: 3}
   explosionRadius: 30
   explosionForce: 15000
   minDamage: 50
@@ -266,7 +266,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 312711286
+  GlobalObjectIdHash: 3724786077
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -321,10 +321,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 8959325904046899293}
     m_Modifications:
-    - target: {fileID: 6312848545668391724, guid: 76fc3a337ebe7a34d8069d2a60704bf5, type: 3}
-      propertyPath: playOnAwake
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 6312848545668391724, guid: 76fc3a337ebe7a34d8069d2a60704bf5, type: 3}
       propertyPath: InitialModule.startSpeed.scalar
       value: 0.5

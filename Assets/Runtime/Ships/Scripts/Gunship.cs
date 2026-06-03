@@ -7,9 +7,6 @@ using TMPro;
 [RequireComponent(typeof(TurretSystem)), RequireComponent(typeof(TorpedoSystem))]
 public class Gunship : Ship
 {
-    private TurretSystem turretSystem;
-    private TorpedoSystem torpedoSystem;
-
     [SerializeField] private HUDSystem _HUDSystem;
     [SerializeField, Header("Gunship")] private Material modelMaterial;
     [SerializeField] private Transform targetModelParent;
@@ -17,13 +14,6 @@ public class Gunship : Ship
     [SerializeField] private Transform targetDirectionPivot;
     private Transform targetModel;
     private RadarTarget lockedTarget;
-
-    protected override void Start()
-    {
-        base.Start();
-        turretSystem = GetComponent<TurretSystem>();
-        torpedoSystem = GetComponent<TorpedoSystem>();
-    }
 
     protected override void FixedUpdate()
     {

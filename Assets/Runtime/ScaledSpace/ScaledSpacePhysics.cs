@@ -184,8 +184,8 @@ public class ScaledSpacePhysics : MonoBehaviour
             if (sqrDistancePerFrame > minDistance * minDistance)
             {
                 // Continuous Collision Detection (CCD) for spheres:
-                //  ((posB​−posA​)+(velB​−velA​)t).magnitude^2 = (radiusA​+radiusB​)^2
-                //  (relativePos + relativeVel*t).magnitude^2 = (combinedRadius)^2
+                //  |(posB​−posA​)+(velB​−velA​)t|^2 = (radiusA​+radiusB​)^2
+                //  |relativePos + relativeVel*t|^2 = (combinedRadius)^2
                 //  (P+Vt)⋅(P+Vt) = R^2
                 //  P⋅P + 2(P⋅V)t + (V⋅V)t^2 = R^2
                 //  (V⋅V)t^2 + 2(P⋅V)t + (P⋅P−R^2) = 0
@@ -196,9 +196,14 @@ public class ScaledSpacePhysics : MonoBehaviour
                 double aCoeff = Vector3d.Dot(relativeVelocity, relativeVelocity);
                 double bCoeff = 2.0 * Vector3d.Dot(relativePosition, relativeVelocity);
                 double cCoeff = Vector3d.Dot(relativePosition, relativePosition) - minDistance * minDistance;
-
+                double t = SpaceMath.SolveQuadratic(aCoeff, bCoeff, cCoeff);
+                if (t >= 0.0)
+                {
+                    collided = true;
+                    Debug.Log($"CCD collide: {a.name} with {b.name}");
+                }
                 // Use quadratic formula to solve for t
-                double discriminant = bCoeff * bCoeff - 4.0 * aCoeff * cCoeff;
+                /*double discriminant = bCoeff * bCoeff - 4.0 * aCoeff * cCoeff;
 
                 if (discriminant >= 0.0)
                 {
@@ -224,7 +229,7 @@ public class ScaledSpacePhysics : MonoBehaviour
                         // distance is already = minDistance
                         Debug.Log($"CCD collide: {a.name} with {b.name}");
                     }
-                }
+                }*/
             }
         }
 

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using SpaceStuff;
+using Unity.Collections;
 
 [RequireComponent(typeof(RadarTarget))]
 public class Torpedo : Projectile
@@ -14,7 +15,7 @@ public class Torpedo : Projectile
     [SerializeField] private float damping = 2.0f;
     [SerializeField] private GameObject rocketParticles;
 
-    [SerializeField] private ParticleSystem explosionParticles;
+    [SerializeField] private GameObject explosionPrefab;
     [SerializeField] private float explosionRadius = 15f;
     [SerializeField] private float explosionForce = 100f;
     [SerializeField] private float minDamage = 25f;
@@ -49,34 +50,55 @@ public class Torpedo : Projectile
                 Vector3d relativePosition = realTargetPosition - realTorpedoPosition;
                 double distance = relativePosition.magnitude;
                 Vector3d direction = relativePosition / distance;
-                Vector3d relativeAcceleration = target.acceleration - thisRadarTarget.acceleration;
                 Vector3d relativeVelocity = targetVelocity - torpedoVelocity;
+                Vector3d relativeAcceleration = target.acceleration - thisRadarTarget.acceleration;
+
+                // double arrivalTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration,);
 
                 double closingAcceleration = -Vector3d.Dot(relativeAcceleration, direction);
                 double closingSpeed = -Vector3d.Dot(relativeVelocity, direction);
-                double arrivalTime = SpaceMath.CalculateArrivalTime(closingAcceleration - engineAcceleration, closingSpeed, distance);
-
+                double arrivalTime = SpaceMath.CalculateArrivalTime(distance, closingSpeed, closingAcceleration + engineAcceleration);
                 if (arrivalTime < 0.0) // Will never arrive
                     return;
+                // futureTargetPos = futureTorpedoPos
+                // realTargetPosition + targetVelocity * t + 0.5 * t^2 * target.acceleration = realTorpedoPosition + torpedoVelocity * t + 0.5 * t^2 * requiredA;
+                // requiredA = (relativePosition + relativeVelocity * t + 0.5 * tag * tag * target.acceleration) / 0.5 * t^2;
+                double invArrivalTime = 1.0 / arrivalTime;
+                Vector3d requiredAcceleration = (relativePosition + relativeVelocity * arrivalTime + 0.5 * arrivalTime * arrivalTime * target.acceleration) * (2.0 * invArrivalTime * invArrivalTime);
+                Vector3d gravityAcceleration = doubleRigidbody.GetGravity();
+                requiredAcceleration -= gravityAcceleration; // Remove component that gravity is already acting on
+                Vector3d requiredForce = doubleRigidbody.attachedRigidbody.mass * requiredAcceleration;
+                Vector3d forceDirection = requiredForce.normalized;
+                Vector3 localRequiredForce = transform.InverseTransformDirection(requiredForce.ToVector3());
 
-                Vector3d predictedRelativePosition = relativePosition + (relativeVelocity * arrivalTime) + (0.5 * arrivalTime * arrivalTime * relativeAcceleration);
+                // Vector3d predictedRelativePosition = relativePosition + (relativeVelocity * arrivalTime) + (0.5 * arrivalTime * arrivalTime * relativeAcceleration);
 
                 // Apply force to get to desired future position
-                Vector3 desiredLocalVelocity = transform.InverseTransformDirection((predictedRelativePosition * 1000f).ToVector3());
+                /*Vector3 desiredLocalVelocity = transform.InverseTransformDirection((predictedRelativePosition * 1000f).ToVector3());
                 Vector3 localVelocity = transform.InverseTransformDirection(torpedoVelocity.ToVector3());
                 Vector3 error = desiredLocalVelocity - localVelocity;
                 
                 error = Vector3.ClampMagnitude(error, 1.0f);
                 error.x *= thrusterForce;
-                error.y *= thrusterForce;
-                error.z = error.z > 0 ? error.z * engineForce : error.z * thrusterForce;
+                error.y *= thrusterForce;*/
+                if (localRequiredForce.z > 0)
+                {
+                    localRequiredForce.z *= engineForce;
+                    if (!rocketParticles.activeSelf)
+                        rocketParticles.SetActive(true);
+                }
+                else
+                {
+                    localRequiredForce.z *= thrusterForce;
+                    if (rocketParticles.activeSelf)
+                        rocketParticles.SetActive(false);
+                }
 
-                doubleRigidbody.AddRelativeForce(error.ToVector3d(), ForceMode.Force);
+                doubleRigidbody.AddRelativeForce(localRequiredForce.ToVector3d(), ForceMode.Force);
 
-                Debug.DrawLine(transform.position, transform.position + predictedRelativePosition.ToVector3(), Color.green, Time.fixedDeltaTime);
                 // Rotate to align engines with error
                 // Desired facing direction
-                Vector3 desiredForward = predictedRelativePosition.normalized.ToVector3();
+                Vector3 desiredForward = forceDirection.ToVector3();
 
                 // Current angular velocity in world space
                 Vector3 angularVelocity = doubleRigidbody.angularVelocity.ToVector3();
@@ -151,7 +173,7 @@ public class Torpedo : Projectile
             return;
         }
 
-        Instantiate(explosionParticles, transform.position, transform.rotation);
+        Instantiate(explosionPrefab, transform.position, transform.rotation);
         Collider[] colliders = new Collider[128];
         HashSet<Transform> hitTransforms = new HashSet<Transform>();
         int hits = Physics.OverlapSphereNonAlloc(transform.position, explosionRadius, colliders, ~ignoreLayers, QueryTriggerInteraction.Ignore);
@@ -198,9 +220,6 @@ public class Torpedo : Projectile
                         {
                             hitRigidbody.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
                         }
-                        break;
-                    case "Turret":
-
                         break;
                     case "Projectile":
                         // Bullets and projectiles are super lightweight, so just destroy them

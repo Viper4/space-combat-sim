@@ -83,7 +83,7 @@ public class Radar : MonoBehaviour
                 double closingSpeed = -Vector3d.Dot(relativeVelocity, direction);
                 double closingAcceleration = -Vector3d.Dot(relativeAcceleration, direction);
 
-                double arrivalTime = SpaceMath.CalculateArrivalTime(closingAcceleration, closingSpeed, distance);
+                double arrivalTime = SpaceMath.CalculateArrivalTime(distance, closingSpeed, closingAcceleration);
 
                 // Update metrics for use in other places like the HUD
                 float speed = (float)radarTarget.doubleRigidbody.velocity.magnitude;

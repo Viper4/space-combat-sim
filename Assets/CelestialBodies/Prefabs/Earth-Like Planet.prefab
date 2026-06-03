@@ -101,6 +101,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ecefe1d978853f4f91e593a040236b7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  originalLayer: 0
   generationSettingsFoldout: 1
   generationSettings: {fileID: 11400000, guid: c38d34bdf206c384b8828cb3e206e8ac, type: 2}
   gravity: 1

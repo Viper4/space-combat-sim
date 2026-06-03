@@ -9808,7 +9808,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: ea8beba92fda34346ac4d24936d53ea9, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.6
+  m_Volume: 0.7
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -9948,8 +9948,8 @@ MonoBehaviour:
   - 0.8
   - 1.2
   volumeRange:
-  - 1
-  - 1
+  - 0.7
+  - 0.7
 --- !u!114 &-1008843181477096106
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -1,6 +1,7 @@
 using UnityEngine;
 using SpaceStuff;
 using System;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody), typeof(ScaledTransform))]
 public class DoubleRigidbody : MonoBehaviour
@@ -128,6 +129,8 @@ public class DoubleRigidbody : MonoBehaviour
     private float scaledTriggerRadius = -1f;
 
     private Vector3d gravityAcceleration;
+
+    private HashSet<uint> ignoredRbs = new HashSet<uint>();
 
     void Awake()
     {
@@ -454,5 +457,22 @@ public class DoubleRigidbody : MonoBehaviour
         OnScaledTriggerExit = null;
 
         FloatingWorldOrigin.Instance.OnOriginShift -= OnOriginShift;
+    }
+
+    public void IgnoreDoubleRigidbody(uint otherId, bool ignore)
+    {
+        if (ignore)
+        {
+            ignoredRbs.Add(otherId);
+        }
+        else
+        {
+            ignoredRbs.Remove(otherId);
+        }
+    }
+
+    public bool IsIgnoring(uint otherId)
+    {
+        return ignoredRbs.Contains(otherId);
     }
 }

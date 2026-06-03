@@ -17104,7 +17104,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2708368669
+  GlobalObjectIdHash: 3738660560
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -17226,7 +17226,7 @@ MonoBehaviour:
   D: 0
   maxFuel: 100
   minCollideSpeed: 50
-  collideDamageScale: 0.01
+  collideDamageScale: 0.005
   maxLocalZ: 9
   shields: {fileID: 7062523681545924001}
   _HUDSystem: {fileID: 7292164829124766721}
@@ -17352,8 +17352,8 @@ MonoBehaviour:
   defensiveTags:
   - Projectile
   - Torpedo
-  detectRadius: 10000
-  killRadius: 500
+  detectRadius: 25000
+  killRadius: 1000
   velocityDotThreshold: 0
 --- !u!114 &5661573249483558542
 MonoBehaviour:

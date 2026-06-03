@@ -5533,8 +5533,8 @@ MonoBehaviour:
   fireTime: 0
   projectilePrefab: {fileID: 1854897518929172335, guid: 6e8b419a39dc4244c9bcae8a86f97bee, type: 3}
   shootParticles: {fileID: 3610617624835580716, guid: 71b07424ffcb49a41830ab0761db5c07, type: 3}
-  projectileSpeed: 1000
-  tracerInterval: 1
+  projectileSpeed: 2000
+  tracerInterval: 2
   casingPrefab: {fileID: 6854141528186018479, guid: 57ebb8e7e88aee44f98160a192eea584, type: 3}
   casingSpeed: 5
   currentTarget: {fileID: 0}

@@ -220,18 +220,27 @@ public class Ship : RadarTarget
         if (collision.transform.CompareTag("Projectile") || collision.transform.CompareTag("Torpedo"))
             return; // Projectiles handle damage themselves
         float sqrCollisionSpeed = collision.relativeVelocity.sqrMagnitude;
-        if (sqrCollisionSpeed <= minCollideSpeed * minCollideSpeed)
+        if (collision.rigidbody.mass < 0.5f || sqrCollisionSpeed <= minCollideSpeed * minCollideSpeed)
             return;
-        Vector3 collisionPoint = collision.GetContact(0).point;
-        Vector3 relativeCollisionPoint = collisionPoint - transform.position;
-        // Damage at the front of the ship is less severe
-        float attenuation = Mathf.Clamp01((-relativeCollisionPoint.z + maxLocalZ) / (2 * maxLocalZ)); // Remap [back, front] from [-maxLocalZ, maxLocalZ] to [1, 0]
-        float damageAmount = (sqrCollisionSpeed - minCollideSpeed * minCollideSpeed) * attenuation * collideDamageScale;
+        ContactPoint contact = collision.GetContact(0);
+        float impulseMagnitude = collision.impulse.magnitude;
+        // Optional: attenuate glancing blows (0 = glancing, 1 = head-on)
+        float impactDot = Mathf.Abs(Vector3.Dot(collision.impulse.normalized, contact.normal));
+
+        // Front attenuation
+        Vector3 relativeCollisionPoint = contact.point - transform.position;
+        float attenuation = Mathf.Clamp01((-relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
+
+        float damageAmount = impulseMagnitude * impactDot * attenuation * collideDamageScale;
+
         if (shields != null)
-            shields.Damage(damageAmount, collisionPoint);
+            shields.Damage(damageAmount, contact.point);
         else
             statSystem.Damage(damageAmount);
-        Debug.Log($"Collided with {collision.gameObject.name} at speed {collision.relativeVelocity.magnitude:F2}, taking {damageAmount:F2} damage");
+
+        Debug.Log($"Collided with {collision.gameObject.name} at speed " +
+                $"{collision.relativeVelocity.magnitude:F2}, impulse {impulseMagnitude:F1}, " +
+                $"taking {damageAmount:F2} damage");
     }
 
     public void SetAutoRotStabilization(int state)

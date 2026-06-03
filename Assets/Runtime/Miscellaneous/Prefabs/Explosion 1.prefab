@@ -9949,8 +9949,8 @@ MonoBehaviour:
   - 1.2
   - 1.3
   volumeRange:
-  - 0.6
-  - 0.7
+  - 0.8
+  - 0.9
 --- !u!114 &479926527093910578
 MonoBehaviour:
   m_ObjectHideFlags: 0

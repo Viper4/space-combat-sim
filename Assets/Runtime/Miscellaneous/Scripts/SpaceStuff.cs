@@ -3,6 +3,7 @@ using System;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using UnityEngine.Internal;
+using System.Runtime.InteropServices;
 
 namespace SpaceStuff
 {
@@ -1183,6 +1184,43 @@ namespace SpaceStuff
             return result;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void TryRoot(double t, ref double best)
+        {
+            if (t > 0f)
+                best = Math.Min(best, t);
+        }
+
+        /// <summary>
+        /// Solves the quadratic equation: ax^2+bx+c=0 and returns the smallest positive real root.
+        /// </summary>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <param name="c"></param>
+        /// <param name="best"></param>
+        /// <returns>Smallest positive real root, or -1 if imaginary or negative.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static double SolveQuadratic(double a, double b, double c)
+        {
+            if (Math.Abs(a) < epsilon)
+            {
+                if (Math.Abs(b) < epsilon)
+                    return -1.0;
+                double x = -c / b;
+                return x < 0 ? -1.0 : x;
+            }
+            // x = (-b +/- sqrt(b^2-4ac)) / 2a
+            double discriminant = b * b - 4.0 * a * c;
+            if (discriminant < 0.0)
+                return -1.0;
+            double sqrtD = Math.Sqrt(discriminant);
+            double inv2a = 0.5 / a;
+            double best = double.PositiveInfinity;
+            TryRoot((-b + sqrtD) * inv2a, ref best);
+            TryRoot((-b - sqrtD) * inv2a, ref best);
+            return double.IsPositiveInfinity(best) ? -1.0 : best;
+        }
+
         /// <summary>
         /// Calculates the time it will take for object A to arrive at object B given the closingAcceleration, closingSpeed, and distance from A to B
         /// </summary>
@@ -1190,59 +1228,199 @@ namespace SpaceStuff
         /// <param name="closingSpeed">m/s. + => moving towards B, - => moving away from B</param>
         /// <param name="distance">Distance in meters between A and B</param>
         /// <returns>The time in seconds it will take for the object to arrive at the target, or -1 if it can never arrive.</returns>
-        public static double CalculateArrivalTime(double closingAcceleration, double closingSpeed, double distance)
+        public static double CalculateArrivalTime(double distance, double closingSpeed, double closingAcceleration)
         {
-            // 0 = (1/2)At^2 + Vt + dst
-            // a = (1/2)A, b = V, c = dst
+            // dst = (1/2)At^2 + Vt
+            // a = (1/2)A, b = V, c = -dst
             if (distance < epsilon)
                 return 0f;
+            
+            return SolveQuadratic(0.5 * closingAcceleration, closingSpeed, -distance);
+        }
 
-            // Constant velocity
-            if (Math.Abs(closingAcceleration) < epsilon)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void SolveBiquadratic(double p, double r, double shift, ref double best)
+        {
+            // x⁴ + p·x² + r = 0  →  u = x²,  u² + p·u + r = 0
+            double disc = p * p - 4.0 * r;
+            if (disc < 0.0)
+                return;
+            double sq = Math.Sqrt(disc);
+            foreach (double u in new[] { (-p + sq) * 0.5, (-p - sq) * 0.5 })
             {
-                if (closingSpeed <= 0.0)
-                    return -1.0; // moving away or stationary
-
-                return distance / closingSpeed;
+                if (u < 0.0) continue;
+                double xr = Math.Sqrt(u);
+                TryRoot( xr + shift, ref best);
+                TryRoot(-xr + shift, ref best);
             }
-
-            // Quadratic formula to get arrival time
-            double discriminant = closingSpeed * closingSpeed + 2 * closingAcceleration * distance;
-
-            if (discriminant < 0.0)
-                return -1.0; // Can never arrive
-
-            double sqrtD = Math.Sqrt(discriminant);
-
-            double t1 = (-closingSpeed + sqrtD) / closingAcceleration;
-            double t2 = (-closingSpeed - sqrtD) / closingAcceleration;
-
-            // Choose smallest positive root
-            double arrival = double.PositiveInfinity;
-
-            if (t1 > epsilon)
-                arrival = t1;
-
-            if (t2 > epsilon)
-                arrival = Math.Min(arrival, t2);
-
-            return double.IsInfinity(arrival) ? -1.0 : arrival;
         }
 
         /// <summary>
-        /// Calculates the time it will take for object A to arrive at object B given the acceleration, velocity, and position of both objects.
+        /// Solves   m³ + B·m² + C·m + D = 0.
         /// </summary>
-        /// <returns>The time in seconds it will take for the object to arrive at the target, or -1 if it can never arrive.</returns>
-        public static double CalculateArrivalTime(Vector3d accelA, Vector3d accelB, Vector3d velA, Vector3d velB, Vector3d posA, Vector3d posB)
+        /// <param name="B"></param>
+        /// <param name="C"></param>
+        /// <param name="D"></param>
+        /// <returns>1 or 3 real roots</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static double[] SolveCubic(double B, double C, double D)
         {
-            Vector3d relativePositionB = posB - posA; // B's position relative to A
-            double distance = relativePositionB.magnitude; // Distance to B
-            Vector3d relativeVelocityB = velB - velA; // B's velocity relative to A
-            Vector3d relativeAccelerationB = accelB - accelA; // B's acceleration relative to A
-            Vector3d directionAB = relativePositionB / distance; // A -> B
-            double closingSpeed = -Vector3d.Dot(relativeVelocityB, directionAB);
-            double closingAcceleration = -Vector3d.Dot(relativeAccelerationB, directionAB);
-            return CalculateArrivalTime(closingAcceleration, closingSpeed, distance);
+            const double third = 1.0 / 3.0;
+            const double twoPiThird = 2.0 * Math.PI * third;
+
+            // Depress to  u³ + pu + q = 0  via  m = u − B/3
+            double B2     = B * B;
+            double p      = C - B2 * third;
+            double q      = D + B * (2.0 * B2 / 27.0 - C * third);
+            double mShift = -B * third;
+
+            // Δ > 0  ↔  three distinct real roots
+            double delta = -(4.0 * p * p * p + 27.0 * q * q);
+
+            if (delta > 0.0)
+            {
+                // Trigonometric method (p < 0 is guaranteed when Δ > 0)
+                double sqrtMp3 = Math.Sqrt(-p * third);
+                double cosArg  = Math.Max(-1.0, Math.Min(1.0, 1.5 * q / (p * sqrtMp3)));
+                double theta   = Math.Acos(cosArg) * third;
+                double amp     = 2.0 * sqrtMp3;
+                return new[]
+                {
+                    amp * Math.Cos(theta)               + mShift,
+                    amp * Math.Cos(theta - twoPiThird)  + mShift,
+                    amp * Math.Cos(theta + twoPiThird)  + mShift,
+                };
+            }
+            else
+            {
+                // Cardano — one real root
+                double hq        = q * 0.5;
+                double inner     = Math.Max(0.0, hq * hq + p * p * p / 27.0);
+                double sqrtInner = Math.Sqrt(inner);
+                return new[]
+                {
+                    Math.Cbrt(-hq + sqrtInner) + Math.Cbrt(-hq - sqrtInner) + mShift
+                };
+            }
+        }
+
+        public static double CalculateProjectileTime(Vector3d relativePosition, Vector3d relativeVelocity, Vector3d relativeAcceleration, double projectileSpeed)
+        {
+            // Equate projectile's displacement to the target's displacement
+            // y = time
+            // v_b = (x_i-x_b) + vy + (1/2)ay^2
+            // 0 = -v_b + (x_i-x_b) + vy + (1/2)ay^2
+            // Square both sides to remove vector component
+            // ay^4 + by^3 + cy^2 + dy + e = 0
+            // a = (1/4)|a|^2
+            // b = dot(v, a)
+            // c = |v|^2 + dot(x_i-x_b, a) - bulletSpeed^2
+            // d = 2(dot(x_i-x_b, v)
+            // e = |(x_i-x_b)|^2
+
+            double a = 0.25 * relativeAcceleration.sqrMagnitude;
+            double b = Vector3d.Dot(relativeVelocity, relativeAcceleration);
+            double c = relativeVelocity.sqrMagnitude + Vector3d.Dot(relativePosition, relativeAcceleration) - projectileSpeed * projectileSpeed;
+            double d = 2.0 * Vector3d.Dot(relativePosition, relativeVelocity);
+            double e = relativePosition.sqrMagnitude;
+
+            if (a < epsilon)
+            {
+                // No relative acceleration, use quadratic instead
+                return SolveQuadratic(c, d, e);
+            }
+
+            // Depress quartic to: y^4 + (b/a)y^3 + (c/a)y^2 + (d/a)y + e/a = 0
+            // Let y = x-b/(4a)
+            // x^4 + px^2 + qx + r = 0
+            // p = (8ac - 3b^2) / (8a^2)
+            // q = (b^3 - 4abc + 8(a^2)d) / (8a^3)
+            // r = (16a(b^2)c - 64(a^2)bd - 3b^4 + 256(a^3)e) / 256a^4
+            double inv_a = 1.0 / a;
+            double inv_a2 = inv_a * inv_a;
+            double b2 = b * b;
+            //double p = (8.0*a*c - 3.0*b2) / (8.0*a*a);
+            double p = inv_a*c - 0.375*b2*inv_a2;
+            //double q = (b2*b - 4.0*a*b*c + 8.0*a*a*d) / 8*a*a*a;
+            double q = 0.125*b2*b*inv_a2*inv_a - 0.5*inv_a2*b*c + d*inv_a;
+            //double r = (16.0*a*b2*c - 64.0*a*a*b*d - 3.0*b2*b2 + 256.0*a*a*a*e) / 256*a*a*a*a;
+            double r = 0.0625*inv_a2*inv_a*b2*c - 0.25*inv_a2*b*d - 0.01171875*inv_a2*inv_a2*b2*b2 + inv_a*e;
+            
+            double shift = -b * 0.25 * inv_a; // t = x + shift
+            double t = double.PositiveInfinity;
+
+            if (Math.Abs(q) < epsilon)
+            {
+                // Biquadratic shortcut
+                SolveBiquadratic(p, r, shift, ref t);
+                return double.IsPositiveInfinity(t) ? -1.0 : t;
+            }
+
+            // Now use Ferrari method to solve the 4 solutions
+            // x^4 + px^2 + qx + r = (x^2 + sx + t)(x^2 + ux + v)
+            // (s+u) = 0
+            // (t+v+su) = p
+            // (sv+tu) = q
+            // tv = r
+            // v = (2sr) / (s^3 + ps - q)
+            // rs^6 + 2prs^4 + (rp^2 - 4r^2)s^2 = (q^2)r = 0
+            // Find s²=m via resolvent cubic m³ + 2p·m² + (p²−4r)·m − q² = 0
+            // Factor the quartic as (x² + sx + tv)(x² − sx + vv)
+            // Any real root of the resolvent cubic works; the largest is most stable.
+            double[] mRoots = SolveCubic(2.0 * p, p * p - 4.0 * r, -(q * q));
+            double m = double.NegativeInfinity;
+            foreach (double root in mRoots)
+                if (!double.IsNaN(root) && root > m) m = root;
+
+            if (m < 0.0)
+                return -1.0; // quartic has no real roots
+
+            m = Math.Max(0.0, m); // numerical guard against tiny negative
+            double s = Math.Sqrt(m);
+
+            if (s < epsilon) // s ≈ 0: degenerate back to biquadratic
+            {
+                SolveBiquadratic(p, r, shift, ref t);
+                return double.IsPositiveInfinity(t) ? -1.0 : t;
+            }
+
+            // tv = (s² + p − q/s) / 2,   vv = (s² + p + q/s) / 2
+            double sp  = m + p;
+            double qos = q / s;
+            double tv  = (sp - qos) * 0.5;
+            double vv  = (sp + qos) * 0.5;
+
+            // Quadratic 1: x² + sx + tv = 0,  roots x = (−s ± √(s²−4tv)) / 2
+            double disc1 = m - 4.0 * tv;
+            if (disc1 >= 0.0)
+            {
+                double sq1 = Math.Sqrt(disc1);
+                TryRoot(0.5 * (-s + sq1) + shift, ref t);
+                TryRoot(0.5 * (-s - sq1) + shift, ref t);
+            }
+
+            // Quadratic 2: x² − sx + vv = 0,  roots x = (s ± √(s²−4vv)) / 2
+            double disc2 = m - 4.0 * vv;
+            if (disc2 >= 0.0)
+            {
+                double sq2 = Math.Sqrt(disc2);
+                TryRoot(0.5 * ( s + sq2) + shift, ref t);
+                TryRoot(0.5 * ( s - sq2) + shift, ref t);
+            }
+
+            return double.IsPositiveInfinity(t) ? -1.0 : t;
+        }
+
+        public static double EstimateProjectileTime(Vector3d relativePosition, Vector3d relativeVelocity, Vector3d relativeAcceleration, double projectileSpeed)
+        {
+            double a = 0.25 * relativeAcceleration.sqrMagnitude;
+            double b = Vector3d.Dot(relativeVelocity, relativeAcceleration);
+            double c = relativeVelocity.sqrMagnitude + Vector3d.Dot(relativePosition, relativeAcceleration) - projectileSpeed * projectileSpeed;
+            double d = 2.0 * Vector3d.Dot(relativePosition, relativeVelocity);
+            double e = relativePosition.sqrMagnitude;
+            // Newton-Raphson method or Jenkins-Traub algorithm
+            // x_n+1 = x_n - f(x_n)/f'(x_n)
+            return -1.0;
         }
     }
 

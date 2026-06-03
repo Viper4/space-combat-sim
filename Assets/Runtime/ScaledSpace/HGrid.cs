@@ -103,24 +103,41 @@ public class HGrid
 
         list.Add(rb);
     }
+
+    private static void AddPairs(List<DoubleRigidbody> aList, List<DoubleRigidbody> bList, HashSet<(DoubleRigidbody, DoubleRigidbody)> pairs)
+    {
+        foreach (var a in aList)
+        foreach (var b in bList)
+        {
+            if (a.id == b.id)
+                continue;
+            if (a.IsIgnoring(b.id) || b.IsIgnoring(a.id))
+                continue;
+
+            var pair = a.id < b.id ? (a, b) : (b, a);
+            pairs.Add(pair);
+        }
+    }
     
     public IEnumerable<(DoubleRigidbody, DoubleRigidbody)> GetCandidatePairs()
     {
-        HashSet<(DoubleRigidbody, DoubleRigidbody)> pairs = new HashSet<(DoubleRigidbody, DoubleRigidbody)>();
+        HashSet<(DoubleRigidbody, DoubleRigidbody)> pairs = new();
 
-        // Iterate through every occupied grid cell at every level
         for (int level = 0; level < maxLevels; level++)
         {
             foreach (var kvp in levels[level])
             {
                 GridCell cell = kvp.Key;
+                List<DoubleRigidbody> localObjects = kvp.Value;
 
-                // All 27 cells in a 3x3x3 cube
+                //
+                // SAME LEVEL
+                //
                 for (int dx = -1; dx <= 1; dx++)
                 for (int dy = -1; dy <= 1; dy++)
                 for (int dz = -1; dz <= 1; dz++)
                 {
-                    GridCell neighbor = new GridCell(
+                    GridCell neighbor = new(
                         cell.x + dx,
                         cell.y + dy,
                         cell.z + dz
@@ -129,14 +146,49 @@ public class HGrid
                     if (!levels[level].TryGetValue(neighbor, out var otherList))
                         continue;
 
-                    foreach (var a in kvp.Value)
-                    foreach (var b in otherList)
-                    {
-                        // Prevent (a,a) and prevent duplicate pairs getting added e.g (a,b) and (b,a)
-                        if (a.id == b.id || a.id > b.id)
-                            continue;
+                    AddPairs(localObjects, otherList, pairs);
+                }
 
-                        pairs.Add((a, b));
+                //
+                // COARSER LEVELS
+                //
+                foreach (var rb in localObjects)
+                {
+                    Vector3d pos = rb.scaledTransform.realPosition;
+
+                    for (int coarseLevel = level + 1; coarseLevel < maxLevels; coarseLevel++)
+                    {
+                        double coarseSize = levelCellSizes[coarseLevel];
+
+                        GridCell coarseCell = GetCell(pos, coarseSize);
+
+                        for (int dx = -1; dx <= 1; dx++)
+                        for (int dy = -1; dy <= 1; dy++)
+                        for (int dz = -1; dz <= 1; dz++)
+                        {
+                            GridCell neighbor = new(
+                                coarseCell.x + dx,
+                                coarseCell.y + dy,
+                                coarseCell.z + dz
+                            );
+
+                            if (!levels[coarseLevel].TryGetValue(neighbor, out var otherList))
+                                continue;
+
+                            foreach (var other in otherList)
+                            {
+                                if (rb.id == other.id)
+                                    continue;
+                                if (rb.IsIgnoring(other.id) || other.IsIgnoring(rb.id))
+                                    continue;
+
+                                var pair = rb.id < other.id
+                                    ? (rb, other)
+                                    : (other, rb);
+
+                                pairs.Add(pair);
+                            }
+                        }
                     }
                 }
             }
