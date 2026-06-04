@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SpaceStuff;
+using UnityEngine;
 
 public class HGrid
 {
@@ -19,9 +20,7 @@ public class HGrid
 
         public bool Equals(GridCell other)
         {
-            return x == other.x &&
-                y == other.y &&
-                z == other.z;
+            return x == other.x && y == other.y && z == other.z;
         }
 
         public override int GetHashCode()
@@ -83,117 +82,113 @@ public class HGrid
             levels[i].Clear();
     }
 
-    public void Insert(DoubleRigidbody rb)
+    private void Insert(DoubleRigidbody rb, int level, GridCell cell)
     {
-        if (rb.hGridLevel == -1)
-            rb.hGridLevel = GetLevel(rb.GetCollisionRadius());
-
-        double cellSize = levelCellSizes[rb.hGridLevel];
-
-        GridCell cell = GetCell(
-            rb.scaledTransform.realPosition,
-            cellSize
-        );
-
-        if (!levels[rb.hGridLevel].TryGetValue(cell, out var list))
+        if(!levels[level].TryGetValue(cell, out var list))
         {
             list = new List<DoubleRigidbody>();
-            levels[rb.hGridLevel].Add(cell, list);
+            levels[level].Add(cell, list);
         }
-
         list.Add(rb);
     }
 
-    private static void AddPairs(List<DoubleRigidbody> aList, List<DoubleRigidbody> bList, HashSet<(DoubleRigidbody, DoubleRigidbody)> pairs)
+    private void Remove(DoubleRigidbody rb, int level, GridCell cell)
     {
-        foreach (var a in aList)
-        foreach (var b in bList)
-        {
-            if (a.id == b.id)
-                continue;
-            if (a.IsIgnoring(b.id) || b.IsIgnoring(a.id))
-                continue;
+        if(!levels[level].TryGetValue(cell, out var list))
+            return;
+        list.Remove(rb);
+    }
 
-            var pair = a.id < b.id ? (a, b) : (b, a);
-            pairs.Add(pair);
+    public void Delete(DoubleRigidbody rb)
+    {
+        if (rb.currentColliderLevel == -1)
+            return;
+        Remove(rb, rb.currentColliderLevel, rb.currentColliderCell);
+    }
+
+    public void UpdatePosition(DoubleRigidbody rb)
+    {
+        // Effective radius = collider radius + distance traveled this frame.
+        // This places fast-moving objects into a coarser level whose cell size
+        // is large enough to contain the entire swept path in one cell.
+        double displacement = rb.velocity.magnitude * Time.fixedDeltaTime;
+        double effectiveRadius = rb.GetCollisionRadius() + displacement;
+        int newLevel = GetLevel(effectiveRadius);
+
+        if (rb.currentColliderLevel == -1)
+        {
+            rb.currentColliderLevel = newLevel;
+            rb.currentColliderCell = GetCell(rb.scaledTransform.realPosition, levelCellSizes[newLevel]);
+            Insert(rb, rb.currentColliderLevel, rb.currentColliderCell);
+            return;
+        }
+
+        int prevLevel = rb.currentColliderLevel;
+        GridCell prevCell = rb.currentColliderCell;
+        GridCell newCell = GetCell(rb.scaledTransform.realPosition, levelCellSizes[newLevel]);
+
+        // Re-insert only when the level or cell actually changes
+        if (newLevel != prevLevel || !newCell.Equals(prevCell))
+        {
+            Remove(rb, prevLevel, prevCell);
+            rb.currentColliderLevel = newLevel;
+            rb.currentColliderCell = newCell;
+            Insert(rb, newLevel, newCell);
         }
     }
-    
-    public IEnumerable<(DoubleRigidbody, DoubleRigidbody)> GetCandidatePairs()
+
+    public void UpdateSize(DoubleRigidbody rb)
     {
-        HashSet<(DoubleRigidbody, DoubleRigidbody)> pairs = new();
+        // Keep velocity inflation consistent with UpdatePosition
+        double displacement = rb.velocity.magnitude * Time.fixedDeltaTime;
+        int newLevel = GetLevel(rb.GetCollisionRadius() + displacement);
+        int prevLevel = rb.currentColliderLevel;
 
-        for (int level = 0; level < maxLevels; level++)
+        if (prevLevel == newLevel)
+            return;
+
+        if (prevLevel != -1)
+            Remove(rb, prevLevel, rb.currentColliderCell);
+
+        rb.currentColliderLevel = newLevel;
+        rb.currentColliderCell = GetCell(rb.scaledTransform.realPosition, levelCellSizes[newLevel]);
+        Insert(rb, rb.currentColliderLevel, rb.currentColliderCell);
+    }
+
+    public IEnumerable<DoubleRigidbody> GetCandidates(DoubleRigidbody rb)
+    {
+        if (rb.currentColliderLevel == -1)
         {
-            foreach (var kvp in levels[level])
+            double displacement = rb.velocity.magnitude * Time.fixedDeltaTime;
+            rb.currentColliderLevel = GetLevel(rb.GetCollisionRadius() + displacement);
+        }
+
+        Vector3d pos = rb.scaledTransform.realPosition;
+
+        // Check this level and above only — smaller objects do their own upward search,
+        // so pairs are never missed and never double-checked at mismatched levels.
+        for (int level = rb.currentColliderLevel; level < maxLevels; level++)
+        {
+            GridCell center = GetCell(pos, levelCellSizes[level]);
+
+            // 3×3×3 neighborhood is sufficient: the inflation guarantee means a fast
+            // object's prevPos and realPos both map to the same cell or one neighbor
+            // at that object's level (displacement ≤ cellSize/2 by GetLevel's invariant).
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+            for (int dz = -1; dz <= 1; dz++)
             {
-                GridCell cell = kvp.Key;
-                List<DoubleRigidbody> localObjects = kvp.Value;
+                GridCell cell = new GridCell(center.x + dx, center.y + dy, center.z + dz);
+                if (!levels[level].TryGetValue(cell, out var list))
+                    continue;
 
-                //
-                // SAME LEVEL
-                //
-                for (int dx = -1; dx <= 1; dx++)
-                for (int dy = -1; dy <= 1; dy++)
-                for (int dz = -1; dz <= 1; dz++)
+                foreach (DoubleRigidbody other in list)
                 {
-                    GridCell neighbor = new(
-                        cell.x + dx,
-                        cell.y + dy,
-                        cell.z + dz
-                    );
-
-                    if (!levels[level].TryGetValue(neighbor, out var otherList))
+                    if (rb.id == other.id || rb.IsIgnoring(other.id) || other.IsIgnoring(rb.id))
                         continue;
-
-                    AddPairs(localObjects, otherList, pairs);
-                }
-
-                //
-                // COARSER LEVELS
-                //
-                foreach (var rb in localObjects)
-                {
-                    Vector3d pos = rb.scaledTransform.realPosition;
-
-                    for (int coarseLevel = level + 1; coarseLevel < maxLevels; coarseLevel++)
-                    {
-                        double coarseSize = levelCellSizes[coarseLevel];
-
-                        GridCell coarseCell = GetCell(pos, coarseSize);
-
-                        for (int dx = -1; dx <= 1; dx++)
-                        for (int dy = -1; dy <= 1; dy++)
-                        for (int dz = -1; dz <= 1; dz++)
-                        {
-                            GridCell neighbor = new(
-                                coarseCell.x + dx,
-                                coarseCell.y + dy,
-                                coarseCell.z + dz
-                            );
-
-                            if (!levels[coarseLevel].TryGetValue(neighbor, out var otherList))
-                                continue;
-
-                            foreach (var other in otherList)
-                            {
-                                if (rb.id == other.id)
-                                    continue;
-                                if (rb.IsIgnoring(other.id) || other.IsIgnoring(rb.id))
-                                    continue;
-
-                                var pair = rb.id < other.id
-                                    ? (rb, other)
-                                    : (other, rb);
-
-                                pairs.Add(pair);
-                            }
-                        }
-                    }
+                    yield return other;
                 }
             }
         }
-
-        return pairs;
     }
 }

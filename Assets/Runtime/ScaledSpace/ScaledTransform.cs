@@ -32,7 +32,7 @@ public class ScaledTransform : MonoBehaviour
         set
         {
             if (_realScale != value && doubleRigidbody != null)
-                doubleRigidbody.hGridLevel = -1; // Let HGrid know to recalculate this doubleRb's level
+                ScaledSpacePhysics.Instance.UpdateGridSize(doubleRigidbody);
             _realScale = value;
             UpdateTransform(true);
         }

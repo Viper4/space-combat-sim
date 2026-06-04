@@ -77,24 +77,6 @@ public class Radar : MonoBehaviour
 
                 double distance = Math.Sqrt(sqrDistance);
                 Vector3d direction = relativePosition / distance;
-                Vector3d relativeAcceleration = radarTarget.acceleration - ship.acceleration;
-                Vector3d relativeVelocity = radarTarget.doubleRigidbody.velocity - ship.doubleRigidbody.velocity;
-                // Negative closing => moving away, Positive closing => coming closer
-                double closingSpeed = -Vector3d.Dot(relativeVelocity, direction);
-                double closingAcceleration = -Vector3d.Dot(relativeAcceleration, direction);
-
-                double arrivalTime = SpaceMath.CalculateArrivalTime(distance, closingSpeed, closingAcceleration);
-
-                // Update metrics for use in other places like the HUD
-                float speed = (float)radarTarget.doubleRigidbody.velocity.magnitude;
-                radarTarget.UpdateMetrics(direction.ToVector3(), distance, speed, closingSpeed, arrivalTime);
-
-                string ETA = arrivalTime < 0.0001f ? "Never" : SpaceMath.SecondsToFormattedString(arrivalTime, 2);
-                string details = "<b>" + radarTarget.name + "</b>" +
-                    "\nDST " + SpaceMath.DistanceToFormattedString(distance, 2) +
-                    "\nSPD " + SpaceMath.SpeedToFormattedString(speed, 2) +
-                    "\nREL " + SpaceMath.SpeedToFormattedString(closingSpeed, 2) +
-                    "\nETA " + ETA;
 
                 if (hologramActive)
                 {
@@ -198,9 +180,24 @@ public class Radar : MonoBehaviour
 
                 if (_HUDSystem.radarHudActive)
                 {
-                    if (!_HUDSystem.UpdateObject(targetID, radarTarget, details))
+                    Vector3d relativeAcceleration = radarTarget.acceleration - ship.acceleration;
+                    Vector3d relativeVelocity = radarTarget.doubleRigidbody.velocity - ship.doubleRigidbody.velocity;
+                    // Negative closing => moving away, Positive closing => coming closer
+                    double closingVelocity = -Vector3d.Dot(relativeVelocity, direction);
+                    double closingAcceleration = -Vector3d.Dot(relativeAcceleration, direction);
+
+                    double arrivalTime = SpaceMath.CalculateArrivalTime(distance, closingVelocity, closingAcceleration);
+
+                    string ETA = arrivalTime < 0.0001f ? "Never" : SpaceMath.SecondsToFormattedString(arrivalTime, 2);
+                    string details = "<b>" + radarTarget.name + "</b>" +
+                        "\nDST " + SpaceMath.DistanceToFormattedString(distance, 2) +
+                        "\nSPD " + SpaceMath.SpeedToFormattedString((float)radarTarget.doubleRigidbody.velocity.magnitude, 2) +
+                        "\nCLS " + SpaceMath.SpeedToFormattedString(closingVelocity, 2) +
+                        "\nETA " + ETA;
+
+                    if (!_HUDSystem.UpdateObject(radarTarget, details))
                     {
-                        HUDObject newHUDObject = _HUDSystem.CreateObject(targetID, radarTarget, details);
+                        HUDObject newHUDObject = _HUDSystem.CreateObject(radarTarget, details);
                         switch (radarTarget.transform.tag)
                         {
                             case "Ship":

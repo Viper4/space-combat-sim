@@ -66,7 +66,7 @@ public class Turret : MonoBehaviour
     private List<Collider> ignoreColliders = new List<Collider>();
 
     [SerializeField] private bool test;
-    Queue<KeyValuePair<float, Vector3d>> predictions = new Queue<KeyValuePair<float, Vector3d>>();
+    private Queue<KeyValuePair<float, Vector3d>> predictions = new Queue<KeyValuePair<float, Vector3d>>();
 
     protected virtual void Start()
     {
@@ -90,7 +90,7 @@ public class Turret : MonoBehaviour
             {
                 Vector3d realTargetPos = currentTarget.doubleRigidbody.scaledTransform.realPosition;
                 Vector3d error = realTargetPos - prediction.Value;
-                Debug.Log($"Turret prediction: {prediction.Value}, actual: {realTargetPos}, error: {error}, err magnitude: {error.magnitude}");
+                Debug.Log($"{Time.time - prediction.Key} Turret prediction: {prediction.Value}, actual: {realTargetPos}, error: {error}, error distance: {error.magnitude}");
                 predictions.Dequeue();
             }
         }
@@ -110,7 +110,7 @@ public class Turret : MonoBehaviour
 
             if (currentTarget != null)
             {
-                // Calculate future position of target
+                // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
                 Vector3d realFirePoint = GetRealFirePoint();
                 Vector3d realTargetPos = currentTarget.doubleRigidbody.scaledTransform.realPosition;
                 Vector3d relativePosition = realTargetPos - realFirePoint;
@@ -122,6 +122,7 @@ public class Turret : MonoBehaviour
                 Vector3d projectileAcceleration = turretSystem.ship.doubleRigidbody.GetGravity();
                 Vector3d relativeAcceleration = currentTarget.acceleration - projectileAcceleration;
 
+                // Maybe add noise or something to bulletTime
                 double bulletTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration, projectileSpeed);
                 Vector3d predictedRelativePos = relativePosition
                         + (relativeVelocity * bulletTime)
@@ -205,16 +206,17 @@ public class Turret : MonoBehaviour
             // Use defensive strategy against target
             double distance = relativePosition.magnitude;
             Vector3d direction = relativePosition / distance;
-            if (Physics.Raycast(origin.position, direction.ToVector3(), out RaycastHit hit, (float)distance, ~ignoreLayers) && hit.transform != target.transform)
+            if (Physics.Raycast(origin.position, direction.ToVector3(), out RaycastHit hit, (float)distance, ~ignoreLayers, QueryTriggerInteraction.Ignore) && hit.transform != target.transform)
             {
                 // Obstructed view
                 return;
             }
 
-            double incomingSpeed = -Vector3d.Dot(target.doubleRigidbody.velocity, direction);
+            // Dont want to use closingVelocity and closingAcceleration since we only want to consider the intention of the target, not if the ship is moving towards it
+            double incomingVelocity = -Vector3d.Dot(target.doubleRigidbody.velocity, direction);
             double incomingAcceleration = -Vector3d.Dot(target.acceleration, direction);
 
-            double estimatedClosingTime = distance / (incomingSpeed + accelerationHeuristic * incomingAcceleration * distance);
+            double estimatedClosingTime = distance / (incomingVelocity + accelerationHeuristic * incomingAcceleration * distance);
             
             if (!inKillRadius && estimatedClosingTime < 0)
             {
@@ -299,7 +301,7 @@ public class Turret : MonoBehaviour
 
     public bool GetRaycastHit(out RaycastHit hit)
     {
-        bool gotHit = Physics.Raycast(origin.position, origin.forward, out hit, Mathf.Infinity, ~ignoreLayers);
+        bool gotHit = Physics.Raycast(origin.position, origin.forward, out hit, Mathf.Infinity, ~ignoreLayers, QueryTriggerInteraction.Ignore);
         obstructed = gotHit && hit.transform == turretSystem.ship.transform;
         return gotHit;
     }

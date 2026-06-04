@@ -1222,20 +1222,20 @@ namespace SpaceStuff
         }
 
         /// <summary>
-        /// Calculates the time it will take for object A to arrive at object B given the closingAcceleration, closingSpeed, and distance from A to B
+        /// Calculates the time it will take for object A to arrive at object B given the closingAcceleration, closingVelocity, and distance from A to B
         /// </summary>
         /// <param name="closingAcceleration">m/s^2. + => accelerating towards B, - => accelerating away from B</param>
-        /// <param name="closingSpeed">m/s. + => moving towards B, - => moving away from B</param>
+        /// <param name="closingVelocity">m/s. + => moving towards B, - => moving away from B</param>
         /// <param name="distance">Distance in meters between A and B</param>
         /// <returns>The time in seconds it will take for the object to arrive at the target, or -1 if it can never arrive.</returns>
-        public static double CalculateArrivalTime(double distance, double closingSpeed, double closingAcceleration)
+        public static double CalculateArrivalTime(double distance, double closingVelocity, double closingAcceleration)
         {
             // dst = (1/2)At^2 + Vt
             // a = (1/2)A, b = V, c = -dst
             if (distance < epsilon)
                 return 0f;
             
-            return SolveQuadratic(0.5 * closingAcceleration, closingSpeed, -distance);
+            return SolveQuadratic(0.5 * closingAcceleration, closingVelocity, -distance);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

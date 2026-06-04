@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using SpaceStuff;
-using Unity.Collections;
 
 [RequireComponent(typeof(RadarTarget))]
 public class Torpedo : Projectile
@@ -22,6 +21,7 @@ public class Torpedo : Projectile
     [SerializeField] private float maxDamage = 75f;
 
     [SerializeField] private RadarTarget target;
+    [SerializeField] private float navigationConstant = 4f;
     private float thrusterTorque;
     private float engineAcceleration;
 
@@ -48,57 +48,48 @@ public class Torpedo : Projectile
                 Vector3d realTorpedoPosition = thisRadarTarget.doubleRigidbody.scaledTransform.realPosition;
 
                 Vector3d relativePosition = realTargetPosition - realTorpedoPosition;
-                double distance = relativePosition.magnitude;
-                Vector3d direction = relativePosition / distance;
+                Vector3d targetDir = relativePosition.normalized;
                 Vector3d relativeVelocity = targetVelocity - torpedoVelocity;
-                Vector3d relativeAcceleration = target.acceleration - thisRadarTarget.acceleration;
 
-                // double arrivalTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration,);
+                // Proportional Navigation Guidance to steer torpedo: a = cross(NV_r, omega)
+                // omega = cross(R, V_r) / dot(R, R)
+                // R = relative position
+                Vector3d rotationVector = Vector3d.Cross(relativePosition, relativeVelocity) / relativePosition.sqrMagnitude;
 
-                double closingAcceleration = -Vector3d.Dot(relativeAcceleration, direction);
-                double closingSpeed = -Vector3d.Dot(relativeVelocity, direction);
-                double arrivalTime = SpaceMath.CalculateArrivalTime(distance, closingSpeed, closingAcceleration + engineAcceleration);
-                if (arrivalTime < 0.0) // Will never arrive
-                    return;
-                // futureTargetPos = futureTorpedoPos
-                // realTargetPosition + targetVelocity * t + 0.5 * t^2 * target.acceleration = realTorpedoPosition + torpedoVelocity * t + 0.5 * t^2 * requiredA;
-                // requiredA = (relativePosition + relativeVelocity * t + 0.5 * tag * tag * target.acceleration) / 0.5 * t^2;
-                double invArrivalTime = 1.0 / arrivalTime;
-                Vector3d requiredAcceleration = (relativePosition + relativeVelocity * arrivalTime + 0.5 * arrivalTime * arrivalTime * target.acceleration) * (2.0 * invArrivalTime * invArrivalTime);
-                Vector3d gravityAcceleration = doubleRigidbody.GetGravity();
-                requiredAcceleration -= gravityAcceleration; // Remove component that gravity is already acting on
-                Vector3d requiredForce = doubleRigidbody.attachedRigidbody.mass * requiredAcceleration;
-                Vector3d forceDirection = requiredForce.normalized;
-                Vector3 localRequiredForce = transform.InverseTransformDirection(requiredForce.ToVector3());
+                Vector3d pnAcceleration = Vector3d.Cross(navigationConstant * relativeVelocity, rotationVector);
 
-                // Vector3d predictedRelativePosition = relativePosition + (relativeVelocity * arrivalTime) + (0.5 * arrivalTime * arrivalTime * relativeAcceleration);
+                Vector3d desiredAcceleration = targetDir * engineAcceleration + pnAcceleration;
 
-                // Apply force to get to desired future position
-                /*Vector3 desiredLocalVelocity = transform.InverseTransformDirection((predictedRelativePosition * 1000f).ToVector3());
-                Vector3 localVelocity = transform.InverseTransformDirection(torpedoVelocity.ToVector3());
-                Vector3 error = desiredLocalVelocity - localVelocity;
+                Vector3d desiredForce = desiredAcceleration * doubleRigidbody.attachedRigidbody.mass;
+                Vector3 localDesiredForce = transform.InverseTransformDirection(desiredForce.ToVector3());
                 
-                error = Vector3.ClampMagnitude(error, 1.0f);
-                error.x *= thrusterForce;
-                error.y *= thrusterForce;*/
-                if (localRequiredForce.z > 0)
+                localDesiredForce.x = Mathf.Clamp(localDesiredForce.x, -thrusterForce, thrusterForce);
+                localDesiredForce.y = Mathf.Clamp(localDesiredForce.y, -thrusterForce, thrusterForce);
+
+                // Z axis
+                if (localDesiredForce.z >= 0.0f)
                 {
-                    localRequiredForce.z *= engineForce;
+                    // Main engine
+                    localDesiredForce.z = Mathf.Min(localDesiredForce.z, engineForce);
+
                     if (!rocketParticles.activeSelf)
                         rocketParticles.SetActive(true);
                 }
                 else
                 {
-                    localRequiredForce.z *= thrusterForce;
+                    // Reverse thruster
+                    localDesiredForce.z = Mathf.Max(localDesiredForce.z, -thrusterForce);
+
                     if (rocketParticles.activeSelf)
                         rocketParticles.SetActive(false);
                 }
 
-                doubleRigidbody.AddRelativeForce(localRequiredForce.ToVector3d(), ForceMode.Force);
+                doubleRigidbody.AddRelativeForce(localDesiredForce.ToVector3d(), ForceMode.Force);
+                Debug.Log($"Force: {localDesiredForce}");
 
                 // Rotate to align engines with error
                 // Desired facing direction
-                Vector3 desiredForward = forceDirection.ToVector3();
+                Vector3 desiredForward = desiredForce.normalized.ToVector3();
 
                 // Current angular velocity in world space
                 Vector3 angularVelocity = doubleRigidbody.angularVelocity.ToVector3();
@@ -128,7 +119,7 @@ public class Torpedo : Projectile
 
                 // Clamp maximum torque
                 torque = Vector3.ClampMagnitude(torque, thrusterTorque);
-
+                Debug.Log($"Torque: {torque}");
                 doubleRigidbody.AddTorque(torque.ToVector3d(), ForceMode.Force);
             }
         }
@@ -158,7 +149,7 @@ public class Torpedo : Projectile
     private float CalculateDamage(float sqrDistance)
     {
         // y = -(maxHeight / intercept^2) * x^2 + maxHeight + minHeight;
-        return -(maxDamage / (explosionRadius * explosionRadius)) * sqrDistance + maxDamage + minDamage;
+        return Mathf.Max(-(maxDamage / (explosionRadius * explosionRadius)) * sqrDistance + maxDamage + minDamage, 0f);
     }
 
     public void Detonate(Vector3 contactPoint, Torpedo caller)
@@ -182,7 +173,7 @@ public class Torpedo : Projectile
             Rigidbody hitRigidbody = colliders[i].attachedRigidbody;
             if (hitRigidbody != doubleRigidbody.attachedRigidbody && !hitTransforms.Contains(hitRigidbody.transform))
             {
-                float damage = CalculateDamage((transform.position - hitRigidbody.transform.position).sqrMagnitude);
+                float damage = CalculateDamage((contactPoint - hitRigidbody.transform.position).sqrMagnitude);
 
                 switch (hitRigidbody.tag)
                 {

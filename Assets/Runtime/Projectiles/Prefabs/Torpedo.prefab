@@ -141,8 +141,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
+  currentColliderLevel: -1
+  currentTriggerLevel: -1
+  prevPos:
+    x: 0
+    y: 0
+    z: 0
   _isKinematic: 0
-  speedThreshold: 1000
+  speedThreshold: 100
   _velocity:
     x: 0
     y: 0
@@ -151,7 +157,6 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  hGridLevel: -1
   trackTrigger: 1
   scaledColliderRadius: 0.3
   scaledTriggerRadius: 10
@@ -183,6 +188,7 @@ MonoBehaviour:
   minDamage: 50
   maxDamage: 125
   target: {fileID: 0}
+  navigationConstant: 4
 --- !u!136 &2688048666450355157
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -266,7 +272,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3724786077
+  GlobalObjectIdHash: 312711286
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1

@@ -22,9 +22,10 @@ public class ScaledSpacePhysics : MonoBehaviour
     [SerializeField] private double baseGridCellSize;
     [SerializeField] private int cellScalingFactor;
     public HGrid hGrid;
-    private List<DoubleRigidbody> doubleRigidbodies = new List<DoubleRigidbody>();
-    private HashSet<(DoubleRigidbody, DoubleRigidbody)> previousCollisions = new HashSet<(DoubleRigidbody, DoubleRigidbody)>();
-    private HashSet<(DoubleRigidbody, DoubleRigidbody)> previousTriggers = new HashSet<(DoubleRigidbody, DoubleRigidbody)>();
+    private Dictionary<uint, DoubleRigidbody> doubleRigidbodies = new Dictionary<uint, DoubleRigidbody>();
+    // private List<DoubleRigidbody> doubleRigidbodies = new List<DoubleRigidbody>();
+    private HashSet<Pair> previousCollisions = new HashSet<Pair>();
+    private HashSet<Pair> previousTriggers = new HashSet<Pair>();
 
     private void Awake()
     {
@@ -37,112 +38,132 @@ public class ScaledSpacePhysics : MonoBehaviour
         hGrid = new HGrid(maxGridLevels, baseGridCellSize, cellScalingFactor);
     }
 
-    public void RegisterDoubleRigidbody(DoubleRigidbody doubleRB)
+    public void RegisterDoubleRigidbody(DoubleRigidbody rb)
     {
-        if (!doubleRigidbodies.Contains(doubleRB))
+        if (!doubleRigidbodies.ContainsKey(rb.id))
         {
-            doubleRigidbodies.Add(doubleRB);
+            doubleRigidbodies.Add(rb.id, rb);
+            hGrid.UpdatePosition(rb);
         }
     }
 
-    public void UnregisterDoubleRigidbody(DoubleRigidbody doubleRB)
+    public void UnregisterDoubleRigidbody(DoubleRigidbody rb)
     {
-        doubleRigidbodies.Remove(doubleRB);
+        doubleRigidbodies.Remove(rb.id);
+        hGrid.Delete(rb);
+    }
+
+    public void UpdateGridSize(DoubleRigidbody rb)
+    {
+        hGrid.UpdateSize(rb);
+    }
+
+    public void UpdateGridPos(DoubleRigidbody rb)
+    {
+        hGrid.UpdatePosition(rb);
     }
 
     private void FixedUpdate()
     {
-        HashSet<(DoubleRigidbody, DoubleRigidbody)> currentCollisions = new HashSet<(DoubleRigidbody, DoubleRigidbody)>();
-        HashSet<(DoubleRigidbody, DoubleRigidbody)> currentTriggers = new HashSet<(DoubleRigidbody, DoubleRigidbody)>();
+        HashSet<Pair> currentCollisions = new HashSet<Pair>();
+        HashSet<Pair> currentTriggers = new HashSet<Pair>();
 
         bool shiftOrigin = FloatingWorldOrigin.Instance.OverShiftThreshold();
         if (shiftOrigin)
             FloatingWorldOrigin.Instance.ShiftOrigin();
         
         bool transformsDirty = shiftOrigin; // If shifting origin, will need to sync transforms after loop, otherwise only if any velocities were nonzero
-        hGrid.Clear();
         // Insert all rigidbodies into hierarchical grid for collision detection, and run other logic per doubleRigidbody
-        for (int i = 0; i < doubleRigidbodies.Count; i++)
+        long getCandidatesTicks = 0;
+        long physicsStepTicks = 0;
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.Start();
+        foreach (DoubleRigidbody rb in doubleRigidbodies.Values)
         {
-            DoubleRigidbody rb = doubleRigidbodies[i];
             rb.ClearGravity();
             PrePhysicsStep?.Invoke(rb);
             rb.PhysicsStep(Time.fixedDeltaTime);
 
-            hGrid.Insert(rb);
-
             if (!transformsDirty && rb.active && !rb.isKinematic && rb.velocity.sqrMagnitude > 0.0001)
                 transformsDirty = true;
         }
-
-        Stopwatch stopwatch = new Stopwatch();
-        stopwatch.Start();
-        IEnumerable<(DoubleRigidbody, DoubleRigidbody)> candidates = hGrid.GetCandidatePairs();
         stopwatch.Stop();
-        long getCandidatesTicks = stopwatch.ElapsedTicks;
-        int num = 0;
+        physicsStepTicks = stopwatch.ElapsedTicks;
+        long collisionCheckTicks = 0;
+        Stopwatch stopwatch1 = new Stopwatch();
         stopwatch.Reset();
         stopwatch.Start();
-        foreach ((DoubleRigidbody rbA, DoubleRigidbody rbB) in candidates)
+        foreach (DoubleRigidbody rb in doubleRigidbodies.Values)
         {
-            num++;
-            // Only check collisions/triggers between objects not handled by Unity physics
-            if (!rbA.active && !rbB.active)
-                continue;
-
-            if (CheckCollision(rbA, rbB, out CollisionInfo collision))
+            /*foreach(DoubleRigidbody candidate in hGrid.GetCandidates(rb))
             {
-                currentCollisions.Add((rbA, rbB));
-                ResolveCollision(collision);
-
-                // Track new collisions
-                if (!previousCollisions.Contains((rbA, rbB)))
+                ulong triggerKey = rb.id << 32 | candidate.id;
+                if (rb.trackTrigger && !currentTriggers.Contains(triggerKey) && CheckTrigger(rb, candidate))
                 {
-                    CollisionInfo collisionInfoForB = collision;
-                    // Swap A and B for the second RB's event
-                    collisionInfoForB.rbA = rbB;
-                    collisionInfoForB.rbB = rbA;
-                    collisionInfoForB.transformA = rbB.transform;
-                    collisionInfoForB.transformB = rbA.transform;
-                    // Also need to invert normal for the second RB
-                    collisionInfoForB.normal = -collision.normal;
-                    rbA.RaiseCollisionEnter(collision);
-                    rbB.RaiseCollisionEnter(collisionInfoForB);
+                    currentTriggers.Add(triggerKey);
+                    if (!previousTriggers.Contains(triggerKey))
+                        rb.RaiseTriggerEnter(candidate);
                 }
-            }
+            }*/
 
-            if (rbA.trackTrigger && CheckTrigger(rbA, rbB))
+            foreach (DoubleRigidbody candidate in hGrid.GetCandidates(rb))
             {
-                currentTriggers.Add((rbA, rbB));
-                if (!previousTriggers.Contains((rbA, rbB)))
-                    rbA.RaiseTriggerEnter(rbB);
-            }
-            if (rbB.trackTrigger && CheckTrigger(rbB, rbA))
-            {
-                currentTriggers.Add((rbB, rbA));
-                if (!previousTriggers.Contains((rbB, rbA)))
-                    rbB.RaiseTriggerEnter(rbA);
+                // key's 1st 32-bit half is the min id uint, 2nd 32-bit half is the max id uint
+                Pair collisionKey = new Pair(Math.Min(rb.id, candidate.id), Math.Max(rb.id, candidate.id));
+
+                if ((!rb.active && !candidate.active) || currentCollisions.Contains(collisionKey))
+                    continue;
+
+                stopwatch1.Reset();
+                stopwatch1.Start();
+                if (CheckCollision(rb, candidate, out CollisionInfo collision))
+                {
+                    currentCollisions.Add(collisionKey);
+                    ResolveCollision(collision);
+
+                    // Track new collisions
+                    if (!previousCollisions.Contains(collisionKey))
+                    {
+                        CollisionInfo collisionInfoForB = collision;
+                        // Swap A and B for the second RB's event
+                        collisionInfoForB.rbA = candidate;
+                        collisionInfoForB.rbB = rb;
+                        collisionInfoForB.transformA = candidate.transform;
+                        collisionInfoForB.transformB = rb.transform;
+                        // Also need to invert normal for the second RB
+                        collisionInfoForB.normal = -collision.normal;
+                        rb.RaiseCollisionEnter(collision);
+                        candidate.RaiseCollisionEnter(collisionInfoForB);
+                    }
+                }
+                stopwatch1.Stop();
+                collisionCheckTicks += stopwatch1.ElapsedTicks;
             }
         }
         stopwatch.Stop();
-        long loopTicks = stopwatch.ElapsedTicks;
-        Debug.Log($"pairs: {num}. GetCandidates ticks: {getCandidatesTicks}. Loop ticks: {loopTicks}");
+        getCandidatesTicks = stopwatch.ElapsedTicks;
+        Debug.Log($"Physics Step ticks: {physicsStepTicks}, Get candidates loop ticks: {getCandidatesTicks}, Check Collision ticks: {collisionCheckTicks}");
+
         // Detect collision exits
-        foreach (var previousCollision in previousCollisions)
+        foreach (Pair collision in previousCollisions)
         {
-            if (!currentCollisions.Contains(previousCollision))
+            if (!currentCollisions.Contains(collision) 
+            && doubleRigidbodies.TryGetValue(collision.idA, out var rbA) 
+            && doubleRigidbodies.TryGetValue(collision.idB, out var rbB))
             {
-                previousCollision.Item1.RaiseCollisionExit(previousCollision.Item2);
-                previousCollision.Item2.RaiseCollisionExit(previousCollision.Item1);
+                rbA.RaiseCollisionExit(rbB);
+                rbB.RaiseCollisionExit(rbA);
             }
         }
 
         // Detect trigger exits
-        foreach (var previousTrigger in previousTriggers)
+        foreach (Pair trigger in previousTriggers)
         {
-            if (!currentTriggers.Contains(previousTrigger))
+            if (!currentTriggers.Contains(trigger)
+            && doubleRigidbodies.TryGetValue(trigger.idA, out var rbA) 
+            && doubleRigidbodies.TryGetValue(trigger.idB, out var rbB))
             {
-                previousTrigger.Item1.RaiseTriggerExit(previousTrigger.Item2);
+                rbA.RaiseTriggerExit(rbB);
             }
         }
 
@@ -161,83 +182,73 @@ public class ScaledSpacePhysics : MonoBehaviour
         double radiusB = b.GetCollisionRadius();
         double minDistance = radiusA + radiusB;
 
+        // Positions at END of frame (after PhysicsStep)
         Vector3d posA = a.scaledTransform.realPosition;
         Vector3d posB = b.scaledTransform.realPosition;
         Vector3d relativePosition = posB - posA;
         double sqrDistance = relativePosition.sqrMagnitude;
         double distance = minDistance;
 
-        bool collided = false;
+        bool collided;
+
         if (sqrDistance < minDistance * minDistance)
         {
+            // Overlapping at end of frame — standard intersection
             collided = true;
             distance = Math.Sqrt(sqrDistance);
-            Debug.Log($"Intersect collide: {a.name} with {b.name}");
+            Debug.Log($"Intersect Collide: {a.id} {a.name} and {b.id} {b.name}");
         }
         else
         {
-            // Check if the velocities of A and B can cause them to skip over each other in one frame
-            Vector3d velA = a.velocity;
-            Vector3d velB = b.velocity;
-            Vector3d relativeVelocity = velB - velA;
-            double sqrDistancePerFrame = relativeVelocity.sqrMagnitude * Time.fixedDeltaTime * Time.fixedDeltaTime;
-            if (sqrDistancePerFrame > minDistance * minDistance)
-            {
-                // Continuous Collision Detection (CCD) for spheres:
-                //  |(posB​−posA​)+(velB​−velA​)t|^2 = (radiusA​+radiusB​)^2
-                //  |relativePos + relativeVel*t|^2 = (combinedRadius)^2
-                //  (P+Vt)⋅(P+Vt) = R^2
-                //  P⋅P + 2(P⋅V)t + (V⋅V)t^2 = R^2
-                //  (V⋅V)t^2 + 2(P⋅V)t + (P⋅P−R^2) = 0
-                // aCoef = V⋅V
-                // bCoef = 2(P⋅V)
-                // cCoef = P⋅P−R^2
+            // CCD: sweep from prevPos to realPos (retroactive)
+            // displacement = realPos - prevPos = what PhysicsStep just added
+            Vector3d dispA = a.scaledTransform.realPosition - a.prevPos;
+            Vector3d dispB = b.scaledTransform.realPosition - b.prevPos;
 
-                double aCoeff = Vector3d.Dot(relativeVelocity, relativeVelocity);
-                double bCoeff = 2.0 * Vector3d.Dot(relativePosition, relativeVelocity);
-                double cCoeff = Vector3d.Dot(relativePosition, relativePosition) - minDistance * minDistance;
-                double t = SpaceMath.SolveQuadratic(aCoeff, bCoeff, cCoeff);
-                if (t >= 0.0)
-                {
-                    collided = true;
-                    Debug.Log($"CCD collide: {a.name} with {b.name}");
-                }
-                // Use quadratic formula to solve for t
-                /*double discriminant = bCoeff * bCoeff - 4.0 * aCoeff * cCoeff;
+            // Use start-of-frame positions as the sweep origin
+            Vector3d startPosA = a.prevPos;
+            Vector3d startPosB = b.prevPos;
+            Vector3d relPos0 = startPosB - startPosA;  // relative pos at frame start
+            Vector3d relDisp = dispB - dispA;           // relative displacement over frame
+            
+            // Quick reject: objects moving apart at frame start
+            if (Vector3d.Dot(relPos0, relDisp) >= 0)
+                return false;
 
-                if (discriminant >= 0.0)
-                {
-                    double sqrtD = Math.Sqrt(discriminant);
+            // Only need CCD if relative displacement exceeds the gap
+            double gap = Math.Sqrt(relPos0.sqrMagnitude) - minDistance;
+            if (gap < 0)
+                gap = 0; // prevPos already overlapping — handled next frame
+            double sqrRelDisp = relDisp.sqrMagnitude;
+            if (sqrRelDisp <= gap * gap)
+                return false;
 
-                    double t0 = (-bCoeff - sqrtD) / (2.0 * aCoeff);
-                    double t1 = (-bCoeff + sqrtD) / (2.0 * aCoeff);
+            // Quadratic: |relPos0 + relDisp*t|² = minDistance²,  t ∈ [0,1]
+            double aCoeff = Vector3d.Dot(relDisp, relDisp);
+            double bCoeff = 2.0 * Vector3d.Dot(relPos0, relDisp);
+            double cCoeff = Vector3d.Dot(relPos0, relPos0) - minDistance * minDistance;
 
-                    double t = double.PositiveInfinity;
-                    if (t0 >= 0.0 && t0 <= Time.fixedDeltaTime)
-                        t = t0;
-                    if (t1 >= 0.0 && t1 <= Time.fixedDeltaTime)
-                        t = Math.Min(t, t1);
+            double t = SpaceMath.SolveQuadratic(aCoeff, bCoeff, cCoeff);
+            if (t < 0.0)
+                return false;
 
-                    if (!double.IsInfinity(t))
-                    {
-                        collided = true;
+            collided = true;
 
-                        posA += velA * t;
-                        posB += velB * t;
-
-                        relativePosition = posB - posA;
-                        // distance is already = minDistance
-                        Debug.Log($"CCD collide: {a.name} with {b.name}");
-                    }
-                }*/
-            }
+            // Interpolate positions to moment of contact for normal/contact point
+            posA = startPosA + dispA * t;
+            posB = startPosB + dispB * t;
+            relativePosition = posB - posA;
+            // |relativePosition| == minDistance by construction, so distance = minDistance
+            // penetration will be 0 — velocity impulse handles separation; position
+            // correction is handled because ResolveCollision moves realPosition directly
+            Debug.Log($"CCD Collide: {a.id} {a.name} and {b.id} {b.name}");
         }
 
         if (!collided)
             return false;
 
-        // Calculate collision normal and contact point
         Vector3d normal = distance > 0.0001 ? relativePosition / distance : Vector3d.up;
+
         double penetration = minDistance - distance;
         Vector3d contactPoint = posA + normal * radiusA;
 
@@ -251,12 +262,6 @@ public class ScaledSpacePhysics : MonoBehaviour
             normal = normal,
             penetration = penetration
         };
-
-        if (debugDraw)
-        {
-            Debug.DrawLine(posA.ToVector3(), posB.ToVector3(), Color.red);
-            Debug.DrawLine(contactPoint.ToVector3(), (contactPoint + normal * 10).ToVector3(), Color.green);
-        }
 
         return true;
     }
@@ -448,5 +453,17 @@ public class ScaledSpacePhysics : MonoBehaviour
             }
         }
         return false;
+    }
+
+    public struct Pair
+    {
+        public uint idA;
+        public uint idB;
+
+        public Pair(uint idA, uint idB)
+        {
+            this.idA = idA;
+            this.idB = idB;
+        }
     }
 }

@@ -8,9 +8,14 @@ public class DoubleRigidbody : MonoBehaviour
 {
     public static float speedLimit = 2.99792458e8f; // Speed of light in m/s
 
+    // HGrid stuff
     private static uint nextId;
-
     public uint id {get; private set;}
+    public int currentColliderLevel = -1;
+    public int currentTriggerLevel = -1;
+    public HGrid.GridCell currentColliderCell;
+    public HGrid.GridCell currentTriggerCell;
+    public Vector3d prevPos;
 
     private bool _active;
     public bool active
@@ -100,8 +105,6 @@ public class DoubleRigidbody : MonoBehaviour
         }
     }
 
-    public int hGridLevel = -1;
-
     /// <summary>
     /// Event fired when this RB enters collision with another RB in scaled space
     /// </summary>
@@ -141,16 +144,8 @@ public class DoubleRigidbody : MonoBehaviour
         {
             FloatingWorldOrigin.Instance.OnOriginShift += OnOriginShift;
         }
-    }
-
-    private void OnEnable()
-    {
+        prevPos = scaledTransform.realPosition;
         ScaledSpacePhysics.Instance.RegisterDoubleRigidbody(this);
-    }
-
-    private void OnDisable()
-    {
-        ScaledSpacePhysics.Instance.UnregisterDoubleRigidbody(this);
     }
     
     public void ClearGravity()
@@ -172,9 +167,10 @@ public class DoubleRigidbody : MonoBehaviour
     {
         if (_isKinematic)
             return;
+        prevPos = scaledTransform.realPosition;
 
         AddForce(gravityAcceleration, ForceMode.Acceleration);
-        
+
         if (_active)
         {
             scaledTransform.realPosition += _velocity * deltaTime;
@@ -190,15 +186,18 @@ public class DoubleRigidbody : MonoBehaviour
                 transform.rotation = delta * transform.rotation;
             }
 
+            double sqrSpeed = _velocity.sqrMagnitude;
             // Can only use rigidbody when speed is below threshold and in world space
             if (speedThreshold != -1 && !scaledTransform.inScaledSpace)
             {
-                double sqrSpeed = _velocity.sqrMagnitude;
                 if (sqrSpeed < speedThreshold * speedThreshold)
                 {
                     active = false;
                 }
             }
+
+            if (sqrSpeed > 0.0001)
+                ScaledSpacePhysics.Instance.UpdateGridPos(this);
         }
         else
         {
@@ -207,12 +206,16 @@ public class DoubleRigidbody : MonoBehaviour
             _angularVelocity = attachedRigidbody.angularVelocity.ToVector3d();
             if (speedThreshold != -1 && !scaledTransform.inScaledSpace)
             {
-                float sqrSpeed = rigidbodyVelocity.sqrMagnitude;
-                if (sqrSpeed > speedThreshold * speedThreshold)
+                float sqrAngularSpeed = rigidbodyVelocity.sqrMagnitude;
+                if (sqrAngularSpeed > speedThreshold * speedThreshold)
                 {
                     active = true;
                 }
             }
+
+            float sqrSpeed = rigidbodyVelocity.sqrMagnitude;
+            if (sqrSpeed > 0.0001f)
+                ScaledSpacePhysics.Instance.UpdateGridPos(this);
         }
     }
 
@@ -457,6 +460,7 @@ public class DoubleRigidbody : MonoBehaviour
         OnScaledTriggerExit = null;
 
         FloatingWorldOrigin.Instance.OnOriginShift -= OnOriginShift;
+        ScaledSpacePhysics.Instance.UnregisterDoubleRigidbody(this);
     }
 
     public void IgnoreDoubleRigidbody(uint otherId, bool ignore)

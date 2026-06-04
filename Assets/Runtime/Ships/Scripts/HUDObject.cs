@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class HUDObject : MonoBehaviour
 {
-    private uint ID;
+    private uint id;
     private HUDSystem _HUDSystem;
 
     [SerializeField] private RectTransform canvasRectangle;
@@ -13,8 +13,8 @@ public class HUDObject : MonoBehaviour
     [SerializeField] private RectTransform topLeftCorner;
     [SerializeField] private RectTransform topRightCorner;
     [SerializeField] private RectTransform bottomRightCorner;
-    [SerializeField] private RectTransform boundsCenter;
     [SerializeField] private RectTransform centerOfMass;
+    [SerializeField] private RectTransform predictedCenter;
 
     [SerializeField] private TextMeshProUGUI detailsText;
     [SerializeField] private TextMeshProUGUI targetText;
@@ -23,8 +23,8 @@ public class HUDObject : MonoBehaviour
     private Image topLeftImage;
     private Image topRightImage;
     private Image bottomRightImage;
-    private Image boundsCenterImage;
     private Image centerOfMassImage;
+    private Image predictedCenterImage;
 
     [SerializeField] private float killTime = 0.5f;
     private float killTimer;
@@ -36,44 +36,29 @@ public class HUDObject : MonoBehaviour
         killTimer -= Time.deltaTime;
         if (killTimer <= 0)
         {
-            _HUDSystem.Remove(ID);
+            _HUDSystem.Remove(id);
             Destroy(gameObject);
         }
     }
 
-    public void Init(HUDSystem _HUDSystem, Vector3 position, uint ID, string details)
+    public void Init(HUDSystem _HUDSystem, Vector3 position, uint id, string details, bool detailsActive)
     {
         this._HUDSystem = _HUDSystem;
-        this.ID = ID;
-        _HUDSystem.Add(ID, this);
+        this.id = id;
+        _HUDSystem.Add(id, this);
         bottomLeftImage = bottomLeftCorner.GetChild(0).GetComponent<Image>();
         topLeftImage = topLeftCorner.GetChild(0).GetComponent<Image>();
         topRightImage = topRightCorner.GetChild(0).GetComponent<Image>();
         bottomRightImage = bottomRightCorner.GetChild(0).GetComponent<Image>();
-        boundsCenterImage = boundsCenter.GetChild(0).GetComponent<Image>();
         centerOfMassImage = centerOfMass.GetChild(0).GetComponent<Image>();
+        predictedCenterImage = predictedCenter.GetChild(0).GetComponent<Image>();
         originalSize = bottomLeftCorner.sizeDelta.x;
-        UpdateObject(position, details);
-    }
-
-    public void Init(HUDSystem _HUDSystem, Vector3 position, Quadrilateral quad, uint ID, string details)
-    {
-        this._HUDSystem = _HUDSystem;
-        this.ID = ID;
-        _HUDSystem.Add(ID, this);
-        bottomLeftImage = bottomLeftCorner.GetChild(0).GetComponent<Image>();
-        topLeftImage = topLeftCorner.GetChild(0).GetComponent<Image>();
-        topRightImage = topRightCorner.GetChild(0).GetComponent<Image>();
-        bottomRightImage = bottomRightCorner.GetChild(0).GetComponent<Image>();
-        boundsCenterImage = boundsCenter.GetChild(0).GetComponent<Image>();
-        centerOfMassImage = centerOfMass.GetChild(0).GetComponent<Image>();
-        originalSize = bottomLeftCorner.sizeDelta.x;
-        UpdateObject(position, quad, details);
+        UpdateObject(position, details, detailsActive);
     }
 
     public Color GetColor()
     {
-        return boundsCenterImage.color;
+        return predictedCenterImage.color;
     }
 
     public void SetColor(Color color)
@@ -83,13 +68,13 @@ public class HUDObject : MonoBehaviour
         topLeftImage.color = color;
         topRightImage.color = color;
         bottomRightImage.color = color;
-        boundsCenterImage.color = color;
         centerOfMassImage.color = color;
+        predictedCenterImage.color = color;
         detailsText.color = color;
         targetText.color = color;
     }
 
-    public void UpdateObject(Vector3 position, string details)
+    public void UpdateObject(Vector3 position, string details, bool detailsActive)
     {
         if (!centerOfMass.gameObject.activeSelf)
         {
@@ -102,12 +87,22 @@ public class HUDObject : MonoBehaviour
             topLeftCorner.gameObject.SetActive(false);
             topRightCorner.gameObject.SetActive(false);
             bottomRightCorner.gameObject.SetActive(false);
-            boundsCenter.gameObject.SetActive(false);
+            predictedCenter.gameObject.SetActive(false);
         }
 
-        if (detailsText != null)
+        if (detailsActive)
         {
-            detailsText.text = details;
+            if (!detailsText.gameObject.activeSelf)
+                detailsText.gameObject.SetActive(true);
+            if (detailsText != null)
+            {
+                detailsText.text = details;
+            }
+        }
+        else
+        {
+            if (detailsText.gameObject.activeSelf)
+                detailsText.gameObject.SetActive(false);
         }
 
         killTimer = killTime;
@@ -116,7 +111,7 @@ public class HUDObject : MonoBehaviour
         centerOfMass.position = position;
     }
 
-    public void UpdateObject(Vector3 position, Quadrilateral quad, string details)
+    public void UpdateObject(Vector3 position, Quadrilateral quad, string details, bool detailsActive)
     {
         if (SpaceGeometry.QuadrilateralIsZero(quad))
         {
@@ -126,7 +121,7 @@ public class HUDObject : MonoBehaviour
                 topLeftCorner.gameObject.SetActive(false);
                 topRightCorner.gameObject.SetActive(false);
                 bottomRightCorner.gameObject.SetActive(false);
-                boundsCenter.gameObject.SetActive(false);
+                predictedCenter.gameObject.SetActive(false);
                 centerOfMass.gameObject.SetActive(false);
             }
             return;
@@ -138,13 +133,23 @@ public class HUDObject : MonoBehaviour
             topLeftCorner.gameObject.SetActive(true);
             topRightCorner.gameObject.SetActive(true);
             bottomRightCorner.gameObject.SetActive(true);
-            boundsCenter.gameObject.SetActive(true);
+            predictedCenter.gameObject.SetActive(true);
             centerOfMass.gameObject.SetActive(true);
         }
 
-        if (detailsText != null)
+        if (detailsActive)
         {
-            detailsText.text = details;
+            if (!detailsText.gameObject.activeSelf)
+                detailsText.gameObject.SetActive(true);
+            if (detailsText != null)
+            {
+                detailsText.text = details;
+            }
+        }
+        else
+        {
+            if (detailsText.gameObject.activeSelf)
+                detailsText.gameObject.SetActive(false);
         }
 
         killTimer = killTime;
@@ -165,7 +170,7 @@ public class HUDObject : MonoBehaviour
         topLeftCorner.position = topLeftPos;
         topRightCorner.position = topRightPos;
         bottomRightCorner.position = bottomRightPos;
-        boundsCenter.position = centerPos;
+        predictedCenter.position = centerPos;
         centerOfMass.position = position;
 
         // If corners are too close together, scale them down

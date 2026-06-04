@@ -278,6 +278,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
+  currentColliderLevel: -1
+  currentTriggerLevel: -1
+  prevPos:
+    x: 0
+    y: 0
+    z: 0
   _isKinematic: 0
   speedThreshold: 1000
   _velocity:
@@ -288,7 +294,6 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  hGridLevel: -1
   trackTrigger: 0
   scaledColliderRadius: 0.01
   scaledTriggerRadius: -1

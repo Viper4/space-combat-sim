@@ -35,8 +35,8 @@ RectTransform:
   - {fileID: 97768408540960138}
   - {fileID: 6559125192458069883}
   - {fileID: 4509031547568151258}
-  - {fileID: 4193963557268419827}
   - {fileID: 4404354865030173732}
+  - {fileID: 4193963557268419827}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -102,8 +102,8 @@ MonoBehaviour:
   topLeftCorner: {fileID: 97768408540960138}
   topRightCorner: {fileID: 6559125192458069883}
   bottomRightCorner: {fileID: 4509031547568151258}
-  boundsCenter: {fileID: 4193963557268419827}
   centerOfMass: {fileID: 4404354865030173732}
+  predictedCenter: {fileID: 4193963557268419827}
   detailsText: {fileID: 5528863612146361827}
   targetText: {fileID: 8570209859114900497}
   killTime: 0.1
@@ -1028,7 +1028,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4193963557268419827}
   m_Layer: 5
-  m_Name: Bounds Center
+  m_Name: Predicted Center
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1041,7 +1041,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7311956260179547768}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0

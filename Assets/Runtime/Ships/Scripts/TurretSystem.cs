@@ -93,11 +93,20 @@ public class TurretSystem : MonoBehaviour
                 if (triggerHeld)
                     manualControlCrosshair.color = crosshairTriggerColor;
                 Vector3 aimPoint;
-                if (Physics.Raycast(manualControlCrosshair.transform.position, crosshairDirection, out RaycastHit crosshairHit, Mathf.Infinity, ~ship.ignoreLayers))
+                if (Physics.Raycast(manualControlCrosshair.transform.position, crosshairDirection, out RaycastHit crosshairHit, Mathf.Infinity, ~ship.ignoreLayers, QueryTriggerInteraction.Ignore))
                 {
+                    if (crosshairHit.transform.TryGetComponent<ScaledTransform>(out var scaledTransform) && scaledTransform.inScaledSpace)
+                    {
+                        // Convert hit point to real position
+                        Vector3d offset = (crosshairHit.transform.position - crosshairHit.point).ToVector3d() * scaledTransform.scaleFactor;
+                        aimPoint = (scaledTransform.realPosition - offset - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3();
+                    }
+                    else
+                    {
+                        aimPoint = crosshairHit.point;
+                    }
                     if (!triggerHeld)
                         manualControlCrosshair.color = crosshairHoverColor;
-                    aimPoint = crosshairHit.point;
                 }
                 else
                 {

@@ -12254,10 +12254,11 @@ MonoBehaviour:
   combatHudActive: 0
   radarHudObjectPrefab: {fileID: 75830354910885544, guid: 19ebbf769e1d7bc43a531bbdfec7ad19, type: 3}
   radarHudParent: {fileID: 4853518825871850971}
-  RadarHUDDistance: 1.5
+  radarHUDDistance: 1.5
   combatPanel: {fileID: 5787281789236885775}
   combatHUDDistance: 1
   targetCrosshair: {fileID: 5513248687060821374}
+  detailsDistance: 0.1
 --- !u!1 &4657379893424643995
 GameObject:
   m_ObjectHideFlags: 0
@@ -17051,6 +17052,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  currentColliderLevel: -1
+  currentTriggerLevel: -1
+  prevPos:
+    x: 0
+    y: 0
+    z: 0
   _isKinematic: 0
   speedThreshold: 1000
   _velocity:
@@ -17061,7 +17068,6 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  hGridLevel: -1
   trackTrigger: 1
   scaledColliderRadius: 8
   scaledTriggerRadius: 10000
@@ -17104,7 +17110,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3738660560
+  GlobalObjectIdHash: 2708368669
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -17195,6 +17201,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   team: 1
   radarIcon: {fileID: 0}
+  targeted: 0
   turretsTargeting: 0
   stealthDistance: -1
   useScaleForBounds: 0
