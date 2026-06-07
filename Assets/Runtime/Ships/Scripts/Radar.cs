@@ -9,6 +9,7 @@ public class Radar : MonoBehaviour
     [SerializeField] private Ship ship;
     [SerializeField] private ShipGUI shipGUI;
     [SerializeField] private HUDSystem _HUDSystem;
+    [SerializeField] private AlertSystem alertSystem;
 
     public bool active = true;
     [SerializeField] private float[] radarRanges;
@@ -109,6 +110,7 @@ public class Radar : MonoBehaviour
                         switch (radarTarget.transform.tag)
                         {
                             case "Ship":
+                                alertSystem.NewContact();
                                 newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
                                 if (radarTarget.team == ship.team)
                                 {
@@ -122,6 +124,7 @@ public class Radar : MonoBehaviour
                                 }
                                 break;
                             case "Projectile":
+                                alertSystem.NewContact();
                                 newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
                                 if (radarTarget.team == ship.team)
                                 {
@@ -135,6 +138,7 @@ public class Radar : MonoBehaviour
                                 }
                                 break;
                             case "Torpedo":
+                                alertSystem.NewContact();
                                 newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
                                 if (radarTarget.team == ship.team)
                                 {
@@ -188,16 +192,19 @@ public class Radar : MonoBehaviour
 
                     double arrivalTime = SpaceMath.CalculateArrivalTime(distance, closingVelocity, closingAcceleration);
 
-                    string ETA = arrivalTime < 0.0001f ? "Never" : SpaceMath.SecondsToFormattedString(arrivalTime, 2);
+                    string ETA = arrivalTime < 0.0 ? "Never" : SpaceMath.SecondsToFormattedString(arrivalTime, 2);
                     string details = "<b>" + radarTarget.name + "</b>" +
                         "\nDST " + SpaceMath.DistanceToFormattedString(distance, 2) +
                         "\nSPD " + SpaceMath.SpeedToFormattedString((float)radarTarget.doubleRigidbody.velocity.magnitude, 2) +
                         "\nCLS " + SpaceMath.SpeedToFormattedString(closingVelocity, 2) +
                         "\nETA " + ETA;
 
-                    if (!_HUDSystem.UpdateObject(radarTarget, details))
+                    double predictTime = arrivalTime < 0.0 ? distance / 25.0 : arrivalTime;
+                    Vector3d predictedPosition = radarTarget.doubleRigidbody.scaledTransform.realPosition + radarTarget.doubleRigidbody.velocity * predictTime + 0.5 * predictTime * predictTime * radarTarget.acceleration;
+
+                    if (!_HUDSystem.UpdateObject(radarTarget, details, predictedPosition))
                     {
-                        HUDObject newHUDObject = _HUDSystem.CreateObject(radarTarget, details);
+                        HUDObject newHUDObject = _HUDSystem.CreateObject(radarTarget, details, predictedPosition);
                         switch (radarTarget.transform.tag)
                         {
                             case "Ship":

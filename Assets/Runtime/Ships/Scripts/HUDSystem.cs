@@ -6,14 +6,14 @@ using UnityEngine.UI;
 
 public class HUDSystem : MonoBehaviour
 {
-    public bool radarHudActive = false;
-    public bool combatHudActive = false;
+    public bool radarHudActive {get; private set;}
+    public bool combatHudActive {get; private set;}
+    [SerializeField] private TargetingSystem targetingSystem;
     [SerializeField] private GameObject radarHudObjectPrefab;
     [SerializeField] private GameObject radarHudParent;
     [SerializeField] private float radarHUDDistance = 1.5f;
     public RectTransform combatPanel;
     [SerializeField] private float combatHUDDistance = 1.0f;
-    public Image targetCrosshair;
     [SerializeField, Tooltip("Distance away from camera center HUD objects will show details text.")] private float detailsDistance = 0.05f;
 
     private Dictionary<uint, HUDObject> radarIDHUDPair = new Dictionary<uint, HUDObject>();
@@ -22,7 +22,6 @@ public class HUDSystem : MonoBehaviour
     {
         radarHudParent.SetActive(radarHudActive);
         combatPanel.gameObject.SetActive(combatHudActive);
-        targetCrosshair.gameObject.SetActive(false);
     }
 
     private Vector3 CalculateHUDPosition(Vector3d realPosition, string tag)
@@ -39,39 +38,32 @@ public class HUDSystem : MonoBehaviour
         return position;
     }
 
-    public void TargetObject(RadarTarget target)
-    {
-        
-    }
-
-    public HUDObject CreateObject(RadarTarget target, string details)
+    public HUDObject CreateObject(RadarTarget target, string details, Vector3d predictedPosition)
     {
         Vector3 position = CalculateHUDPosition(target.doubleRigidbody.scaledTransform.realPosition, target.tag);
+        Vector3 prediction = CalculateHUDPosition(predictedPosition, target.tag);
         float sqrDistanceToCenter = (Camera.main.transform.position + Camera.main.transform.forward * radarHUDDistance - position).sqrMagnitude;
         bool detailsActive = sqrDistanceToCenter < detailsDistance * detailsDistance;
         HUDObject newHUDObject = Instantiate(radarHudObjectPrefab, radarHudParent.transform).GetComponent<HUDObject>();
-        newHUDObject.Init(this, position, target.GetID(), details, detailsActive);
+        newHUDObject.Init(this, position, target.GetID(), details, detailsActive, prediction);
+        newHUDObject.sqrDistanceToCenter = sqrDistanceToCenter;
         return newHUDObject;
     }
 
-    public bool UpdateObject(RadarTarget target, string details)
+    public bool UpdateObject(RadarTarget target, string details, Vector3d predictedPosition)
     {
         if (!radarIDHUDPair.TryGetValue(target.GetID(), out HUDObject HUDObject))
             return false;
 
         Vector3 position = CalculateHUDPosition(target.doubleRigidbody.scaledTransform.realPosition, target.tag);
+        Vector3 predicted = CalculateHUDPosition(predictedPosition, target.tag);
         float sqrDistanceToCenter = (Camera.main.transform.position + Camera.main.transform.forward * radarHUDDistance - position).sqrMagnitude;
-        bool detailsActive = sqrDistanceToCenter < detailsDistance * detailsDistance;
-        if (!target.targeted)
-        {
-            HUDObject.UpdateObject(position, details, detailsActive);
-            return true;
-        }
+        HUDObject.sqrDistanceToCenter = sqrDistanceToCenter;
 
-        if (!target.doubleRigidbody.scaledTransform.visible)
+        if (targetingSystem.lockedTarget != target || !target.doubleRigidbody.scaledTransform.visible)
         {
-            // Need to pass predicted future position to set position of predicted center marker
-            HUDObject.UpdateObject(position, details, detailsActive);
+            // No quad bounds
+            HUDObject.UpdateObject(position, details, sqrDistanceToCenter < detailsDistance * detailsDistance, predicted);
             return true;
         }
 
@@ -87,7 +79,7 @@ public class HUDSystem : MonoBehaviour
             quad = SpaceGeometry.GetMinimumBoundingBox(target.boundsRenderers, Camera.main);
         }
 
-        HUDObject.UpdateObject(position, quad, details, detailsActive);
+        HUDObject.UpdateObject(position, quad, details, true, predicted);
         return true;
     }
 
@@ -116,5 +108,20 @@ public class HUDSystem : MonoBehaviour
     {
         combatHudActive = state == 1;
         combatPanel.gameObject.SetActive(combatHudActive);
+    }
+
+    public RadarTarget GetClosestTarget()
+    {
+        float closestDistance = float.MaxValue;
+        RadarTarget best = null;
+        foreach((uint id, HUDObject HUDObject) in radarIDHUDPair)
+        {
+            if (HUDObject.sqrDistanceToCenter < closestDistance)
+            {
+                if (RadarRegistry.TryGet(id, out best))
+                    closestDistance = HUDObject.sqrDistanceToCenter;
+            }
+        }
+        return best;
     }
 }

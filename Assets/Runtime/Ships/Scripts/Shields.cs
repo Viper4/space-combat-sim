@@ -11,6 +11,8 @@ public class Shields : MonoBehaviour
     [SerializeField] private GameObject colliderObject;
     private MeshRenderer shieldRenderer;
     private Material shieldMaterial;
+    private Collider shieldCollider;
+
     [SerializeField] private float dieTime = 0.5f;
     [SerializeField] private float minAlpha = 0.1f;
     [SerializeField] private float maxAlpha = 1.0f;
@@ -27,6 +29,7 @@ public class Shields : MonoBehaviour
         statSystem = GetComponent<StatSystem>();
         shieldRenderer = colliderObject.GetComponent<MeshRenderer>();
         shieldMaterial = shieldRenderer.material; // Clone material
+        shieldCollider = colliderObject.GetComponent<Collider>();
         colliderObject.SetActive(active);
     }
 
@@ -58,9 +61,10 @@ public class Shields : MonoBehaviour
     {
         if (active)
         {
+            Vector3 colliderPoint = shieldCollider.ClosestPoint(origin);
             // Shields are up, damage the shield
             ShieldRipple ripple = Instantiate(shieldRippleEffect, colliderObject.transform).GetComponent<ShieldRipple>();
-            ripple.Init(origin, amount * damageDurationScale, maxAlpha, minAlpha, maxRadius, minRadius, amount * damageMagnitudeScale);
+            ripple.Init(colliderPoint, amount * damageDurationScale, maxAlpha, minAlpha, maxRadius, minRadius, amount * damageMagnitudeScale);
 
             statSystem.Damage(amount);
         }

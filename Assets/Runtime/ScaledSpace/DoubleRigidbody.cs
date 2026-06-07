@@ -6,16 +6,10 @@ using System.Collections.Generic;
 [RequireComponent(typeof(Rigidbody), typeof(ScaledTransform))]
 public class DoubleRigidbody : MonoBehaviour
 {
+
     public static float speedLimit = 2.99792458e8f; // Speed of light in m/s
 
-    // HGrid stuff
-    private static uint nextId;
-    public uint id {get; private set;}
-    public int currentColliderLevel = -1;
-    public int currentTriggerLevel = -1;
-    public HGrid.GridCell currentColliderCell;
-    public HGrid.GridCell currentTriggerCell;
-    public Vector3d prevPos;
+    public ScaledTransform scaledTransform {get; private set;}
 
     private bool _active;
     public bool active
@@ -61,7 +55,6 @@ public class DoubleRigidbody : MonoBehaviour
         }
     }
 
-    public ScaledTransform scaledTransform {get; private set;}
     public Rigidbody attachedRigidbody {get; private set;}
     [SerializeField, Tooltip("Switch to rigidbody if speed is below this threshold, DoubleRigidbody if above")] private float speedThreshold = -1;
 
@@ -105,6 +98,8 @@ public class DoubleRigidbody : MonoBehaviour
         }
     }
 
+    private Vector3d gravityAcceleration;
+
     /// <summary>
     /// Event fired when this RB enters collision with another RB in scaled space
     /// </summary>
@@ -113,39 +108,42 @@ public class DoubleRigidbody : MonoBehaviour
     /// <summary>
     /// Event fired when this RB exits collision with another RB in scaled space
     /// </summary>
-    public event Action<DoubleRigidbody> OnScaledCollisionExit;
+    public event Action<ScaledCollider> OnScaledCollisionExit;
 
     /// <summary>
     /// Event fired when other RB enters this RB's trigger
     /// </summary>
-    public event Action<DoubleRigidbody> OnScaledTriggerEnter;
+    public event Action<ScaledCollider> OnScaledTriggerEnter;
     
     /// <summary>
     /// Event fired when other RB exits this RB's trigger
     /// </summary>
-    public event Action<DoubleRigidbody> OnScaledTriggerExit;
+    public event Action<ScaledCollider> OnScaledTriggerExit;
 
-    public bool trackTrigger = false;
-    [Tooltip("Radius of simulated sphere collider in scaled space physics. Use -1 to calculate as Max(scale.x, scale.y, scale.z)"), SerializeField]
-    private float scaledColliderRadius = -1f;
-    [Tooltip("Radius of simulated sphere trigger in scaled space physics. Use -1 to calculate as Max(scale.x, scale.y, scale.z)"), SerializeField]
-    private float scaledTriggerRadius = -1f;
+    public bool finishedStep = false;
+    public List<ScaledCollider> scaledColliders {get; private set;}
+    public Vector3d prevPos;
 
-    private Vector3d gravityAcceleration;
-
-    private HashSet<uint> ignoredRbs = new HashSet<uint>();
-
-    void Awake()
+    private void Awake()
     {
-        id = nextId++;
         scaledTransform = GetComponent<ScaledTransform>();
         attachedRigidbody = GetComponent<Rigidbody>();
+        scaledColliders = new List<ScaledCollider>();
+        
         if (transform != FloatingWorldOrigin.Instance.transform)
         {
             FloatingWorldOrigin.Instance.OnOriginShift += OnOriginShift;
         }
         prevPos = scaledTransform.realPosition;
-        ScaledSpacePhysics.Instance.RegisterDoubleRigidbody(this);
+    }
+
+    public void AddCollider(ScaledCollider newCollider)
+    {
+        foreach(ScaledCollider collider in scaledColliders)
+        {
+            collider.IgnoreCollider(newCollider.id, true);
+        }
+        scaledColliders.Add(newCollider);
     }
     
     public void ClearGravity()
@@ -370,40 +368,22 @@ public class DoubleRigidbody : MonoBehaviour
                 offset /= distance;
             }
 
-            double attenuation = explosionRadius <= 0 ? 1.0 : Math.Max(0.0, 1.0 - distance / explosionRadius);
+            /*double attenuation = explosionRadius <= 0 ? 1.0 : Math.Max(0.0, 1.0 - distance / explosionRadius);
 
             if (attenuation <= 0)
                 return;
 
-            Vector3d force = offset * (explosionForce * attenuation);
+            Vector3d force = offset * (explosionForce * attenuation);*/
+            Vector3d force = offset * explosionForce;
 
             // Apply at explosion center to generate torque
             AddForceAtPosition(force, adjustedExplosionPos, forceMode);
         }
         else
         {
-            attachedRigidbody.AddExplosionForce(explosionForce, explosionPosition.ToVector3(), explosionRadius, upwardsModifier, forceMode);
+            Vector3 renderPosition = (explosionPosition - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3();
+            attachedRigidbody.AddExplosionForce(explosionForce, renderPosition, explosionRadius, upwardsModifier, forceMode);
         }
-    }
-
-    public double GetCollisionRadius()
-    {
-        if (scaledColliderRadius < 0)
-        {
-            Vector3d scale = scaledTransform.realScale;
-            return Math.Max(Math.Max(scale.x, scale.y), scale.z);
-        }
-        return scaledColliderRadius;
-    }
-
-    public double GetTriggerRadius()
-    {
-        if (scaledTriggerRadius < 0)
-        {
-            Vector3d scale = scaledTransform.realScale;
-            return Math.Max(Math.Max(scale.x, scale.y), scale.z);
-        }
-        return scaledTriggerRadius;
     }
 
     /// <summary>
@@ -417,7 +397,7 @@ public class DoubleRigidbody : MonoBehaviour
     /// <summary>
     /// Internal method called by ScaledSpacePhysics to raise collision exit event
     /// </summary>
-    internal void RaiseCollisionExit(DoubleRigidbody other)
+    internal void RaiseCollisionExit(ScaledCollider other)
     {
         OnScaledCollisionExit?.Invoke(other);
     }
@@ -425,7 +405,7 @@ public class DoubleRigidbody : MonoBehaviour
     /// <summary>
     /// Internal method called by ScaledSpacePhysics to raise collision enter event
     /// </summary>
-    internal void RaiseTriggerEnter(DoubleRigidbody other)
+    internal void RaiseTriggerEnter(ScaledCollider other)
     {
         OnScaledTriggerEnter?.Invoke(other);
     }
@@ -433,7 +413,7 @@ public class DoubleRigidbody : MonoBehaviour
     /// <summary>
     /// Internal method called by ScaledSpacePhysics to raise collision exit event
     /// </summary>
-    internal void RaiseTriggerExit(DoubleRigidbody other)
+    internal void RaiseTriggerExit(ScaledCollider other)
     {
         OnScaledTriggerExit?.Invoke(other);
     }
@@ -460,23 +440,16 @@ public class DoubleRigidbody : MonoBehaviour
         OnScaledTriggerExit = null;
 
         FloatingWorldOrigin.Instance.OnOriginShift -= OnOriginShift;
-        ScaledSpacePhysics.Instance.UnregisterDoubleRigidbody(this);
     }
 
-    public void IgnoreDoubleRigidbody(uint otherId, bool ignore)
+    public void IgnoreDoubleRigidbody(DoubleRigidbody other, bool ignore)
     {
-        if (ignore)
+        foreach (ScaledCollider collider in scaledColliders)
         {
-            ignoredRbs.Add(otherId);
+            foreach (ScaledCollider otherCollider in other.scaledColliders)
+            {
+                collider.IgnoreCollider(otherCollider.id, ignore);
+            }
         }
-        else
-        {
-            ignoredRbs.Remove(otherId);
-        }
-    }
-
-    public bool IsIgnoring(uint otherId)
-    {
-        return ignoredRbs.Contains(otherId);
     }
 }

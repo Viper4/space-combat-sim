@@ -16,7 +16,7 @@ public class Bullet : Projectile
                 ship.statSystem.Damage(damageAmount);
                 break;
             case "Torpedo":
-                collisionInfo.transformB.GetComponent<Torpedo>().Detonate(collisionInfo.contactPoint.ToVector3(), null);
+                collisionInfo.transformB.GetComponent<Torpedo>().Detonate(collisionInfo.contactPoint);
                 break;
             case "Shields":
                 collisionInfo.transformB.GetComponent<Shields>().Damage(damageAmount, collisionInfo.contactPoint.ToVector3());

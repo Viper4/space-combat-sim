@@ -28,8 +28,9 @@ public class HUDObject : MonoBehaviour
 
     [SerializeField] private float killTime = 0.5f;
     private float killTimer;
-
     private float originalSize;
+
+    public float sqrDistanceToCenter;
 
     private void Update()
     {
@@ -41,7 +42,7 @@ public class HUDObject : MonoBehaviour
         }
     }
 
-    public void Init(HUDSystem _HUDSystem, Vector3 position, uint id, string details, bool detailsActive)
+    public void Init(HUDSystem _HUDSystem, Vector3 position, uint id, string details, bool detailsActive, Vector3 predictedPosition)
     {
         this._HUDSystem = _HUDSystem;
         this.id = id;
@@ -53,7 +54,7 @@ public class HUDObject : MonoBehaviour
         centerOfMassImage = centerOfMass.GetChild(0).GetComponent<Image>();
         predictedCenterImage = predictedCenter.GetChild(0).GetComponent<Image>();
         originalSize = bottomLeftCorner.sizeDelta.x;
-        UpdateObject(position, details, detailsActive);
+        UpdateObject(position, details, detailsActive, predictedPosition);
     }
 
     public Color GetColor()
@@ -74,7 +75,7 @@ public class HUDObject : MonoBehaviour
         targetText.color = color;
     }
 
-    public void UpdateObject(Vector3 position, string details, bool detailsActive)
+    public void UpdateObject(Vector3 position, string details, bool detailsActive, Vector3 predictedPosition)
     {
         if (!centerOfMass.gameObject.activeSelf)
         {
@@ -87,7 +88,6 @@ public class HUDObject : MonoBehaviour
             topLeftCorner.gameObject.SetActive(false);
             topRightCorner.gameObject.SetActive(false);
             bottomRightCorner.gameObject.SetActive(false);
-            predictedCenter.gameObject.SetActive(false);
         }
 
         if (detailsActive)
@@ -98,20 +98,25 @@ public class HUDObject : MonoBehaviour
             {
                 detailsText.text = details;
             }
+            if (!predictedCenter.gameObject.activeSelf)
+                predictedCenter.gameObject.SetActive(true);
         }
         else
         {
             if (detailsText.gameObject.activeSelf)
                 detailsText.gameObject.SetActive(false);
+            if (predictedCenter.gameObject.activeSelf)
+                predictedCenter.gameObject.SetActive(false);
         }
 
         killTimer = killTime;
         transform.SetPositionAndRotation(position, Quaternion.LookRotation(transform.position - Camera.main.transform.position, Camera.main.transform.up));
 
         centerOfMass.position = position;
+        predictedCenter.position = predictedPosition;
     }
 
-    public void UpdateObject(Vector3 position, Quadrilateral quad, string details, bool detailsActive)
+    public void UpdateObject(Vector3 position, Quadrilateral quad, string details, bool detailsActive, Vector3 predictedPosition)
     {
         if (SpaceGeometry.QuadrilateralIsZero(quad))
         {
@@ -121,7 +126,6 @@ public class HUDObject : MonoBehaviour
                 topLeftCorner.gameObject.SetActive(false);
                 topRightCorner.gameObject.SetActive(false);
                 bottomRightCorner.gameObject.SetActive(false);
-                predictedCenter.gameObject.SetActive(false);
                 centerOfMass.gameObject.SetActive(false);
             }
             return;
@@ -133,7 +137,6 @@ public class HUDObject : MonoBehaviour
             topLeftCorner.gameObject.SetActive(true);
             topRightCorner.gameObject.SetActive(true);
             bottomRightCorner.gameObject.SetActive(true);
-            predictedCenter.gameObject.SetActive(true);
             centerOfMass.gameObject.SetActive(true);
         }
 
@@ -145,33 +148,34 @@ public class HUDObject : MonoBehaviour
             {
                 detailsText.text = details;
             }
+            if (!predictedCenter.gameObject.activeSelf)
+                predictedCenter.gameObject.SetActive(true);
         }
         else
         {
             if (detailsText.gameObject.activeSelf)
                 detailsText.gameObject.SetActive(false);
+            if (predictedCenter.gameObject.activeSelf)
+                predictedCenter.gameObject.SetActive(false);
         }
 
         killTimer = killTime;
         transform.SetPositionAndRotation(position, Quaternion.LookRotation(transform.position - Camera.main.transform.position, Camera.main.transform.up));
 
-        Vector2 centerScreenPoint = (quad.p1 + quad.p2 + quad.p3 + quad.p4) / 4;
-
         bool bottomLeftVisible = RectTransformUtility.ScreenPointToWorldPointInRectangle(canvasRectangle, quad.p1, Camera.main, out Vector3 bottomLeftPos);
         bool topLeftVisible = RectTransformUtility.ScreenPointToWorldPointInRectangle(canvasRectangle, quad.p2, Camera.main, out Vector3 topLeftPos);
         bool topRightVisible = RectTransformUtility.ScreenPointToWorldPointInRectangle(canvasRectangle, quad.p3, Camera.main, out Vector3 topRightPos);
         bool bottomRightVisible = RectTransformUtility.ScreenPointToWorldPointInRectangle(canvasRectangle, quad.p4, Camera.main, out Vector3 bottomRightPos);
-        bool centerVisible = RectTransformUtility.ScreenPointToWorldPointInRectangle(canvasRectangle, centerScreenPoint, Camera.main, out Vector3 centerPos);
 
-        if (!bottomLeftVisible && !topLeftVisible && !topRightVisible && !bottomRightVisible && !centerVisible)
+        if (!bottomLeftVisible && !topLeftVisible && !topRightVisible && !bottomRightVisible)
             return;
 
         bottomLeftCorner.position = bottomLeftPos;
         topLeftCorner.position = topLeftPos;
         topRightCorner.position = topRightPos;
         bottomRightCorner.position = bottomRightPos;
-        predictedCenter.position = centerPos;
         centerOfMass.position = position;
+        predictedCenter.position = predictedPosition;
 
         // If corners are too close together, scale them down
         float dx = Mathf.Abs(bottomLeftCorner.localPosition.x - bottomRightCorner.localPosition.x);

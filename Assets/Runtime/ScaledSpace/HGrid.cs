@@ -36,12 +36,12 @@ public class HGrid
 
     private int maxLevels;
     private double[] levelCellSizes;
-    private Dictionary<GridCell, List<DoubleRigidbody>>[] levels;
+    private Dictionary<GridCell, List<ScaledCollider>>[] levels;
 
     public HGrid(int maxLevels, double baseCellSize, int scalingFactor)
     {
         this.maxLevels = maxLevels;
-        levels = new Dictionary<GridCell, List<DoubleRigidbody>>[maxLevels];
+        levels = new Dictionary<GridCell, List<ScaledCollider>>[maxLevels];
 
         levelCellSizes = new double[maxLevels];
         levelCellSizes[0] = baseCellSize;
@@ -49,7 +49,7 @@ public class HGrid
         {
             if (i > 0)
                 levelCellSizes[i] = levelCellSizes[i - 1] * scalingFactor;
-            levels[i] = new Dictionary<GridCell, List<DoubleRigidbody>>();
+            levels[i] = new Dictionary<GridCell, List<ScaledCollider>>();
         }
     }
 
@@ -82,92 +82,92 @@ public class HGrid
             levels[i].Clear();
     }
 
-    private void Insert(DoubleRigidbody rb, int level, GridCell cell)
+    private void Insert(ScaledCollider collider, int level, GridCell cell)
     {
         if(!levels[level].TryGetValue(cell, out var list))
         {
-            list = new List<DoubleRigidbody>();
+            list = new List<ScaledCollider>();
             levels[level].Add(cell, list);
         }
-        list.Add(rb);
+        list.Add(collider);
     }
 
-    private void Remove(DoubleRigidbody rb, int level, GridCell cell)
+    private void Remove(ScaledCollider collider, int level, GridCell cell)
     {
         if(!levels[level].TryGetValue(cell, out var list))
             return;
-        list.Remove(rb);
+        list.Remove(collider);
     }
 
-    public void Delete(DoubleRigidbody rb)
+    public void Delete(ScaledCollider collider)
     {
-        if (rb.currentColliderLevel == -1)
+        if (collider.hGridLevel == -1)
             return;
-        Remove(rb, rb.currentColliderLevel, rb.currentColliderCell);
+        Remove(collider, collider.hGridLevel, collider.hGridCell);
     }
 
-    public void UpdatePosition(DoubleRigidbody rb)
+    public void UpdatePosition(ScaledCollider collider)
     {
         // Effective radius = collider radius + distance traveled this frame.
         // This places fast-moving objects into a coarser level whose cell size
         // is large enough to contain the entire swept path in one cell.
-        double displacement = rb.velocity.magnitude * Time.fixedDeltaTime;
-        double effectiveRadius = rb.GetCollisionRadius() + displacement;
+        double displacement = collider.doubleRigidbody.velocity.magnitude * Time.fixedDeltaTime;
+        double effectiveRadius = collider.GetRadius() + displacement;
         int newLevel = GetLevel(effectiveRadius);
 
-        if (rb.currentColliderLevel == -1)
+        if (collider.hGridLevel == -1)
         {
-            rb.currentColliderLevel = newLevel;
-            rb.currentColliderCell = GetCell(rb.scaledTransform.realPosition, levelCellSizes[newLevel]);
-            Insert(rb, rb.currentColliderLevel, rb.currentColliderCell);
+            collider.hGridLevel = newLevel;
+            collider.hGridCell = GetCell(collider.GetRealCenter(), levelCellSizes[newLevel]);
+            Insert(collider, collider.hGridLevel, collider.hGridCell);
             return;
         }
 
-        int prevLevel = rb.currentColliderLevel;
-        GridCell prevCell = rb.currentColliderCell;
-        GridCell newCell = GetCell(rb.scaledTransform.realPosition, levelCellSizes[newLevel]);
+        int prevLevel = collider.hGridLevel;
+        GridCell prevCell = collider.hGridCell;
+        GridCell newCell = GetCell(collider.GetRealCenter(), levelCellSizes[newLevel]);
 
         // Re-insert only when the level or cell actually changes
         if (newLevel != prevLevel || !newCell.Equals(prevCell))
         {
-            Remove(rb, prevLevel, prevCell);
-            rb.currentColliderLevel = newLevel;
-            rb.currentColliderCell = newCell;
-            Insert(rb, newLevel, newCell);
+            Remove(collider, prevLevel, prevCell);
+            collider.hGridLevel = newLevel;
+            collider.hGridCell = newCell;
+            Insert(collider, newLevel, newCell);
         }
     }
 
-    public void UpdateSize(DoubleRigidbody rb)
+    public void UpdateSize(ScaledCollider collider)
     {
         // Keep velocity inflation consistent with UpdatePosition
-        double displacement = rb.velocity.magnitude * Time.fixedDeltaTime;
-        int newLevel = GetLevel(rb.GetCollisionRadius() + displacement);
-        int prevLevel = rb.currentColliderLevel;
+        double displacement = collider.doubleRigidbody.velocity.magnitude * Time.fixedDeltaTime;
+        int newLevel = GetLevel(collider.GetRadius() + displacement);
+        int prevLevel = collider.hGridLevel;
 
         if (prevLevel == newLevel)
             return;
 
         if (prevLevel != -1)
-            Remove(rb, prevLevel, rb.currentColliderCell);
+            Remove(collider, prevLevel, collider.hGridCell);
 
-        rb.currentColliderLevel = newLevel;
-        rb.currentColliderCell = GetCell(rb.scaledTransform.realPosition, levelCellSizes[newLevel]);
-        Insert(rb, rb.currentColliderLevel, rb.currentColliderCell);
+        collider.hGridLevel = newLevel;
+        collider.hGridCell = GetCell(collider.GetRealCenter(), levelCellSizes[newLevel]);
+        Insert(collider, collider.hGridLevel, collider.hGridCell);
     }
 
-    public IEnumerable<DoubleRigidbody> GetCandidates(DoubleRigidbody rb)
+    public IEnumerable<ScaledCollider> GetCandidates(ScaledCollider collider)
     {
-        if (rb.currentColliderLevel == -1)
+        if (collider.hGridLevel == -1)
         {
-            double displacement = rb.velocity.magnitude * Time.fixedDeltaTime;
-            rb.currentColliderLevel = GetLevel(rb.GetCollisionRadius() + displacement);
+            double displacement = collider.doubleRigidbody.velocity.magnitude * Time.fixedDeltaTime;
+            collider.hGridLevel = GetLevel(collider.GetRadius() + displacement);
         }
 
-        Vector3d pos = rb.scaledTransform.realPosition;
+        Vector3d pos = collider.GetRealCenter();
 
         // Check this level and above only — smaller objects do their own upward search,
         // so pairs are never missed and never double-checked at mismatched levels.
-        for (int level = rb.currentColliderLevel; level < maxLevels; level++)
+        for (int level = collider.hGridLevel; level < maxLevels; level++)
         {
             GridCell center = GetCell(pos, levelCellSizes[level]);
 
@@ -182,9 +182,9 @@ public class HGrid
                 if (!levels[level].TryGetValue(cell, out var list))
                     continue;
 
-                foreach (DoubleRigidbody other in list)
+                foreach (ScaledCollider other in list)
                 {
-                    if (rb.id == other.id || rb.IsIgnoring(other.id) || other.IsIgnoring(rb.id))
+                    if (collider.id == other.id || collider.IsIgnoring(other.id) || other.IsIgnoring(collider.id))
                         continue;
                     yield return other;
                 }

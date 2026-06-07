@@ -1,14 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using SpaceStuff;
 
 public class TorpedoPoint : MonoBehaviour
 {
-    MeshRenderer staticMesh;
-    [SerializeField] GameObject torpedoPrefab;
-    [SerializeField] Vector3 launchVelocity;
+    private MeshRenderer staticMesh;
+    [SerializeField] private GameObject torpedoPrefab;
+    [SerializeField] private Vector3d launchVelocity;
     public bool hasTorpedo = true;
-    [SerializeField] float activateDelay;
+    [SerializeField] private float activateDelay;
 
     void Start()
     {
@@ -21,17 +22,26 @@ public class TorpedoPoint : MonoBehaviour
         staticMesh.enabled = true;
     }
 
-    public Torpedo LaunchTorpedo(Vector3 initialVelocity, RadarTarget target, int index, string team)
+    public Torpedo LaunchTorpedo(Vector3d launchPosition, Vector3d initialVelocity, RadarTarget target, int index, string team)
     {
         hasTorpedo = false;
         staticMesh.enabled = false;
         Torpedo torpedo = Instantiate(torpedoPrefab, transform.position, transform.rotation).GetComponent<Torpedo>();
+        torpedo.GetComponent<Collider>().enabled = false;
+        RadarTarget torpedoTarget = torpedo.GetComponent<RadarTarget>();
         torpedo.name = torpedoPrefab.name + " " + (index + 1);
-        torpedo.GetComponent<RadarTarget>().team = team;
-        Rigidbody torpedoRB = torpedo.GetComponent<Rigidbody>();
-        torpedoRB.linearVelocity = initialVelocity;
-        torpedoRB.AddRelativeForce(launchVelocity, ForceMode.VelocityChange);
+        torpedoTarget.team = team;
+        StartCoroutine(LaunchRoutine(torpedoTarget, launchPosition, initialVelocity));
         torpedo.Activate(target, activateDelay);
         return torpedo;
+    }
+
+    private IEnumerator LaunchRoutine(RadarTarget torpedoTarget, Vector3d launchPosition, Vector3d initialVelocity)
+    {
+        yield return new WaitWhile(() => torpedoTarget.doubleRigidbody == null); // Wait until torpedo's Start() ran
+        torpedoTarget.GetComponent<Collider>().enabled = true;
+        torpedoTarget.doubleRigidbody.velocity = initialVelocity;
+        torpedoTarget.doubleRigidbody.AddRelativeForce(launchVelocity, ForceMode.VelocityChange);
+        torpedoTarget.doubleRigidbody.scaledTransform.realPosition = launchPosition;
     }
 }

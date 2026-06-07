@@ -11,12 +11,14 @@ GameObject:
   - component: {fileID: 8959325904046899293}
   - component: {fileID: 4274497117098890081}
   - component: {fileID: 2153530488087983894}
+  - component: {fileID: 1613615964272944648}
+  - component: {fileID: 2688048666450355157}
+  - component: {fileID: 4006850097849104209}
   - component: {fileID: 4633688431431094526}
   - component: {fileID: 2821699641902407001}
+  - component: {fileID: 6829326925194150218}
+  - component: {fileID: 2848928438514413154}
   - component: {fileID: 6577287821693102537}
-  - component: {fileID: 2688048666450355157}
-  - component: {fileID: 1613615964272944648}
-  - component: {fileID: 4006850097849104209}
   - component: {fileID: 3063794515001352480}
   - component: {fileID: 8942289586678289918}
   - component: {fileID: 4776741766681722286}
@@ -102,6 +104,77 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!54 &1613615964272944648
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6316366540338611349}
+  serializedVersion: 5
+  m_Mass: 300
+  m_LinearDamping: 0
+  m_AngularDamping: 0
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 2
+--- !u!136 &2688048666450355157
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6316366540338611349}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.12
+  m_Height: 2.24
+  m_Direction: 2
+  m_Center: {x: 8.832e-42, y: 0.0000000037252903, z: -0.01202172}
+--- !u!135 &4006850097849104209
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6316366540338611349}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 10
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &4633688431431094526
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -141,12 +214,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
-  currentColliderLevel: -1
-  currentTriggerLevel: -1
-  prevPos:
-    x: 0
-    y: 0
-    z: 0
   _isKinematic: 0
   speedThreshold: 100
   _velocity:
@@ -157,9 +224,49 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  trackTrigger: 1
-  scaledColliderRadius: 0.3
-  scaledTriggerRadius: 10
+  finishedStep: 0
+  prevPos:
+    x: 0
+    y: 0
+    z: 0
+--- !u!114 &6829326925194150218
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6316366540338611349}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
+    z: 0
+  radius: 0.25
+  isTrigger: 0
+  hGridLevel: -1
+--- !u!114 &2848928438514413154
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6316366540338611349}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
+    z: 0
+  radius: 10
+  isTrigger: 1
+  hGridLevel: -1
 --- !u!114 &6577287821693102537
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -178,88 +285,21 @@ MonoBehaviour:
   destroyDelay: -1
   active: 0
   _collider: {fileID: 2688048666450355157}
-  engineForce: 10000
-  thrusterForce: 100
-  damping: 32
+  engineForce: 50000
+  thrusterForce: 500
+  lateralDampGain: 1
+  proportionalGain: 5.118147
+  integralGain: 0
+  derivativeGain: 3.921913
   rocketParticles: {fileID: 4901987813079629749}
+  collideSpeedThreshold: 100
   explosionPrefab: {fileID: 3982350210874365306, guid: 38256d267e02f9045b36a61ca4903a4d, type: 3}
   explosionRadius: 30
-  explosionForce: 15000
-  minDamage: 50
-  maxDamage: 125
+  explosionForce: 10000
+  minDamage: 300
+  maxDamage: 1000
   target: {fileID: 0}
   navigationConstant: 4
---- !u!136 &2688048666450355157
-CapsuleCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6316366540338611349}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 0
-  serializedVersion: 2
-  m_Radius: 0.12
-  m_Height: 2.24
-  m_Direction: 2
-  m_Center: {x: 8.832e-42, y: 0.0000000037252903, z: -0.01202172}
---- !u!54 &1613615964272944648
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6316366540338611349}
-  serializedVersion: 5
-  m_Mass: 300
-  m_LinearDamping: 0
-  m_AngularDamping: 0
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 2
---- !u!135 &4006850097849104209
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6316366540338611349}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 10
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &3063794515001352480
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -272,7 +312,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 312711286
+  GlobalObjectIdHash: 3724786077
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -299,6 +339,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
   team: 
+  alertSystem: {fileID: 0}
   radarIcon: {fileID: 0}
   turretsTargeting: 0
   stealthDistance: -1

@@ -1,7 +1,7 @@
+using System;
 using SpaceStuff;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class Ship : RadarTarget
 {
@@ -11,19 +11,20 @@ public class Ship : RadarTarget
 
     public GameObject radarModel;
     [SerializeField] protected ParticleSystem rocketTrail;
-    public LayerMask ignoreLayers;
 
     [SerializeField] private Transform velocityDirectionPivot;
     [SerializeField] private TextMeshProUGUI speedText;
-    [SerializeField] private TextMeshProUGUI fuelText;
-    [SerializeField] private TextMeshProUGUI healthText;
-    [SerializeField] private Slider fuelSlider;
-    [SerializeField] private Slider healthSlider;
 
     [SerializeField] private float engineForce = 50f;
     [SerializeField] private float engineLaunchForce = 50f;
     [SerializeField] private float thrusterForce = 10f;
     private bool launchMode = false;
+    [SerializeField] private AudioSource thrusterAudioSource;
+    [SerializeField] private float thrusterVolumeScale = 1.0f;
+    [SerializeField] private AudioSource engineAudioSource;
+    [SerializeField] private float engineVolumeScale = 0.8f;
+    [SerializeField] private AudioClip normalEngineClip;
+    [SerializeField] private AudioClip launchEngineClip;
 
     [SerializeField, Tooltip("Thruster distance from ship's x axis (Pitch)")] private float thrusterRadiusX = 5f;
     [SerializeField, Tooltip("Thruster distance from ship's y axis (Yaw)")] private float thrusterRadiusY = 5f;
@@ -48,7 +49,7 @@ public class Ship : RadarTarget
     protected float fuel = 100f;
     [SerializeField] private float maxFuel = 100f;
 
-    [SerializeField, Tooltip("Minimum relative collision speed for ship to take damage")] private float minCollideSpeed = 5f;
+    [SerializeField, Tooltip("Minimum collision speed for ship to take damage")] private float minCollideSpeed = 5f;
     [SerializeField] private float collideDamageScale = 0.01f;
     [SerializeField, Tooltip("Local Z position at the front tip of the ship")] private float maxLocalZ;
     public Shields shields;
@@ -64,27 +65,13 @@ public class Ship : RadarTarget
 
         thrusterTorque = new Vector3(thrusterForce * thrusterRadiusX, thrusterForce * thrusterRadiusY, thrusterForce * thrusterRadiusZ);
 
-        // Clamp integral between -maxIntegral and maxIntegral to prevent integral windup
-        if(Mathf.Approximately(I, 0f))
-        {
-            xRotatePID = new PIDController(P, I, D, float.MaxValue);
-            yRotatePID = new PIDController(P, I, D, float.MaxValue);
-            zRotatePID = new PIDController(P, I, D, float.MaxValue);
+        xRotatePID = new PIDController(P, I, D);
+        yRotatePID = new PIDController(P, I, D);
+        zRotatePID = new PIDController(P, I, D);
 
-            xMovePID = new PIDController(P, I, D, float.MaxValue);
-            yMovePID = new PIDController(P, I, D, float.MaxValue);
-            zMovePID = new PIDController(P, I, D, float.MaxValue);
-        }
-        else
-        {
-            xRotatePID = new PIDController(P, I, D, thrusterTorque.x / I);
-            yRotatePID = new PIDController(P, I, D, thrusterTorque.y / I);
-            zRotatePID = new PIDController(P, I, D, thrusterTorque.z / I);
-
-            xMovePID = new PIDController(P, I, D, thrusterForce / I);
-            yMovePID = new PIDController(P, I, D, thrusterForce / I);
-            zMovePID = new PIDController(P, I, D, thrusterForce / I);
-        }
+        xMovePID = new PIDController(P, I, D);
+        yMovePID = new PIDController(P, I, D);
+        zMovePID = new PIDController(P, I, D);
     }
 
     protected virtual void Update()
@@ -163,20 +150,61 @@ public class Ship : RadarTarget
                 }
             }
 
-            if (finalForce.sqrMagnitude > 0.0001)
-                doubleRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
+            bool hasForce = finalForce.sqrMagnitude > 0.0001;
 
-            if (finalForce.z > 0)
+            if (hasForce)
             {
-                rocketTrail.gameObject.SetActive(true);
+                bool usingThrusters =
+                    Math.Abs(finalForce.x) > 0.001 ||
+                    Math.Abs(finalForce.y) > 0.001 ||
+                    finalForce.z < 0.0;
+
+                bool usingMainEngine = finalForce.z > 0.0;
+
+                // Thruster audio
+                if (usingThrusters)
+                {
+                    double magnitude = finalForce.magnitude;
+
+                    thrusterAudioSource.transform.localPosition = new Vector3(
+                        -(float)(finalForce.x / magnitude) * thrusterRadiusX,
+                        -(float)(finalForce.y / magnitude) * thrusterRadiusY,
+                        -(float)(finalForce.z / magnitude) * thrusterRadiusZ
+                    );
+                    thrusterAudioSource.volume = (float)magnitude / thrusterForce * thrusterVolumeScale;
+                }
+
+                // Main engine effects
+                if (usingMainEngine)
+                {
+                    if (!rocketTrail.gameObject.activeSelf)
+                    {
+                        rocketTrail.gameObject.SetActive(true);
+                    }
+                    engineAudioSource.clip = launchMode ? launchEngineClip : normalEngineClip;
+                    engineAudioSource.volume = (float)finalForce.z / engineLaunchForce * engineVolumeScale;
+                    if (!engineAudioSource.isPlaying)
+                        engineAudioSource.Play();
+                }
+                else if (rocketTrail.gameObject.activeSelf)
+                {
+                    engineAudioSource.volume = 0f;
+                    rocketTrail.gameObject.SetActive(false);
+                }
+
+                doubleRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
             }
             else
             {
-                rocketTrail.gameObject.SetActive(false);
+                if (rocketTrail.gameObject.activeSelf)
+                {
+                    engineAudioSource.volume = 0f;
+                    rocketTrail.gameObject.SetActive(false);
+                }
             }
 
             // Calculate local torque to apply
-            Vector3d finalTorque = Vector3d.zero;
+            Vector3d desiredRotate = Vector3d.zero;
 
             // Rotation inputs for pitch and roll
             Vector2 lookDelta = Vector2.zero;
@@ -185,11 +213,11 @@ public class Ship : RadarTarget
                 lookDelta = GameManager.Instance.inputActions.Player.Look.ReadValue<Vector2>();
                 Vector2 desiredLook = GameManager.Instance.playerSettings.sensitivity * GameManager.Instance.sensitivityScale * lookDelta;
                 desiredLook = Vector2.ClampMagnitude(desiredLook, 1f); // Prevent from rotating faster than max torque allows
-                finalTorque = new Vector3d(-desiredLook.y * thrusterTorque.x, 0, 0);
+                desiredRotate = new Vector3d(-desiredLook.y, 0.0, 0.0);
                 if (rollMode)
-                    finalTorque.z = -desiredLook.x * thrusterTorque.z;
+                    desiredRotate.z = -desiredLook.x;
                 else
-                    finalTorque.y = desiredLook.x * thrusterTorque.y;
+                    desiredRotate.y = desiredLook.x;
             }
             rotating = lookDelta.x != 0 || lookDelta.y != 0;
 
@@ -201,46 +229,67 @@ public class Ship : RadarTarget
                 float tx = xRotatePID.GetOutput(error.x, Time.fixedDeltaTime);
                 float ty = yRotatePID.GetOutput(error.y, Time.fixedDeltaTime);
                 float tz = zRotatePID.GetOutput(error.z, Time.fixedDeltaTime);
-                Vector3 desired = new Vector3(tx, ty, tz);
-                desired = Vector3.ClampMagnitude(desired, 1f);
-
-                finalTorque = new Vector3d(
-                    desired.x * thrusterTorque.x, 
-                    desired.y * thrusterTorque.y, 
-                    desired.z * thrusterTorque.z
-                );
+                desiredRotate = new Vector3d(tx, ty, tz);
+                desiredRotate = Vector3d.ClampMagnitude(desiredRotate, 1f);
             }
+
+            Vector3d finalTorque = new Vector3d(
+                desiredRotate.x * thrusterTorque.x, 
+                desiredRotate.y * thrusterTorque.y, 
+                desiredRotate.z * thrusterTorque.z
+            );
+
             if (finalTorque.sqrMagnitude > 0.0001)
+            {
                 doubleRigidbody.AddRelativeTorque(finalTorque, ForceMode.Force);
+                if (!hasForce)
+                {
+                    thrusterAudioSource.transform.position = transform.position;
+                    thrusterAudioSource.volume = (float)desiredRotate.magnitude * thrusterVolumeScale;
+                }
+                else
+                {
+                    thrusterAudioSource.volume = Mathf.Max(thrusterAudioSource.volume, (float)desiredRotate.magnitude * thrusterVolumeScale);
+                }
+            }
+            else if (!hasForce)
+            {
+                thrusterAudioSource.volume = 0f;
+            }
         }
     }
 
     private void OnCollisionEnter(Collision collision)
     {
         if (collision.transform.CompareTag("Projectile") || collision.transform.CompareTag("Torpedo"))
-            return; // Projectiles handle damage themselves
-        float sqrCollisionSpeed = collision.relativeVelocity.sqrMagnitude;
-        if (collision.rigidbody.mass < 0.5f || sqrCollisionSpeed <= minCollideSpeed * minCollideSpeed)
             return;
+
+        Rigidbody otherRb = collision.rigidbody;
+
+        if (otherRb == null || otherRb.mass < 0.5f)
+            return;
+
+        if (collision.relativeVelocity.sqrMagnitude < minCollideSpeed * minCollideSpeed)
+            return;
+
         ContactPoint contact = collision.GetContact(0);
-        float impulseMagnitude = collision.impulse.magnitude;
-        // Optional: attenuate glancing blows (0 = glancing, 1 = head-on)
-        float impactDot = Mathf.Abs(Vector3.Dot(collision.impulse.normalized, contact.normal));
+
+        float impulse = collision.impulse.magnitude;
 
         // Front attenuation
         Vector3 relativeCollisionPoint = contact.point - transform.position;
         float attenuation = Mathf.Clamp01((-relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
 
-        float damageAmount = impulseMagnitude * impactDot * attenuation * collideDamageScale;
+        float damage = attenuation * impulse * collideDamageScale;
 
         if (shields != null)
-            shields.Damage(damageAmount, contact.point);
+            shields.Damage(damage, contact.point);
         else
-            statSystem.Damage(damageAmount);
+            statSystem.Damage(damage);
 
-        Debug.Log($"Collided with {collision.gameObject.name} at speed " +
-                $"{collision.relativeVelocity.magnitude:F2}, impulse {impulseMagnitude:F1}, " +
-                $"taking {damageAmount:F2} damage");
+        Debug.Log(
+            $"Impulse: {impulse:F1}, " +
+            $"damage: {damage:F1}");
     }
 
     public void SetAutoRotStabilization(int state)

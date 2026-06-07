@@ -18,21 +18,11 @@ public class Projectile : MonoBehaviour
         {
             Destroy(gameObject, destroyDelay);
         }
-    }
-
-    private void OnEnable()
-    {
         doubleRigidbody.OnScaledCollisionEnter += OnCollide;
-        doubleRigidbody.OnScaledTriggerEnter += OnTriggerWrapper;        
+        doubleRigidbody.OnScaledTriggerEnter += OnTriggerWrapper;       
     }
 
-    private void OnDisable()
-    {
-        doubleRigidbody.OnScaledCollisionEnter -= OnCollide;
-        doubleRigidbody.OnScaledTriggerEnter -= OnTriggerWrapper;
-    }
-
-    private void OnTriggerWrapper(DoubleRigidbody other)
+    private void OnTriggerWrapper(ScaledCollider other)
     {
         OnTrigger(other.transform, other);
     }
@@ -42,9 +32,8 @@ public class Projectile : MonoBehaviour
         Destroy(gameObject);
     }
 
-    protected virtual void OnTrigger(Transform other, DoubleRigidbody otherDoubleRB)
+    protected virtual void OnTrigger(Transform other, ScaledCollider otherDoubleRB)
     {
-        Debug.Log("Here");
         Destroy(gameObject);
     }
 
@@ -53,16 +42,42 @@ public class Projectile : MonoBehaviour
         if (((1 << collision.gameObject.layer) & ignoreLayers) != 0)
             return;
 
+        ScaledCollider thisCollider = null;
+        foreach(ScaledCollider collider in doubleRigidbody.scaledColliders)
+        {
+            if (!collider.isTrigger)
+            {
+                thisCollider = collider;
+                break;
+            }
+        }
+
         DoubleRigidbody otherDoubleRB = collision.rigidbody == null ? collision.transform.GetComponent<DoubleRigidbody>() : collision.rigidbody.GetComponent<DoubleRigidbody>();
+        ScaledCollider otherCollider = null;
+        if (otherDoubleRB != null)
+        {
+            foreach(ScaledCollider collider in otherDoubleRB.scaledColliders)
+            {
+                if (!collider.isTrigger)
+                {
+                    otherCollider = collider;
+                    break;
+                }
+            }
+        }
+        Vector3d realContactPoint = doubleRigidbody.scaledTransform.GetChildRealPosition(collision.GetContact(0).point);
+        double realPenetration = collision.GetContact(0).separation;
+        if (doubleRigidbody.scaledTransform.inScaledSpace)
+            realPenetration *= doubleRigidbody.scaledTransform.scaleFactor;
         ScaledSpacePhysics.CollisionInfo collisionInfo = new()
         {
+            colliderA = thisCollider,
+            colliderB = otherCollider,
             transformA = transform,
             transformB = collision.transform,
-            rbA = doubleRigidbody,
-            rbB = otherDoubleRB,
-            contactPoint = collision.GetContact(0).point.ToVector3d(),
+            contactPoint = realContactPoint,
             normal = collision.GetContact(0).normal.ToVector3d(),
-            penetration = collision.GetContact(0).separation
+            penetration = realPenetration
         };
         OnCollide(collisionInfo);
     }
@@ -76,7 +91,19 @@ public class Projectile : MonoBehaviour
             return;
 
         DoubleRigidbody otherDoubleRB = other.attachedRigidbody == null ? other.transform.GetComponent<DoubleRigidbody>() : other.attachedRigidbody.GetComponent<DoubleRigidbody>();
-        OnTrigger(other.transform, otherDoubleRB);
+        ScaledCollider otherCollider = null;
+        if (otherDoubleRB != null)
+        {
+            foreach(ScaledCollider collider in otherDoubleRB.scaledColliders)
+            {
+                if (collider.isTrigger == other.isTrigger)
+                {
+                    otherCollider = collider;
+                    break;
+                }
+            }
+        }
+        OnTrigger(other.transform, otherCollider);
     }
 
     private void OnDestroy()

@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 9008321704609613152}
   - component: {fileID: 9044496995838638813}
   - component: {fileID: 4843936539018863421}
+  - component: {fileID: 1289931754431887923}
   m_Layer: 2
   m_Name: 5.56 Bullet
   m_TagString: Projectile
@@ -173,7 +174,7 @@ TrailRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Time: 0.005
+  m_Time: 0.01
   m_PreviewTimeScale: 1
   m_Parameters:
     serializedVersion: 3
@@ -278,14 +279,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
-  currentColliderLevel: -1
-  currentTriggerLevel: -1
-  prevPos:
-    x: 0
-    y: 0
-    z: 0
   _isKinematic: 0
-  speedThreshold: 1000
+  speedThreshold: 100
   _velocity:
     x: 0
     y: 0
@@ -294,9 +289,11 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  trackTrigger: 0
-  scaledColliderRadius: 0.01
-  scaledTriggerRadius: -1
+  finishedStep: 0
+  prevPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &9008321704609613152
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -355,3 +352,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TransformChange
   trackPosition: 1
   trackRotation: 0
+--- !u!114 &1289931754431887923
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1854897518929172335}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
+    z: 0
+  radius: 0.01
+  isTrigger: 0
+  hGridLevel: -1

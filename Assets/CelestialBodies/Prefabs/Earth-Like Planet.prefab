@@ -158,10 +158,11 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  hGridLevel: -1
-  trackTrigger: 0
-  scaledColliderRadius: -1
-  scaledTriggerRadius: 1
+  finishedStep: 0
+  prevPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &4011333338206696670
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -215,6 +216,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
   team: 
+  alertSystem: {fileID: 0}
   radarIcon: {fileID: 0}
   turretsTargeting: 0
   stealthDistance: -1

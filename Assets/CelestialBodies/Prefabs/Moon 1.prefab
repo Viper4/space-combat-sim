@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 2609004871448456363}
   - component: {fileID: 777354655779282844}
   - component: {fileID: 325603571820138488}
+  - component: {fileID: -8214975133850535882}
   m_Layer: 0
   m_Name: Moon 1
   m_TagString: CelestialBody
@@ -157,10 +158,11 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  hGridLevel: -1
-  trackTrigger: 0
-  scaledColliderRadius: -1
-  scaledTriggerRadius: 1
+  finishedStep: 0
+  prevPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &2609004871448456363
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -214,8 +216,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
   team: 
+  alertSystem: {fileID: 0}
   radarIcon: {fileID: 0}
   turretsTargeting: 0
   stealthDistance: -1
   useScaleForBounds: 1
   boundsRenderers: []
+--- !u!114 &-8214975133850535882
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2201142413859200454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
+    z: 0
+  radius: -1
+  isTrigger: 0
+  hGridLevel: -1

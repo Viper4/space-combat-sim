@@ -9,9 +9,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4191834479830750107}
-  - component: {fileID: 8042605825554430832}
   - component: {fileID: 3203808644395471499}
   - component: {fileID: 4653979682324458050}
+  - component: {fileID: 8042605825554430832}
   - component: {fileID: 8241638172933148449}
   - component: {fileID: 3226591562496017464}
   - component: {fileID: -2348939505975168751}
@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 4352565607208763949}
   - component: {fileID: 4176110155589567358}
   - component: {fileID: 448297595236042583}
+  - component: {fileID: -3219646378955236575}
   m_Layer: 3
   m_Name: Star
   m_TagString: CelestialBody
@@ -43,33 +44,6 @@ Transform:
   - {fileID: 8120683167609297409}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8042605825554430832
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2675124551879334190}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 660b2028be04cb445a20efd3df3e65c9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _realPosition:
-    x: 0
-    y: 0
-    z: 150000000000
-  _realScale:
-    x: 695700000
-    y: 695700000
-    z: 695700000
-  minScreenPixelSize: 3
-  visible: 1
-  scaledSpaceLayer: 3
-  inScaledSpace: 1
-  scaleFactor: 200000000
-  worldSpaceThreshold: 4900
-  scaledSpaceThreshold: 5100
 --- !u!33 &3203808644395471499
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -127,6 +101,33 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &8042605825554430832
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2675124551879334190}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 660b2028be04cb445a20efd3df3e65c9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _realPosition:
+    x: 0
+    y: 0
+    z: 150000000000
+  _realScale:
+    x: 695700000
+    y: 695700000
+    z: 695700000
+  minScreenPixelSize: 3
+  visible: 1
+  scaledSpaceLayer: 3
+  inScaledSpace: 1
+  scaleFactor: 200000000
+  worldSpaceThreshold: 4900
+  scaledSpaceThreshold: 5100
 --- !u!114 &8241638172933148449
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -186,12 +187,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentColliderLevel: -1
-  currentTriggerLevel: -1
-  prevPos:
-    x: 0
-    y: 0
-    z: 0
   _isKinematic: 0
   speedThreshold: 500
   _velocity:
@@ -202,9 +197,11 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  trackTrigger: 0
-  scaledColliderRadius: -1
-  scaledTriggerRadius: -1
+  finishedStep: 0
+  prevPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &1084746199370567776
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -306,11 +303,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   ShowTopMostFoldoutHeaderGroup: 1
   team: 
+  alertSystem: {fileID: 0}
   radarIcon: {fileID: 0}
   turretsTargeting: 0
   stealthDistance: -1
   useScaleForBounds: 1
   boundsRenderers: []
+--- !u!114 &-3219646378955236575
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2675124551879334190}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
+    z: 0
+  radius: -1
+  isTrigger: 0
+  hGridLevel: -1
 --- !u!1 &7089161551974816913
 GameObject:
   m_ObjectHideFlags: 0

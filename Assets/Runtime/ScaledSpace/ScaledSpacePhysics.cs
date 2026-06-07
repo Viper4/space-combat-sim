@@ -4,6 +4,7 @@ using SpaceStuff;
 using System;
 using System.Diagnostics;
 using Debug = UnityEngine.Debug;
+using System.Linq;
 
 /// <summary>
 /// Manages collision detection and response for objects in scaled space.
@@ -22,10 +23,8 @@ public class ScaledSpacePhysics : MonoBehaviour
     [SerializeField] private double baseGridCellSize;
     [SerializeField] private int cellScalingFactor;
     public HGrid hGrid;
-    private Dictionary<uint, DoubleRigidbody> doubleRigidbodies = new Dictionary<uint, DoubleRigidbody>();
-    // private List<DoubleRigidbody> doubleRigidbodies = new List<DoubleRigidbody>();
+    private Dictionary<uint, ScaledCollider> scaledColliders = new Dictionary<uint, ScaledCollider>();
     private HashSet<Pair> previousCollisions = new HashSet<Pair>();
-    private HashSet<Pair> previousTriggers = new HashSet<Pair>();
 
     private void Awake()
     {
@@ -38,54 +37,59 @@ public class ScaledSpacePhysics : MonoBehaviour
         hGrid = new HGrid(maxGridLevels, baseGridCellSize, cellScalingFactor);
     }
 
-    public void RegisterDoubleRigidbody(DoubleRigidbody rb)
+    public void RegisterCollider(ScaledCollider collider)
     {
-        if (!doubleRigidbodies.ContainsKey(rb.id))
+        if (!scaledColliders.ContainsKey(collider.id))
         {
-            doubleRigidbodies.Add(rb.id, rb);
-            hGrid.UpdatePosition(rb);
+            scaledColliders.Add(collider.id, collider);
+            hGrid.UpdatePosition(collider);
         }
     }
 
-    public void UnregisterDoubleRigidbody(DoubleRigidbody rb)
+    public void UnregisterCollider(ScaledCollider collider)
     {
-        doubleRigidbodies.Remove(rb.id);
-        hGrid.Delete(rb);
+        scaledColliders.Remove(collider.id);
+        hGrid.Delete(collider);
     }
 
     public void UpdateGridSize(DoubleRigidbody rb)
     {
-        hGrid.UpdateSize(rb);
+        foreach(ScaledCollider collider in rb.scaledColliders)
+        {
+            hGrid.UpdateSize(collider);
+        }
     }
 
     public void UpdateGridPos(DoubleRigidbody rb)
     {
-        hGrid.UpdatePosition(rb);
+        foreach(ScaledCollider collider in rb.scaledColliders)
+        {
+            hGrid.UpdatePosition(collider);
+        }
     }
 
     private void FixedUpdate()
     {
         HashSet<Pair> currentCollisions = new HashSet<Pair>();
-        HashSet<Pair> currentTriggers = new HashSet<Pair>();
 
         bool shiftOrigin = FloatingWorldOrigin.Instance.OverShiftThreshold();
         if (shiftOrigin)
             FloatingWorldOrigin.Instance.ShiftOrigin();
         
-        bool transformsDirty = shiftOrigin; // If shifting origin, will need to sync transforms after loop, otherwise only if any velocities were nonzero
         // Insert all rigidbodies into hierarchical grid for collision detection, and run other logic per doubleRigidbody
         long getCandidatesTicks = 0;
         long physicsStepTicks = 0;
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.Start();
-        foreach (DoubleRigidbody rb in doubleRigidbodies.Values)
+        ScaledCollider[] values = scaledColliders.Values.ToArray();
+        foreach (ScaledCollider collider in values)
         {
-            rb.ClearGravity();
-            PrePhysicsStep?.Invoke(rb);
-            rb.PhysicsStep(Time.fixedDeltaTime);
-
-            if (!transformsDirty && rb.active && !rb.isKinematic && rb.velocity.sqrMagnitude > 0.0001)
-                transformsDirty = true;
+            if (collider.doubleRigidbody.finishedStep)
+                continue;
+            collider.doubleRigidbody.ClearGravity();
+            PrePhysicsStep?.Invoke(collider.doubleRigidbody);
+            collider.doubleRigidbody.PhysicsStep(Time.fixedDeltaTime);
+            collider.doubleRigidbody.finishedStep = true;
         }
         stopwatch.Stop();
         physicsStepTicks = stopwatch.ElapsedTicks;
@@ -93,98 +97,160 @@ public class ScaledSpacePhysics : MonoBehaviour
         Stopwatch stopwatch1 = new Stopwatch();
         stopwatch.Reset();
         stopwatch.Start();
-        foreach (DoubleRigidbody rb in doubleRigidbodies.Values)
+        foreach (ScaledCollider collider in values)
         {
-            /*foreach(DoubleRigidbody candidate in hGrid.GetCandidates(rb))
-            {
-                ulong triggerKey = rb.id << 32 | candidate.id;
-                if (rb.trackTrigger && !currentTriggers.Contains(triggerKey) && CheckTrigger(rb, candidate))
-                {
-                    currentTriggers.Add(triggerKey);
-                    if (!previousTriggers.Contains(triggerKey))
-                        rb.RaiseTriggerEnter(candidate);
-                }
-            }*/
-
-            foreach (DoubleRigidbody candidate in hGrid.GetCandidates(rb))
+            foreach (ScaledCollider candidate in hGrid.GetCandidates(collider))
             {
                 // key's 1st 32-bit half is the min id uint, 2nd 32-bit half is the max id uint
-                Pair collisionKey = new Pair(Math.Min(rb.id, candidate.id), Math.Max(rb.id, candidate.id));
+                Pair collisionKey = new Pair(Math.Min(collider.id, candidate.id), Math.Max(collider.id, candidate.id));
 
-                if ((!rb.active && !candidate.active) || currentCollisions.Contains(collisionKey))
+                if ((!collider.doubleRigidbody.active && !candidate.doubleRigidbody.active) || currentCollisions.Contains(collisionKey))
                     continue;
 
                 stopwatch1.Reset();
                 stopwatch1.Start();
-                if (CheckCollision(rb, candidate, out CollisionInfo collision))
-                {
-                    currentCollisions.Add(collisionKey);
-                    ResolveCollision(collision);
 
-                    // Track new collisions
-                    if (!previousCollisions.Contains(collisionKey))
+                if (collider.isTrigger || candidate.isTrigger)
+                {
+                    if (CheckTrigger(collider, candidate))
                     {
-                        CollisionInfo collisionInfoForB = collision;
-                        // Swap A and B for the second RB's event
-                        collisionInfoForB.rbA = candidate;
-                        collisionInfoForB.rbB = rb;
-                        collisionInfoForB.transformA = candidate.transform;
-                        collisionInfoForB.transformB = rb.transform;
-                        // Also need to invert normal for the second RB
-                        collisionInfoForB.normal = -collision.normal;
-                        rb.RaiseCollisionEnter(collision);
-                        candidate.RaiseCollisionEnter(collisionInfoForB);
+                        currentCollisions.Add(collisionKey);
+
+                        if (!previousCollisions.Contains(collisionKey))
+                        {
+                            collider.doubleRigidbody.RaiseTriggerEnter(candidate);
+                            candidate.doubleRigidbody.RaiseTriggerEnter(collider);
+                        }
                     }
                 }
+                else
+                {
+                    if (CheckCollision(collider, candidate, out CollisionInfo collision))
+                    {
+                        currentCollisions.Add(collisionKey);
+
+                        // Track new collisions
+                        if (!previousCollisions.Contains(collisionKey))
+                        {
+                            CollisionInfo collisionInfoForB = collision;
+                            // Swap A and B for the second RB's event
+                            collisionInfoForB.colliderA = candidate;
+                            collisionInfoForB.colliderB = collider;
+                            collisionInfoForB.transformA = candidate.transform;
+                            collisionInfoForB.transformB = collider.transform;
+                            // Also need to invert normal for the second RB
+                            collisionInfoForB.normal = -collision.normal;
+                            collider.doubleRigidbody.RaiseCollisionEnter(collision);
+                            candidate.doubleRigidbody.RaiseCollisionEnter(collisionInfoForB);
+                        }
+                        ResolveCollision(collision);
+                    }
+                }
+                
                 stopwatch1.Stop();
                 collisionCheckTicks += stopwatch1.ElapsedTicks;
             }
+            collider.doubleRigidbody.finishedStep = false;
         }
         stopwatch.Stop();
         getCandidatesTicks = stopwatch.ElapsedTicks;
-        Debug.Log($"Physics Step ticks: {physicsStepTicks}, Get candidates loop ticks: {getCandidatesTicks}, Check Collision ticks: {collisionCheckTicks}");
+        //Debug.Log($"Physics Step ticks: {physicsStepTicks}, Get candidates loop ticks: {getCandidatesTicks}, Check Collision ticks: {collisionCheckTicks}");
 
         // Detect collision exits
         foreach (Pair collision in previousCollisions)
         {
             if (!currentCollisions.Contains(collision) 
-            && doubleRigidbodies.TryGetValue(collision.idA, out var rbA) 
-            && doubleRigidbodies.TryGetValue(collision.idB, out var rbB))
+            && scaledColliders.TryGetValue(collision.idA, out var colliderA) 
+            && scaledColliders.TryGetValue(collision.idB, out var colliderB))
             {
-                rbA.RaiseCollisionExit(rbB);
-                rbB.RaiseCollisionExit(rbA);
-            }
-        }
-
-        // Detect trigger exits
-        foreach (Pair trigger in previousTriggers)
-        {
-            if (!currentTriggers.Contains(trigger)
-            && doubleRigidbodies.TryGetValue(trigger.idA, out var rbA) 
-            && doubleRigidbodies.TryGetValue(trigger.idB, out var rbB))
-            {
-                rbA.RaiseTriggerExit(rbB);
+                if (colliderA.isTrigger)
+                {
+                    colliderA.doubleRigidbody.RaiseTriggerExit(colliderB);
+                }
+                else
+                {
+                    colliderA.doubleRigidbody.RaiseCollisionExit(colliderB);
+                }
+                if (colliderB.isTrigger)
+                {
+                    colliderB.doubleRigidbody.RaiseTriggerExit(colliderA);
+                }
+                else
+                {
+                    colliderB.doubleRigidbody.RaiseCollisionExit(colliderA);
+                }
             }
         }
 
         previousCollisions = currentCollisions;
-        previousTriggers = currentTriggers;
 
-        if (transformsDirty)
-            Physics.SyncTransforms();
+        Physics.SyncTransforms();
     }
 
-    private bool CheckCollision(DoubleRigidbody a, DoubleRigidbody b, out CollisionInfo collision)
+    private bool CheckTrigger(ScaledCollider a, ScaledCollider b)
     {
-        collision = default;
-
-        double radiusA = a.GetCollisionRadius();
-        double radiusB = b.GetCollisionRadius();
+        double radiusA = a.GetRadius();
+        double radiusB = b.GetRadius();
         double minDistance = radiusA + radiusB;
 
         // Positions at END of frame (after PhysicsStep)
-        Vector3d posA = a.scaledTransform.realPosition;
-        Vector3d posB = b.scaledTransform.realPosition;
+        Vector3d posA = a.GetRealCenter();
+        Vector3d posB = b.GetRealCenter();
+        Vector3d relativePosition = posB - posA;
+        double sqrDistance = relativePosition.sqrMagnitude;
+
+        if (sqrDistance < minDistance * minDistance)
+        {
+            // Overlapping at end of frame — standard intersection
+            return true;
+        }
+
+        // CCD: sweep from prevPos to realPos (retroactive)
+        // displacement = realPos - prevPos = what PhysicsStep just added
+        Vector3d startPosA = a.doubleRigidbody.prevPos + a.GetLocalCenter();
+        Vector3d startPosB = b.doubleRigidbody.prevPos + b.GetLocalCenter();
+        Vector3d dispA = posA - startPosA;
+        Vector3d dispB = posB - startPosB;
+
+        // Use start-of-frame positions as the sweep origin
+        Vector3d relPos0 = startPosB - startPosA;  // relative pos at frame start
+        Vector3d relDisp = dispB - dispA;           // relative displacement over frame
+        
+        // Quick reject: objects moving apart at frame start
+        double bCoeff = 2.0 * Vector3d.Dot(relPos0, relDisp);
+        if (bCoeff >= 0)
+            return false;
+
+        // Only need CCD if relative displacement exceeds the gap
+        double gap = Math.Sqrt(relPos0.sqrMagnitude) - minDistance;
+        if (gap < 0)
+            gap = 0; // prevPos already overlapping — handled next frame
+        double sqrRelDisp = relDisp.sqrMagnitude;
+        if (sqrRelDisp <= gap * gap)
+            return false;
+
+        // Quadratic: |relPos0 + relDisp*t|² = minDistance²,  t ∈ [0,1]
+        double aCoeff = Vector3d.Dot(relDisp, relDisp);
+        double cCoeff = Vector3d.Dot(relPos0, relPos0) - minDistance * minDistance;
+
+        double t = SpaceMath.SolveQuadratic(aCoeff, bCoeff, cCoeff);
+        if (t < 0.0)
+            return false;
+
+        return true;
+    }
+
+    private bool CheckCollision(ScaledCollider a, ScaledCollider b, out CollisionInfo collision)
+    {
+        collision = default;
+
+        double radiusA = a.GetRadius();
+        double radiusB = b.GetRadius();
+        double minDistance = radiusA + radiusB;
+
+        // Positions at END of frame (after PhysicsStep)
+        Vector3d posA = a.GetRealCenter();
+        Vector3d posB = b.GetRealCenter();
         Vector3d relativePosition = posB - posA;
         double sqrDistance = relativePosition.sqrMagnitude;
         double distance = minDistance;
@@ -196,23 +262,24 @@ public class ScaledSpacePhysics : MonoBehaviour
             // Overlapping at end of frame — standard intersection
             collided = true;
             distance = Math.Sqrt(sqrDistance);
-            Debug.Log($"Intersect Collide: {a.id} {a.name} and {b.id} {b.name}");
+            Debug.Log($"Intersect Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}");
         }
         else
         {
             // CCD: sweep from prevPos to realPos (retroactive)
             // displacement = realPos - prevPos = what PhysicsStep just added
-            Vector3d dispA = a.scaledTransform.realPosition - a.prevPos;
-            Vector3d dispB = b.scaledTransform.realPosition - b.prevPos;
+            Vector3d startPosA = a.doubleRigidbody.prevPos + a.GetLocalCenter();
+            Vector3d startPosB = b.doubleRigidbody.prevPos + b.GetLocalCenter();
+            Vector3d dispA = posA - startPosA;
+            Vector3d dispB = posB - startPosB;
 
             // Use start-of-frame positions as the sweep origin
-            Vector3d startPosA = a.prevPos;
-            Vector3d startPosB = b.prevPos;
             Vector3d relPos0 = startPosB - startPosA;  // relative pos at frame start
             Vector3d relDisp = dispB - dispA;           // relative displacement over frame
             
             // Quick reject: objects moving apart at frame start
-            if (Vector3d.Dot(relPos0, relDisp) >= 0)
+            double bCoeff = 2.0 * Vector3d.Dot(relPos0, relDisp);
+            if (bCoeff >= 0)
                 return false;
 
             // Only need CCD if relative displacement exceeds the gap
@@ -225,7 +292,6 @@ public class ScaledSpacePhysics : MonoBehaviour
 
             // Quadratic: |relPos0 + relDisp*t|² = minDistance²,  t ∈ [0,1]
             double aCoeff = Vector3d.Dot(relDisp, relDisp);
-            double bCoeff = 2.0 * Vector3d.Dot(relPos0, relDisp);
             double cCoeff = Vector3d.Dot(relPos0, relPos0) - minDistance * minDistance;
 
             double t = SpaceMath.SolveQuadratic(aCoeff, bCoeff, cCoeff);
@@ -241,7 +307,7 @@ public class ScaledSpacePhysics : MonoBehaviour
             // |relativePosition| == minDistance by construction, so distance = minDistance
             // penetration will be 0 — velocity impulse handles separation; position
             // correction is handled because ResolveCollision moves realPosition directly
-            Debug.Log($"CCD Collide: {a.id} {a.name} and {b.id} {b.name}");
+            Debug.Log($"CCD Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}");
         }
 
         if (!collided)
@@ -254,10 +320,10 @@ public class ScaledSpacePhysics : MonoBehaviour
 
         collision = new CollisionInfo
         {
+            colliderA = a,
+            colliderB = b,
             transformA = a.transform,
             transformB = b.transform,
-            rbA = a,
-            rbB = b,
             contactPoint = contactPoint,
             normal = normal,
             penetration = penetration
@@ -268,10 +334,10 @@ public class ScaledSpacePhysics : MonoBehaviour
 
     private void ResolveCollision(CollisionInfo collision)
     {
-        if (collision.rbA.isKinematic && collision.rbB.isKinematic)
+        if (collision.colliderA.doubleRigidbody.isKinematic && collision.colliderB.doubleRigidbody.isKinematic)
             return;
-        Vector3d velocityA = collision.rbA.velocity;
-        Vector3d velocityB = collision.rbB.velocity;
+        Vector3d velocityA = collision.colliderA.doubleRigidbody.velocity;
+        Vector3d velocityB = collision.colliderB.doubleRigidbody.velocity;
         Vector3d relativeVelocity = velocityB - velocityA;
 
         double velocityAlongNormal = Vector3d.Dot(relativeVelocity, collision.normal);
@@ -281,178 +347,64 @@ public class ScaledSpacePhysics : MonoBehaviour
             return;
 
         // Calculate impulse magnitude
-        double invMassA = collision.rbA.isKinematic ? 0.0 : 1.0 / collision.rbA.attachedRigidbody.mass;
-        double invMassB = collision.rbB.isKinematic ? 0.0 : 1.0 / collision.rbB.attachedRigidbody.mass;
+        double invMassA = collision.colliderA.doubleRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderA.doubleRigidbody.attachedRigidbody.mass;
+        double invMassB = collision.colliderB.doubleRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderB.doubleRigidbody.attachedRigidbody.mass;
 
         double impulseMagnitude = -(1.0 + restitution) * velocityAlongNormal / (invMassA + invMassB);
 
         // Apply impulses
         Vector3d impulse = collision.normal * impulseMagnitude;
         
-        collision.rbA.AddForceAtPosition(-impulse, collision.contactPoint, ForceMode.Impulse);
-        collision.rbB.AddForceAtPosition(impulse, collision.contactPoint, ForceMode.Impulse);
+        collision.colliderA.doubleRigidbody.AddForceAtPosition(-impulse, collision.contactPoint, ForceMode.Impulse);
+        collision.colliderB.doubleRigidbody.AddForceAtPosition(impulse, collision.contactPoint, ForceMode.Impulse);
 
         // Resolve intersection
-        const double percent = 0.8;
-        const double slop = 0.001;
+        const double percent = 0.2;
+        const double slop = 0.01;
 
         double correctionMagnitude = Math.Max(collision.penetration - slop, 0.0) * percent / (invMassA + invMassB);
         Vector3d correction = correctionMagnitude * collision.normal;
 
-        collision.rbA.scaledTransform.realPosition -= correction * invMassA;
-        collision.rbB.scaledTransform.realPosition += correction * invMassB;
+        collision.colliderA.doubleRigidbody.scaledTransform.realPosition -= correction * invMassA;
+        collision.colliderB.doubleRigidbody.scaledTransform.realPosition += correction * invMassB;
     }
 
     public struct CollisionInfo
     {
         /// <summary>
+        /// The ScaledCollider of the object whose script raised the collision event, null if doesn't have one
+        /// </summary>
+        public ScaledCollider colliderA;
+
+        /// <summary>
+        /// The ScaledCollider of the other object involved in the collision, null if doesn't have one
+        /// </summary>
+        public ScaledCollider colliderB;
+
+        /// <summary>
         /// This transform whose script raised the collision event
         /// </summary>
         public Transform transformA;
+
         /// <summary>
         /// The other transform involved in the collision
         /// </summary>
         public Transform transformB;
-        /// <summary>
-        /// The DoubleRigidbody of the object whose script raised the collision event, if it has one
-        /// </summary>
-        public DoubleRigidbody rbA;
-        /// <summary>
-        /// The DoubleRigidbody of the other object involved in the collision, if it has one
-        /// </summary>
-        public DoubleRigidbody rbB;
+
         /// <summary>
         /// The point of contact in world space, calculated as the point on the surface of the first object along the collision normal
         /// </summary>
         public Vector3d contactPoint;
+
         /// <summary>
         /// The normalized collision normal pointing from the center of A to the center of B
         /// </summary>
         public Vector3d normal;
+
         /// <summary>
         /// Distance needed to move the objects apart along the collision normal so they are just touching
         /// </summary>
         public double penetration;
-    }
-
-    public void ResolveCollision(DoubleRigidbody rbA, DoubleRigidbody rbB, Collision collision)
-    {
-        // Only manually apply impulse and position correction to active DoubleRigidbodies, regular Rigidbody handles those itself
-        if ((rbA == null || !rbA.active) && (rbB == null || !rbB.active))
-            return;
-        bool thisRBNull = collision.thisRigidbody == null;
-        bool otherRBNull = collision.rigidbody == null;
-        if ((thisRBNull || collision.thisRigidbody.isKinematic) && (otherRBNull || collision.rigidbody.isKinematic))
-            return;
-
-        ContactPoint contact = collision.GetContact(0);
-        Vector3d normal = contact.normal.ToVector3d();
-        Vector3d contactPoint = contact.point.ToVector3d();
-        Vector3d velocityA = Vector3d.zero;
-        Vector3d velocityB = Vector3d.zero;
-        if (rbA != null)
-        {
-            velocityA = rbA.velocity;
-        }
-        else if (!thisRBNull)
-        {
-            velocityA = collision.thisRigidbody.linearVelocity.ToVector3d();
-        }
-        if (rbB != null)
-        {
-            velocityB = rbB.velocity;
-        }
-        else if (!otherRBNull)
-        {
-            velocityB = collision.rigidbody.linearVelocity.ToVector3d();
-        }
-        Vector3d relativeVelocity = velocityB - velocityA;
-
-        double velocityAlongNormal = Vector3d.Dot(relativeVelocity, normal);
-
-        // Don't resolve if velocities are separating
-        if (velocityAlongNormal < 0)
-            return;
-
-        // Calculate impulse magnitude
-        double invMassA = thisRBNull || rbA == null || rbA.isKinematic ? 0.0 : 1.0 / collision.thisRigidbody.mass;
-        double invMassB = otherRBNull || rbB == null || rbB.isKinematic ? 0.0 : 1.0 / collision.rigidbody.mass;
-
-        double impulseMagnitude = (1.0 + restitution) * velocityAlongNormal / (invMassA + invMassB);
-
-        // Apply impulses and resolve intersection
-        Vector3d impulse = normal * impulseMagnitude;
-
-        const double percent = 0.8;
-        const double slop = 0.001;
-
-        double correctionMagnitude = Math.Max(-contact.separation - slop, 0.0) * percent / (invMassA + invMassB);
-        Vector3d correction = correctionMagnitude * normal;
-        
-        if (rbA != null && rbA.active)
-        {
-            rbA.AddForceAtPosition(impulse, contactPoint, ForceMode.Impulse);
-            rbA.scaledTransform.realPosition += correction * invMassA;
-        }
-        if (rbB != null && rbB.active)
-        {
-            rbB.AddForceAtPosition(-impulse, contactPoint, ForceMode.Impulse);
-            rbB.scaledTransform.realPosition -= correction * invMassB;
-        }
-    }
-
-    private bool CheckTrigger(DoubleRigidbody a, DoubleRigidbody b)
-    {
-        double radiusA = a.GetTriggerRadius();
-        double radiusB = b.GetCollisionRadius();
-        double minDistance = radiusA + radiusB;
-
-        Vector3d posA = a.scaledTransform.realPosition;
-        Vector3d posB = b.scaledTransform.realPosition;
-        Vector3d relativePosition = posB - posA;
-        double sqrDistance = relativePosition.sqrMagnitude;
-
-        if (sqrDistance < minDistance * minDistance)
-            return true;
-
-        // Check if we need to do CCD for fast moving objects
-        Vector3d velA = a.velocity;
-        Vector3d velB = b.velocity;
-        Vector3d relativeVelocity = velB - velA;
-        double sqrDistancePerFrame = relativeVelocity.sqrMagnitude * Time.fixedDeltaTime * Time.fixedDeltaTime;
-        if (sqrDistance < sqrDistancePerFrame && sqrDistancePerFrame > minDistance * minDistance)
-        {
-            // Continuous Collision Detection (CCD) for spheres:
-            //  ((posB​−posA​)+(velB​−velA​)t).magnitude^2 = (radiusA​+radiusB​)^2
-            //  (relativePos + relativeVel*t).magnitude^2 = (combinedRadius)^2
-            //  (P+Vt)⋅(P+Vt) = R^2
-            //  P⋅P + 2(P⋅V)t + (V⋅V)t^2 = R^2
-            //  (V⋅V)t^2 + 2(P⋅V)t + (P⋅P−R^2) = 0
-            // aCoef = V⋅V
-            // bCoef = 2(P⋅V)
-            // cCoef = P⋅P−R^2
-
-            double aCoeff = Vector3d.Dot(relativeVelocity, relativeVelocity);
-            double bCoeff = 2.0 * Vector3d.Dot(relativePosition, relativeVelocity);
-            double cCoeff = Vector3d.Dot(relativePosition, relativePosition) - minDistance * minDistance;
-
-            // Use quadratic formula to solve for t
-            double discriminant = bCoeff * bCoeff - 4.0 * aCoeff * cCoeff;
-
-            if (discriminant >= 0.0)
-            {
-                double sqrtD = Math.Sqrt(discriminant);
-
-                double t0 = (-bCoeff - sqrtD) / (2.0 * aCoeff);
-                double t1 = (-bCoeff + sqrtD) / (2.0 * aCoeff);
-
-                if (t0 >= 0.0 && t0 <= Time.fixedDeltaTime)
-                    return true;
-                if (t1 >= 0.0 && t1 <= Time.fixedDeltaTime)
-                    return true;
-            }
-        }
-        return false;
     }
 
     public struct Pair

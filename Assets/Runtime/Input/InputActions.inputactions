@@ -158,6 +158,24 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "LockTarget",
+                    "type": "Button",
+                    "id": "837bbe0f-c1f9-4451-b376-33d93a9ba317",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "LaunchTorpedo",
+                    "type": "Button",
+                    "id": "459cc93c-539b-48f3-8792-9b12cfa58428",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -428,7 +446,7 @@
                 {
                     "name": "",
                     "id": "99ec5549-7289-4754-8ad2-2dce5ed113a8",
-                    "path": "<Keyboard>/v",
+                    "path": "<Keyboard>/g",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -439,7 +457,7 @@
                 {
                     "name": "",
                     "id": "b90c0893-5ce8-4039-88dd-b1cb6fdacdd9",
-                    "path": "<Keyboard>/g",
+                    "path": "<Keyboard>/v",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -461,7 +479,7 @@
                 {
                     "name": "",
                     "id": "f29b7c6a-3294-4447-b3c4-8739e6503c18",
-                    "path": "<Keyboard>/h",
+                    "path": "<Keyboard>/t",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -488,6 +506,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "RelativeVelocityToggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "28043bd0-6068-4e88-9f9d-56d747e8baad",
+                    "path": "<Mouse>/forwardButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LockTarget",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d8b83d4c-b57b-4995-8d9c-92cb51bc1ba1",
+                    "path": "<Mouse>/rightButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LaunchTorpedo",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

@@ -339,4 +339,12 @@ public class ScaledTransform : MonoBehaviour
     {
         FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateTransformByEvent;
     }
+    
+    public Vector3d GetChildRealPosition(Vector3 childPosition)
+    {
+        Vector3d offset = (transform.position - childPosition).ToVector3d();
+        if (doubleRigidbody.scaledTransform.inScaledSpace)
+            offset *= doubleRigidbody.scaledTransform.scaleFactor;
+        return _realPosition - offset;
+    }
 }

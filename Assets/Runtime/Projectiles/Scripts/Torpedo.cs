@@ -2,18 +2,29 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using SpaceStuff;
+using System;
 
 [RequireComponent(typeof(RadarTarget))]
 public class Torpedo : Projectile
 {
-    [SerializeField] private bool active;
     private RadarTarget thisRadarTarget;
+    private PIDController xPID;
+    private PIDController yPID;
+    private PIDController zPID;
+
+    [SerializeField] private bool active;
     [Header("Torpedo"), SerializeField] private CapsuleCollider _collider;
     [SerializeField] private float engineForce = 10000f;
     [SerializeField] private float thrusterForce = 100f;
-    [SerializeField] private float damping = 2.0f;
+
+    [SerializeField] private float lateralDampGain = 1.0f;
+    [SerializeField] private float proportionalGain = 16.0f;
+    [SerializeField] private float integralGain = 0.0f;
+    [SerializeField] private float derivativeGain = 4.0f;
+
     [SerializeField] private GameObject rocketParticles;
 
+    [SerializeField, Tooltip("Collisions with a relative speed above this will detonate the torpedo.")] private float collideSpeedThreshold = 100f;
     [SerializeField] private GameObject explosionPrefab;
     [SerializeField] private float explosionRadius = 15f;
     [SerializeField] private float explosionForce = 100f;
@@ -33,102 +44,90 @@ public class Torpedo : Projectile
         thisRadarTarget = GetComponent<RadarTarget>();
         thrusterTorque = _collider.height * thrusterForce;
         engineAcceleration = engineForce / doubleRigidbody.attachedRigidbody.mass;
+        xPID = new PIDController(proportionalGain, integralGain, derivativeGain);
+        yPID = new PIDController(proportionalGain, integralGain, derivativeGain);
+        zPID = new PIDController(proportionalGain, integralGain, derivativeGain);
     }
 
     private void FixedUpdate()
     {
-        if (active)
+        if (!active || target == null)
         {
-            if (target != null)
-            {
-                // Predict target's future position based on its acceleration and velocity
-                Vector3d targetVelocity = target.doubleRigidbody.velocity;
-                Vector3d torpedoVelocity = thisRadarTarget.doubleRigidbody.velocity;
-                Vector3d realTargetPosition = target.doubleRigidbody.scaledTransform.realPosition;
-                Vector3d realTorpedoPosition = thisRadarTarget.doubleRigidbody.scaledTransform.realPosition;
+            if (rocketParticles.activeSelf)
+                rocketParticles.SetActive(false);
+            return;
+        }
 
-                Vector3d relativePosition = realTargetPosition - realTorpedoPosition;
-                Vector3d targetDir = relativePosition.normalized;
-                Vector3d relativeVelocity = targetVelocity - torpedoVelocity;
+        Vector3d targetVelocity = target.doubleRigidbody.velocity;
+        Vector3d torpedoVelocity = thisRadarTarget.doubleRigidbody.velocity;
+        Vector3d realTargetPosition = target.doubleRigidbody.scaledTransform.realPosition;
+        Vector3d realTorpedoPosition = thisRadarTarget.doubleRigidbody.scaledTransform.realPosition;
 
-                // Proportional Navigation Guidance to steer torpedo: a = cross(NV_r, omega)
-                // omega = cross(R, V_r) / dot(R, R)
-                // R = relative position
-                Vector3d rotationVector = Vector3d.Cross(relativePosition, relativeVelocity) / relativePosition.sqrMagnitude;
+        Vector3d relativePosition = realTargetPosition - realTorpedoPosition;
+        Vector3d relativeVelocity = targetVelocity - torpedoVelocity;
+        double sqrDistance = relativePosition.sqrMagnitude;
+        Vector3d targetDir = relativePosition / Math.Sqrt(sqrDistance);
 
-                Vector3d pnAcceleration = Vector3d.Cross(navigationConstant * relativeVelocity, rotationVector);
+        // Proportional Navigation Guidance to steer torpedo: a = cross(NV_r, omega)
+        // omega = cross(R, V_r) / dot(R, R)
+        // R = relative position
+        Vector3d rotationVector = Vector3d.Cross(relativePosition, relativeVelocity) / sqrDistance;
+        Vector3d pnAcceleration = Vector3d.Cross(navigationConstant * relativeVelocity, rotationVector);
 
-                Vector3d desiredAcceleration = targetDir * engineAcceleration + pnAcceleration;
+        // How perpendicular is the torpedo's velocity to the target direction?
+        // 0 = heading straight at target, 1 = fully sideways (orbiting)
+        Vector3d torpedoDir = torpedoVelocity.normalized;
+        double perpendicularFactor = 1.0 - Math.Abs(Vector3d.Dot(torpedoDir, targetDir));
 
-                Vector3d desiredForce = desiredAcceleration * doubleRigidbody.attachedRigidbody.mass;
-                Vector3 localDesiredForce = transform.InverseTransformDirection(desiredForce.ToVector3());
-                
-                localDesiredForce.x = Mathf.Clamp(localDesiredForce.x, -thrusterForce, thrusterForce);
-                localDesiredForce.y = Mathf.Clamp(localDesiredForce.y, -thrusterForce, thrusterForce);
+        // Blend a braking force into the acceleration, scaled by how sideways we are
+        Vector3d brakeAcceleration = -torpedoDir * engineAcceleration * perpendicularFactor;
+        Vector3d desiredAcceleration = targetDir * engineAcceleration + pnAcceleration + brakeAcceleration;
 
-                // Z axis
-                if (localDesiredForce.z >= 0.0f)
-                {
-                    // Main engine
-                    localDesiredForce.z = Mathf.Min(localDesiredForce.z, engineForce);
+        Vector3d desiredForce = desiredAcceleration * doubleRigidbody.attachedRigidbody.mass;
+        Vector3 localDesiredForce = transform.InverseTransformDirection(desiredForce.ToVector3());
+        
+        // Clamp lateral (X/Y) force by magnitude, not per-component
+        // This preserves steering direction when saturated
+        Vector2 lateralForce = new Vector2(localDesiredForce.x, localDesiredForce.y);
+        if (lateralForce.sqrMagnitude > thrusterForce * thrusterForce)
+            lateralForce = lateralForce.normalized * thrusterForce;
 
-                    if (!rocketParticles.activeSelf)
-                        rocketParticles.SetActive(true);
-                }
-                else
-                {
-                    // Reverse thruster
-                    localDesiredForce.z = Mathf.Max(localDesiredForce.z, -thrusterForce);
+        localDesiredForce.x = lateralForce.x;
+        localDesiredForce.y = lateralForce.y;
 
-                    if (rocketParticles.activeSelf)
-                        rocketParticles.SetActive(false);
-                }
-
-                doubleRigidbody.AddRelativeForce(localDesiredForce.ToVector3d(), ForceMode.Force);
-                Debug.Log($"Force: {localDesiredForce}");
-
-                // Rotate to align engines with error
-                // Desired facing direction
-                Vector3 desiredForward = desiredForce.normalized.ToVector3();
-
-                // Current angular velocity in world space
-                Vector3 angularVelocity = doubleRigidbody.angularVelocity.ToVector3();
-
-                // Rotation error quaternion
-                Quaternion rotationError = Quaternion.FromToRotation(transform.forward, desiredForward);
-
-                // Convert to axis-angle
-                rotationError.ToAngleAxis(out float angleDeg, out Vector3 axis);
-
-                if (float.IsNaN(axis.x))
-                    return;
-
-                // Convert to signed shortest-angle
-                if (angleDeg > 180f)
-                    angleDeg -= 360f;
-
-                // Very small errors cause jitter
-                if (Mathf.Abs(angleDeg) < 0.1f)
-                    return;
-
-                // Convert degrees to radians
-                float angleRad = angleDeg * Mathf.Deg2Rad;
-
-                // PD controller
-                Vector3 torque = axis.normalized * (angleRad * thrusterTorque) - angularVelocity * damping;
-
-                // Clamp maximum torque
-                torque = Vector3.ClampMagnitude(torque, thrusterTorque);
-                Debug.Log($"Torque: {torque}");
-                doubleRigidbody.AddTorque(torque.ToVector3d(), ForceMode.Force);
-            }
+        // Z axis stays the same — per-axis clamping is correct here
+        if (localDesiredForce.z >= 0.0f)
+        {
+            localDesiredForce.z = Mathf.Min(localDesiredForce.z, engineForce);
+            if (!rocketParticles.activeSelf)
+                rocketParticles.SetActive(true);
         }
         else
         {
+            localDesiredForce.z = Mathf.Max(localDesiredForce.z, -thrusterForce);
             if (rocketParticles.activeSelf)
-            {
                 rocketParticles.SetActive(false);
-            }
+        }
+
+        doubleRigidbody.AddRelativeForce(localDesiredForce.ToVector3d(), ForceMode.Force);
+
+        // Rotate engine to align with desired force
+        // Desired facing direction
+        Vector3 desiredForward = desiredForce.normalized.ToVector3();
+        Debug.DrawRay(transform.position, desiredForce.ToVector3(), Color.green);
+
+        if (desiredForward.sqrMagnitude > 0.0001f)
+        {
+            Vector3 rotationError = Vector3.Cross(transform.forward, desiredForward);
+
+            Vector3 torque = new Vector3(
+                xPID.GetOutput(rotationError.x, Time.fixedDeltaTime) * thrusterTorque,
+                yPID.GetOutput(rotationError.y, Time.fixedDeltaTime) * thrusterTorque,
+                zPID.GetOutput(rotationError.z, Time.fixedDeltaTime) * thrusterTorque
+            );
+            torque = Vector3.ClampMagnitude(torque, thrusterTorque);
+
+            doubleRigidbody.AddTorque(torque.ToVector3d(), ForceMode.Force);
         }
     }
 
@@ -141,9 +140,20 @@ public class Torpedo : Projectile
     private IEnumerator ActivateRoutine(float delay)
     {
         yield return new WaitForSeconds(delay);
-        rocketParticles.SetActive(true);
         active = true;
         _collider.enabled = true;
+        if (target != null && target.alertSystem != null)
+            target.alertSystem.AddTorpedoLock();
+    }
+
+    public void SetTarget(RadarTarget newTarget)
+    {
+        target = newTarget;
+        
+        if (target == thisRadarTarget)
+        {
+            Detonate(doubleRigidbody.scaledTransform.realPosition);
+        }
     }
 
     private float CalculateDamage(float sqrDistance)
@@ -152,19 +162,19 @@ public class Torpedo : Projectile
         return Mathf.Max(-(maxDamage / (explosionRadius * explosionRadius)) * sqrDistance + maxDamage + minDamage, 0f);
     }
 
-    public void Detonate(Vector3 contactPoint, Torpedo caller)
+    public void Detonate(Vector3d contactPoint)
     {
-        if (detonating)
+        if (detonating) // Prevent stack overflow
             return;
         detonating = true;
 
-        if (doubleRigidbody.scaledTransform.inScaledSpace)
+        if (!doubleRigidbody.scaledTransform.inScaledSpace)
         {
-            Destroy(gameObject);
-            return;
+            Instantiate(explosionPrefab, transform.position, transform.rotation);
         }
 
-        Instantiate(explosionPrefab, transform.position, transform.rotation);
+        Vector3 renderContactPoint = (contactPoint - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3();
+
         Collider[] colliders = new Collider[128];
         HashSet<Transform> hitTransforms = new HashSet<Transform>();
         int hits = Physics.OverlapSphereNonAlloc(transform.position, explosionRadius, colliders, ~ignoreLayers, QueryTriggerInteraction.Ignore);
@@ -173,8 +183,19 @@ public class Torpedo : Projectile
             Rigidbody hitRigidbody = colliders[i].attachedRigidbody;
             if (hitRigidbody != doubleRigidbody.attachedRigidbody && !hitTransforms.Contains(hitRigidbody.transform))
             {
-                float damage = CalculateDamage((contactPoint - hitRigidbody.transform.position).sqrMagnitude);
+                double sqrDistance;
+                if (hitRigidbody.TryGetComponent<ScaledTransform>(out var otherScaledTransform))
+                {
+                    sqrDistance = (contactPoint - otherScaledTransform.realPosition).sqrMagnitude;
+                }
+                else
+                {
+                    sqrDistance = (contactPoint - hitRigidbody.transform.position.ToVector3d()).sqrMagnitude;
+                }
 
+                if (sqrDistance > explosionRadius * explosionRadius)
+                    continue;
+                float damage = CalculateDamage((float)sqrDistance);
                 switch (hitRigidbody.tag)
                 {
                     case "Ship":
@@ -183,7 +204,7 @@ public class Torpedo : Projectile
                         // Apply damage
                         if (ship.shields != null)
                         {
-                            ship.shields.Damage(damage, contactPoint);
+                            ship.shields.Damage(damage, renderContactPoint);
                         }
                         else
                         {
@@ -191,25 +212,25 @@ public class Torpedo : Projectile
                         }
 
                         // Apply force
-                        ship.doubleRigidbody.AddExplosionForce(explosionForce, contactPoint.ToVector3d(), explosionRadius, 0, ForceMode.Impulse);
+                        ship.doubleRigidbody.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
                         break;
                     case "Torpedo":
                         Torpedo otherTorpedo = hitRigidbody.GetComponent<Torpedo>();
-                        if (otherTorpedo != this && otherTorpedo != caller) // Prevent stack overflow
-                            otherTorpedo.Detonate(contactPoint, this);
+                        if (otherTorpedo != this)
+                            otherTorpedo.Detonate(contactPoint);
                         break;
                     case "Shields": // Should work fine for ship shields too
                         // Apply damage
-                        hitRigidbody.GetComponent<Shields>().Damage(damage, contactPoint);
+                        hitRigidbody.GetComponent<Shields>().Damage(damage, renderContactPoint);
 
                         // Apply force
                         if (hitRigidbody.TryGetComponent<DoubleRigidbody>(out var shieldDoubleRigidbody))
                         {
-                            shieldDoubleRigidbody.AddExplosionForce(explosionForce, contactPoint.ToVector3d(), explosionRadius, 0, ForceMode.Impulse);
+                            shieldDoubleRigidbody.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
                         }
                         else
                         {
-                            hitRigidbody.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
+                            hitRigidbody.AddExplosionForce(explosionForce, renderContactPoint, explosionRadius, 0, ForceMode.Impulse);
                         }
                         break;
                     case "Projectile":
@@ -224,11 +245,11 @@ public class Torpedo : Projectile
                         // Apply force
                         if (hitRigidbody.TryGetComponent<DoubleRigidbody>(out var doubleRigidbody))
                         {
-                            doubleRigidbody.AddExplosionForce(explosionForce, contactPoint.ToVector3d(), explosionRadius, 0, ForceMode.Impulse);
+                            doubleRigidbody.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
                         }
                         else
                         {
-                            hitRigidbody.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
+                            hitRigidbody.AddExplosionForce(explosionForce, renderContactPoint, explosionRadius, 0, ForceMode.Impulse);
                         }
                         break;
                 }
@@ -237,21 +258,28 @@ public class Torpedo : Projectile
             }
         }
 
+        if (target != null && target.alertSystem != null)
+            target.alertSystem.RemoveTorpedoLock();
+
         Destroy(gameObject);
     }
 
     protected override void OnCollide(ScaledSpacePhysics.CollisionInfo collisionInfo)
     {
-        Detonate(collisionInfo.contactPoint.ToVector3(), this);
+        Vector3d velocityA = collisionInfo.colliderA == null ? Vector3d.zero : collisionInfo.colliderA.doubleRigidbody.velocity;
+        Vector3d velocityB = collisionInfo.colliderB == null ? Vector3d.zero : collisionInfo.colliderB.doubleRigidbody.velocity;
+        Vector3d relativeVelocity = velocityA - velocityB;
+        if (relativeVelocity.sqrMagnitude > collideSpeedThreshold * collideSpeedThreshold)
+            Detonate(collisionInfo.contactPoint);
     }
 
-    protected override void OnTrigger(Transform other, DoubleRigidbody otherDoubleRB)
+    protected override void OnTrigger(Transform other, ScaledCollider otherCollider)
     {
         if (target == null)
             return;
-        if (other == target.transform || otherDoubleRB == target.doubleRigidbody)
+        if (other == target.transform || otherCollider.doubleRigidbody == target.doubleRigidbody)
         {
-            Detonate(transform.position, this);
+            Detonate(doubleRigidbody.scaledTransform.realPosition);
         }
     }
 }

@@ -9,10 +9,10 @@ public class RadarTarget : NetworkBehaviour
 
     [HideInInspector] public DoubleRigidbody doubleRigidbody { get; private set; }
     [Header("RadarTarget")] public string team;
+    public AlertSystem alertSystem;
 
     // Assuming only one player with one rader and HUD
     [HideInInspector] public RadarIcon radarIcon;
-    [HideInInspector] public bool targeted;
     [HideInInspector] public int turretsTargeting;
     public Vector3d acceleration {get; private set;}
     [Tooltip("RadarTarget is invisible to radar beyond this distance")] public float stealthDistance = -1f;

@@ -18,7 +18,6 @@ public class Turret : MonoBehaviour
     public Transform platform;
     public Transform barrel;
     public Transform firePoint;
-    private double firePointOffset;
     [SerializeField] private Transform casingPoint;
     [SerializeField] private float casingRandomness = 0.1f;
 
@@ -73,9 +72,6 @@ public class Turret : MonoBehaviour
         statSystem = GetComponent<StatSystem>();
         turretSystem.StartTargetSearch += ResetTargetSearch;
         turretSystem.CheckTarget += CheckTarget;
-        firePointOffset = (origin.position - firePoint.position).magnitude;
-        if (turretSystem.ship.doubleRigidbody.scaledTransform.inScaledSpace)
-            firePointOffset *= turretSystem.ship.doubleRigidbody.scaledTransform.scaleFactor;
     }
 
     protected virtual void Update()
@@ -105,39 +101,42 @@ public class Turret : MonoBehaviour
         if (!active)
             return;
         if (!turretSystem.manualControl)
-        {
             shoot = false;
+        if (currentTarget != null)
+        {
+            // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
+            Vector3d realFirePoint = GetRealFirePoint();
+            Vector3d realTargetPos = currentTarget.doubleRigidbody.scaledTransform.realPosition;
+            Vector3d relativePosition = realTargetPos - realFirePoint;
 
-            if (currentTarget != null)
+            if (relativePosition.sqrMagnitude > turretSystem.detectRadius * turretSystem.detectRadius)
             {
-                // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
-                Vector3d realFirePoint = GetRealFirePoint();
-                Vector3d realTargetPos = currentTarget.doubleRigidbody.scaledTransform.realPosition;
-                Vector3d relativePosition = realTargetPos - realFirePoint;
-
-                Vector3d targetVelocity = currentTarget.doubleRigidbody.velocity;
-                Vector3d relativeVelocity = targetVelocity - turretSystem.ship.doubleRigidbody.velocity;
-                
-                // Assume the bullet's acceleration after getting fired is only from gravity
-                Vector3d projectileAcceleration = turretSystem.ship.doubleRigidbody.GetGravity();
-                Vector3d relativeAcceleration = currentTarget.acceleration - projectileAcceleration;
-
-                // Maybe add noise or something to bulletTime
-                double bulletTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration, projectileSpeed);
-                Vector3d predictedRelativePos = relativePosition
-                        + (relativeVelocity * bulletTime)
-                        + (0.5 * bulletTime * bulletTime * relativeAcceleration);
-                Vector3d direction = predictedRelativePos.normalized;
-                Vector3d simulatedVelocity = turretSystem.ship.doubleRigidbody.velocity + direction * projectileSpeed;
-                Vector3d simulatedPos = realFirePoint + simulatedVelocity * bulletTime + 0.5 * bulletTime * bulletTime * projectileAcceleration;
-                aimDirection = direction.ToVector3();
-
-                var prediction = new KeyValuePair<float, Vector3d>(Time.time + (float)bulletTime, simulatedPos);
-                predictions.Enqueue(prediction);
-
-                if ((aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
-                    shoot = true;
+                currentTarget = null;
+                return;
             }
+
+            Vector3d targetVelocity = currentTarget.doubleRigidbody.velocity;
+            Vector3d relativeVelocity = targetVelocity - turretSystem.ship.doubleRigidbody.velocity;
+            
+            // Assume the bullet's acceleration after getting fired is only from gravity
+            Vector3d projectileAcceleration = turretSystem.ship.doubleRigidbody.GetGravity();
+            Vector3d relativeAcceleration = currentTarget.acceleration - projectileAcceleration;
+
+            // Maybe add noise or something to bulletTime
+            double bulletTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration, projectileSpeed);
+            Vector3d predictedRelativePos = relativePosition
+                    + (relativeVelocity * bulletTime)
+                    + (0.5 * bulletTime * bulletTime * relativeAcceleration);
+            Vector3d direction = predictedRelativePos.normalized;
+            Vector3d simulatedVelocity = turretSystem.ship.doubleRigidbody.velocity + direction * projectileSpeed;
+            Vector3d simulatedPos = realFirePoint + simulatedVelocity * bulletTime + 0.5 * bulletTime * bulletTime * projectileAcceleration;
+            aimDirection = direction.ToVector3();
+
+            var prediction = new KeyValuePair<float, Vector3d>(Time.time + (float)bulletTime, simulatedPos);
+            predictions.Enqueue(prediction);
+
+            if (!turretSystem.manualControl && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
+                shoot = true;
         }
 
         if (aimDirection.sqrMagnitude > 0.00001f)
@@ -161,7 +160,7 @@ public class Turret : MonoBehaviour
             Debug.DrawRay(origin.position, origin.forward * 1000f, Color.yellow, Time.fixedDeltaTime);
         }
 
-        if (!obstructed && shoot)
+        if (!obstructed && shoot && turretSystem.currentAmmo > 0)
         {
             fireTime += Time.deltaTime;
             if (fireTime >= fireRate)
@@ -264,9 +263,10 @@ public class Turret : MonoBehaviour
     {
         tracerCounter++;
         fireTime = 0;
+        turretSystem.OnTurretFire();
         DoubleRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation).GetComponent<DoubleRigidbody>();
         Collider projectileCollider = projectileRB.GetComponent<Collider>();
-        projectileRB.IgnoreDoubleRigidbody(turretSystem.ship.doubleRigidbody.id, true);
+        projectileRB.IgnoreDoubleRigidbody(turretSystem.ship.doubleRigidbody, true);
         foreach(Collider collider in ignoreColliders)
         {
             Physics.IgnoreCollision(projectileCollider, collider, true);

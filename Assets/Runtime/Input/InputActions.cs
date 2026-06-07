@@ -244,6 +244,24 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""LockTarget"",
+                    ""type"": ""Button"",
+                    ""id"": ""837bbe0f-c1f9-4451-b376-33d93a9ba317"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""LaunchTorpedo"",
+                    ""type"": ""Button"",
+                    ""id"": ""459cc93c-539b-48f3-8792-9b12cfa58428"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -514,7 +532,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""99ec5549-7289-4754-8ad2-2dce5ed113a8"",
-                    ""path"": ""<Keyboard>/v"",
+                    ""path"": ""<Keyboard>/g"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -525,7 +543,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""b90c0893-5ce8-4039-88dd-b1cb6fdacdd9"",
-                    ""path"": ""<Keyboard>/g"",
+                    ""path"": ""<Keyboard>/v"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -547,7 +565,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""f29b7c6a-3294-4447-b3c4-8739e6503c18"",
-                    ""path"": ""<Keyboard>/h"",
+                    ""path"": ""<Keyboard>/t"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -574,6 +592,28 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""RelativeVelocityToggle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""28043bd0-6068-4e88-9f9d-56d747e8baad"",
+                    ""path"": ""<Mouse>/forwardButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LockTarget"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d8b83d4c-b57b-4995-8d9c-92cb51bc1ba1"",
+                    ""path"": ""<Mouse>/rightButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LaunchTorpedo"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -1238,6 +1278,8 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         m_Player_ShieldToggle = m_Player.FindAction("ShieldToggle", throwIfNotFound: true);
         m_Player_RollYawToggle = m_Player.FindAction("RollYawToggle", throwIfNotFound: true);
         m_Player_LaunchModeToggle = m_Player.FindAction("LaunchModeToggle", throwIfNotFound: true);
+        m_Player_LockTarget = m_Player.FindAction("LockTarget", throwIfNotFound: true);
+        m_Player_LaunchTorpedo = m_Player.FindAction("LaunchTorpedo", throwIfNotFound: true);
         // UI
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
@@ -1351,6 +1393,8 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_ShieldToggle;
     private readonly InputAction m_Player_RollYawToggle;
     private readonly InputAction m_Player_LaunchModeToggle;
+    private readonly InputAction m_Player_LockTarget;
+    private readonly InputAction m_Player_LaunchTorpedo;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -1431,6 +1475,14 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @LaunchModeToggle => m_Wrapper.m_Player_LaunchModeToggle;
         /// <summary>
+        /// Provides access to the underlying input action "Player/LockTarget".
+        /// </summary>
+        public InputAction @LockTarget => m_Wrapper.m_Player_LockTarget;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/LaunchTorpedo".
+        /// </summary>
+        public InputAction @LaunchTorpedo => m_Wrapper.m_Player_LaunchTorpedo;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_Player; }
@@ -1507,6 +1559,12 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @LaunchModeToggle.started += instance.OnLaunchModeToggle;
             @LaunchModeToggle.performed += instance.OnLaunchModeToggle;
             @LaunchModeToggle.canceled += instance.OnLaunchModeToggle;
+            @LockTarget.started += instance.OnLockTarget;
+            @LockTarget.performed += instance.OnLockTarget;
+            @LockTarget.canceled += instance.OnLockTarget;
+            @LaunchTorpedo.started += instance.OnLaunchTorpedo;
+            @LaunchTorpedo.performed += instance.OnLaunchTorpedo;
+            @LaunchTorpedo.canceled += instance.OnLaunchTorpedo;
         }
 
         /// <summary>
@@ -1569,6 +1627,12 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @LaunchModeToggle.started -= instance.OnLaunchModeToggle;
             @LaunchModeToggle.performed -= instance.OnLaunchModeToggle;
             @LaunchModeToggle.canceled -= instance.OnLaunchModeToggle;
+            @LockTarget.started -= instance.OnLockTarget;
+            @LockTarget.performed -= instance.OnLockTarget;
+            @LockTarget.canceled -= instance.OnLockTarget;
+            @LaunchTorpedo.started -= instance.OnLaunchTorpedo;
+            @LaunchTorpedo.performed -= instance.OnLaunchTorpedo;
+            @LaunchTorpedo.canceled -= instance.OnLaunchTorpedo;
         }
 
         /// <summary>
@@ -2021,6 +2085,20 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnLaunchModeToggle(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "LockTarget" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnLockTarget(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "LaunchTorpedo" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnLaunchTorpedo(InputAction.CallbackContext context);
     }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "UI" which allows adding and removing callbacks.

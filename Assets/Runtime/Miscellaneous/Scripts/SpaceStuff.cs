@@ -1046,26 +1046,24 @@ namespace SpaceStuff
         /// <returns>Formatted distance string</returns>
         public static string DistanceToFormattedString(double distance, int decimals = 0)
         {
-            double decimalOffset = Math.Pow(10, decimals);
-
             if (distance < kilo)
             {
-                return (Math.Truncate(distance * decimalOffset) / decimalOffset).ToString() + "m";
+                return distance.ToString("F2") + "m";
             }
             else if (distance < mega)
             {
-                return (Math.Truncate(distance / kilo * decimalOffset) / decimalOffset).ToString() + "km";
+                return (distance / kilo).ToString("F2") + "km";
             }
             else if (distance < giga)
             {
-                return (Math.Truncate(distance / giga * decimalOffset) / decimalOffset).ToString() + "Gm";
+                return (distance / giga).ToString("F2") + "Gm";
             }
             else if (distance < astronomicalUnit)
             {
-                return (Math.Truncate(distance / astronomicalUnit * decimalOffset) / decimalOffset).ToString() + "au";
+                return (distance / astronomicalUnit).ToString("F2") + "au";
             }
 
-            return (Math.Truncate(distance / lightYear * decimalOffset) / decimalOffset).ToString() + "ly";
+            return (distance / lightYear).ToString("F2") + "ly";
         }
 
         /// <summary>
@@ -1076,19 +1074,18 @@ namespace SpaceStuff
         /// <returns>Formatted speed string</returns>
         public static string SpeedToFormattedString(double speed, int decimals = 0)
         {
-            double decimalOffset = Math.Pow(10, decimals);
             double absSpeed = Math.Abs(speed);
 
             if (absSpeed < kilo)
             {
-                return (Math.Truncate(speed * decimalOffset) / decimalOffset).ToString() + "m/s";
+                return speed.ToString("F2") + "m/s";
             }
             else if (absSpeed < 0.01 * c)
             {
-                return (Math.Truncate(speed / kilo * decimalOffset) / decimalOffset).ToString() + "km/s";
+                return (speed / kilo).ToString("F2") + "km/s";
             }
 
-            return (Math.Truncate(speed / c * decimalOffset) / decimalOffset).ToString() + "c";
+            return (speed / c).ToString("F2") + "c";
         }
 
         /// <summary>
@@ -1099,24 +1096,23 @@ namespace SpaceStuff
         /// <returns>Formatted time string</returns>
         public static string SecondsToFormattedString(double seconds, int decimals = 0)
         {
-            double decimalOffset = Math.Pow(10, decimals);
             if(seconds >= year)
             {
-                return (Math.Round(seconds / year * decimalOffset) / decimalOffset).ToString() + "years";
+                return (seconds / year).ToString("F2") + "years";
             }
             else if(seconds >= day)
             {
-                return (Math.Round(seconds / day * decimalOffset) / decimalOffset).ToString() + "days";
+                return (seconds / day).ToString("F2") + "days";
             }
             else if(seconds >= hour)
             {
-                return (Math.Round(seconds / hour * decimalOffset) / decimalOffset).ToString() + "hours";
+                return (seconds / hour).ToString("F2") + "hours";
             }
             else if(seconds >= minute)
             {
-                return (Math.Round(seconds / minute * decimalOffset) / decimalOffset).ToString() + "minutes";
+                return (seconds / minute).ToString("F2") + "minutes";
             }
-            return (Math.Round(seconds * decimalOffset) / decimalOffset).ToString() + "seconds";
+            return seconds.ToString("F2") + "seconds";
         }
 
         public static Vector3d ToVector3d(this Vector3 vector)

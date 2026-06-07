@@ -1,18 +1,22 @@
 using SpaceStuff;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-[RequireComponent(typeof(Ship))]
+[RequireComponent(typeof(Ship)), RequireComponent(typeof(TargetingSystem))]
 public class TurretSystem : MonoBehaviour
 {
     [HideInInspector] public Ship ship;
     [SerializeField] private HUDSystem _HUDSystem;
-    [SerializeField] private Radar radar;
-
+    private TargetingSystem targetingSystem;
+    
+    [SerializeField] private int maxAmmo = 10000;
+    public int currentAmmo {get; private set;}
+    [SerializeField] SliderIndicator ammoIndicator;
     [SerializeField] private Transform[] turretPoints;
     [HideInInspector] public Turret[] turrets;
     [SerializeField] private GameObject turretCrosshairPrefab;
@@ -21,7 +25,6 @@ public class TurretSystem : MonoBehaviour
 
     public bool manualControl = false;
 
-    [SerializeField] private GameObject normalCrosshair;
     [SerializeField] private Image manualControlCrosshair;
 
     [SerializeField] private Color crosshairNormalColor;
@@ -38,18 +41,22 @@ public class TurretSystem : MonoBehaviour
     private HashSet<string> offensiveTagsSet = new HashSet<string>();
     [SerializeField, Tooltip("tags of RadarTargets to use defensive strategy when targeting")] private string[] defensiveTags;
     private HashSet<string> defensiveTagsSet = new HashSet<string>();
-    [SerializeField] private float detectRadius = 10000f;
+    public float detectRadius = 10000f;
     [SerializeField] private float killRadius = 500f;
-    [SerializeField, Tooltip("Targets with a velocity dot product to this ship greater than the threshold are targetted")] private float velocityDotThreshold; 
 
     public HashSet<uint> targetsInRange = new HashSet<uint>();
 
     public Action StartTargetSearch;
     public Action<RadarTarget, bool> CheckTarget;
 
+    private bool triggerHeld;
+
     private void Start()
     {
         ship = GetComponent<Ship>();
+        targetingSystem = GetComponent<TargetingSystem>();
+        currentAmmo = maxAmmo;
+        ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
         for (int i = 0; i < offensiveTags.Length; i++)
         {
             offensiveTagsSet.Add(offensiveTags[i]);
@@ -76,84 +83,42 @@ public class TurretSystem : MonoBehaviour
             turretCrosshairImages[i] = newCrosshair.GetComponent<Image>();
         }
         
-        normalCrosshair.SetActive(!manualControl);
+        targetingSystem.SetCrosshairActive(!manualControl);
         manualControlCrosshair.gameObject.SetActive(manualControl);
         ship.doubleRigidbody.OnScaledTriggerEnter += CheckTargetOnEnter;
+        GameManager.Instance.inputActions.Player.Primary.performed += StartTrigger;
+        GameManager.Instance.inputActions.Player.Primary.canceled += StopTrigger;
     }
 
     private void FixedUpdate()
     {
         if (manualControl)
         {
-            bool triggerHeld = GameManager.Instance.inputActions.Player.Primary.IsPressed();
-            if (_HUDSystem.combatHudActive)
+            if (!_HUDSystem.combatHudActive)
             {
-                Vector3 crosshairDirection = manualControlCrosshair.transform.position - Camera.main.transform.position;
+                return;
+            }
 
-                if (triggerHeld)
-                    manualControlCrosshair.color = crosshairTriggerColor;
-                Vector3 aimPoint;
-                if (Physics.Raycast(manualControlCrosshair.transform.position, crosshairDirection, out RaycastHit crosshairHit, Mathf.Infinity, ~ship.ignoreLayers, QueryTriggerInteraction.Ignore))
-                {
-                    if (crosshairHit.transform.TryGetComponent<ScaledTransform>(out var scaledTransform) && scaledTransform.inScaledSpace)
-                    {
-                        // Convert hit point to real position
-                        Vector3d offset = (crosshairHit.transform.position - crosshairHit.point).ToVector3d() * scaledTransform.scaleFactor;
-                        aimPoint = (scaledTransform.realPosition - offset - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3();
-                    }
-                    else
-                    {
-                        aimPoint = crosshairHit.point;
-                    }
-                    if (!triggerHeld)
-                        manualControlCrosshair.color = crosshairHoverColor;
-                }
-                else
-                {
-                    if (!triggerHeld)
-                        manualControlCrosshair.color = crosshairNormalColor;
-                    aimPoint = Camera.main.transform.position + crosshairDirection.normalized * 5000f;
-                }
-
-                for (int i = 0; i < turrets.Length; i++)
-                {
-                    Turret turret = turrets[i];
-                    turret.shoot = triggerHeld;
-                    turret.aimDirection = aimPoint - turret.firePoint.position;
-                    Vector3 screenHit;
-                    bool gotHit = turret.GetRaycastHit(out RaycastHit turretHit);
-                    if (gotHit)
-                    {
-                        if (turretHit.transform != ship.transform)
-                        {
-                            turretCrosshairImages[i].sprite = turretNormalSprite;
-                            turretCrosshairImages[i].color = turretHoverColor;
-                            screenHit = Camera.main.WorldToScreenPoint(turretHit.point);
-                        }
-                        else
-                        {
-                            turretCrosshairImages[i].sprite = turretBlockedSprite;
-                            turretCrosshairImages[i].color = turretBlockedColor;
-                            screenHit = Camera.main.WorldToScreenPoint(turret.firePoint.position + turret.firePoint.forward * 50f);
-                        }
-                    }
-                    else
-                    {
-                        turretCrosshairImages[i].sprite = turretNormalSprite;
-                        turretCrosshairImages[i].color = turretNormalColor;
-                        screenHit = Camera.main.WorldToScreenPoint(turret.firePoint.position + turret.firePoint.forward * 1000);
-                        if (screenHit.z <= 0)
-                        {
-                            turretCrosshairImages[i].color = Color.clear;
-                            continue;
-                        }
-                    }
-
-                    if (RectTransformUtility.ScreenPointToWorldPointInRectangle(_HUDSystem.combatPanel, screenHit, Camera.main, out Vector3 turretCrosshairPos))
-                    {
-                        turretCrosshairs[i].position = turretCrosshairPos;
-                    }
-                }
+            if (triggerHeld)
+            {
+                manualControlCrosshair.color = crosshairTriggerColor;
+            }
+            else if (targetingSystem.CrosshairIsHovering())
+            {
+                manualControlCrosshair.color = crosshairHoverColor;
+            }
+            else
+            {
+                manualControlCrosshair.color = crosshairNormalColor;
+            }
+            
+            for (int i = 0; i < turrets.Length; i++)
+            {
+                Turret turret = turrets[i];
+                turret.currentTarget = targetingSystem.lockedTarget;
+                if (targetingSystem.lockedTarget == null)
+                    turret.aimDirection = targetingSystem.GetAimPoint() - turret.firePoint.position;
+                UpdateTurretOnHUD(i);
             }
         }
         else
@@ -183,40 +148,7 @@ public class TurretSystem : MonoBehaviour
             {
                 for (int i = 0; i < turrets.Length; i++)
                 {
-                    Turret turret = turrets[i];
-                    Vector3 screenHit;
-                    bool gotHit = turret.GetRaycastHit(out RaycastHit turretHit);
-                    if (gotHit)
-                    {
-                        if (turretHit.transform != ship.transform)
-                        {
-                            turretCrosshairImages[i].sprite = turretNormalSprite;
-                            turretCrosshairImages[i].color = turretHoverColor;
-                            screenHit = Camera.main.WorldToScreenPoint(turretHit.point);
-                        }
-                        else
-                        {
-                            turretCrosshairImages[i].sprite = turretBlockedSprite;
-                            turretCrosshairImages[i].color = turretBlockedColor;
-                            screenHit = Camera.main.WorldToScreenPoint(turret.firePoint.position + turret.firePoint.forward * 50f);
-                        }
-                    }
-                    else
-                    {
-                        turretCrosshairImages[i].sprite = turretNormalSprite;
-                        turretCrosshairImages[i].color = turretNormalColor;
-                        screenHit = Camera.main.WorldToScreenPoint(turret.firePoint.position + turret.firePoint.forward * 1000);
-                        if (screenHit.z <= 0)
-                        {
-                            turretCrosshairImages[i].color = Color.clear;
-                            continue;
-                        }
-                    }
-
-                    if (RectTransformUtility.ScreenPointToWorldPointInRectangle(_HUDSystem.combatPanel, screenHit, Camera.main, out Vector3 turretCrosshairPos))
-                    {
-                        turretCrosshairs[i].position = turretCrosshairPos;
-                    }
+                    UpdateTurretOnHUD(i);
                 }
             }
             else
@@ -226,6 +158,71 @@ public class TurretSystem : MonoBehaviour
                     turrets[i].GetRaycastHit(out RaycastHit _); // Need to update turret's obstructed bool
                 }
             }
+        }
+    }
+
+    private void StartTrigger(InputAction.CallbackContext context)
+    {
+        if (!manualControl)
+            return;
+        triggerHeld = true;
+        for (int i = 0; i < turrets.Length; i++)
+        {
+            turrets[i].shoot = triggerHeld;
+        }
+    }
+
+    private void StopTrigger(InputAction.CallbackContext context)
+    {
+        if (!manualControl)
+            return;
+        triggerHeld = false;
+        for (int i = 0; i < turrets.Length; i++)
+        {
+            turrets[i].shoot = triggerHeld;
+        }
+    }
+
+    private void UpdateTurretOnHUD(int i)
+    {
+        Turret turret = turrets[i];
+        Vector3 screenHit;
+        bool gotHit = turret.GetRaycastHit(out RaycastHit turretHit);
+        if (gotHit)
+        {
+            if (turretHit.transform != ship.transform)
+            {
+                turretCrosshairImages[i].sprite = turretNormalSprite;
+                turretCrosshairImages[i].color = turretHoverColor;
+                screenHit = Camera.main.WorldToScreenPoint(turretHit.point);
+                
+                if (turret.shoot)
+                    turretCrosshairImages[i].color = crosshairTriggerColor;
+            }
+            else
+            {
+                turretCrosshairImages[i].sprite = turretBlockedSprite;
+                turretCrosshairImages[i].color = turretBlockedColor;
+                screenHit = Camera.main.WorldToScreenPoint(turret.firePoint.position + turret.firePoint.forward * 50f);
+            }
+        }
+        else
+        {
+            turretCrosshairImages[i].sprite = turretNormalSprite;
+            turretCrosshairImages[i].color = turretNormalColor;
+            screenHit = Camera.main.WorldToScreenPoint(turret.firePoint.position + turret.firePoint.forward * 1000f);
+            if (screenHit.z <= 0)
+            {
+                turretCrosshairImages[i].color = Color.clear;
+                return;
+            }
+            if (turret.shoot)
+                turretCrosshairImages[i].color = crosshairTriggerColor;
+        }
+        
+        if (RectTransformUtility.ScreenPointToWorldPointInRectangle(_HUDSystem.combatPanel, screenHit, Camera.main, out Vector3 turretCrosshairPos))
+        {
+            turretCrosshairs[i].position = turretCrosshairPos;
         }
     }
 
@@ -248,6 +245,8 @@ public class TurretSystem : MonoBehaviour
     private void OnDestroy()
     {
         ship.doubleRigidbody.OnScaledTriggerEnter -= CheckTargetOnEnter;
+        GameManager.Instance.inputActions.Player.Primary.performed -= StartTrigger;
+        GameManager.Instance.inputActions.Player.Primary.canceled -= StopTrigger;
     }
 
     public bool IsOffensive(RadarTarget target)
@@ -264,8 +263,23 @@ public class TurretSystem : MonoBehaviour
     {
         manualControl = state == 1;
         
-        normalCrosshair.SetActive(!manualControl);
+        targetingSystem.SetCrosshairActive(!manualControl);
         manualControlCrosshair.gameObject.SetActive(manualControl);
+        if (!manualControl)
+        {
+            for(int i = 0; i < turrets.Length; i++)
+            {
+                turrets[i].currentTarget = null;
+                turrets[i].shoot = false;
+            }
+        }
+        else
+        {
+            for(int i = 0; i < turrets.Length; i++)
+            {
+                turrets[i].shoot = false;
+            }
+        }
     }
 
     public void UpdateHudForTarget(RadarTarget target)
@@ -276,5 +290,19 @@ public class TurretSystem : MonoBehaviour
         {
             hudObject.SetTargetText(target.turretsTargeting);
         }
+    }
+
+    public void OnTurretFire()
+    {
+        if (currentAmmo <= 0)
+            return;
+        currentAmmo--;
+        ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
+    }
+
+    public void RefillAmmo(int amount)
+    {
+        currentAmmo = Mathf.Min(maxAmmo, amount);
+        ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
     }
 }

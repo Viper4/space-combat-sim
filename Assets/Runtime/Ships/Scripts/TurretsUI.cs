@@ -1,6 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,8 +11,6 @@ public class TurretsUI : MonoBehaviour
         public TextMeshProUGUI title;
         public TextMeshProUGUI statusText;
         public TextMeshProUGUI targetText;
-        public TextMeshProUGUI ammoText;
-        public TextMeshProUGUI healthText;
         public Transform modelPlatform;
         public Transform modelRotatingObject;
     }
@@ -55,8 +51,6 @@ public class TurretsUI : MonoBehaviour
                 title = turretPanel.transform.Find("Title").GetComponent<TextMeshProUGUI>(),
                 statusText = turretPanel.transform.Find("Status Text").GetComponent<TextMeshProUGUI>(),
                 targetText = turretPanel.transform.Find("Target Text").GetComponent<TextMeshProUGUI>(),
-                ammoText = turretPanel.transform.Find("Ammo Text").GetComponent<TextMeshProUGUI>(),
-                healthText = turretPanel.transform.Find("Health Text").GetComponent<TextMeshProUGUI>(),
                 modelPlatform = modelPlatform,
                 modelRotatingObject = modelPlatform.Find("Rotating Object")
             };
@@ -77,11 +71,15 @@ public class TurretsUI : MonoBehaviour
                     turretPanels[i].title.text = "LSR" + (i + 1) + " INFO";
                     break;
                 case "RailGun":
-                    turretButtonText.text = "RIL" + (i + 1);
+                    turretButtonText.text = "RAI" + (i + 1);
 
-                    turretPanels[i].title.text = "RIL" + (i + 1) + " INFO";
+                    turretPanels[i].title.text = "RAI" + (i + 1) + " INFO";
                     break;
             }
+
+            turret.statSystem.healthIndicator = turretPanel.GetComponent<SliderIndicator>();
+            turret.statSystem.healthIndicator.AddText(turretPanel.transform.Find("Health Text").GetComponent<TextMeshProUGUI>());
+            // turret.statSystem.healthIndicator.UpdateUI(turret.statSystem.health, turret.statSystem.maxHealth);
         }
     }
 
@@ -115,21 +113,7 @@ public class TurretsUI : MonoBehaviour
             {
                 panel.targetText.text = turret.currentTarget == null ? "<color=grey>None</color>" : turret.currentTarget.name;
             }
-            //panel.ammoText.text = "AMMO: " + turret.ammo;
-            float healthPercent = turret.statSystem.health / turret.statSystem.maxHealth;
-            if (healthPercent < 0.25f)
-            {
-                panel.healthText.color = Color.red;
-            }
-            else if (healthPercent < 0.5f)
-            {
-                panel.healthText.color = Color.yellow;
-            }
-            else
-            {
-                panel.healthText.color = Color.green;
-            }
-            panel.healthText.text = Math.Round(healthPercent * 100, 2) + "%";
+            
             panel.modelPlatform.rotation = turret.platform.rotation;
             panel.modelRotatingObject.rotation = turret.barrel.rotation;
         }
