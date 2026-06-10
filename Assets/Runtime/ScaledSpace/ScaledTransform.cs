@@ -173,7 +173,7 @@ public class ScaledTransform : MonoBehaviour
         // screenSize ≈ objectRadius / (distance * tan(FOV/2))
         if (sqrCameraDistance <= 0)
             return 1.0f;
-        double radius = Math.Max(Math.Max(_realScale.x, _realScale.y), _realScale.z);
+        double radius = Math.Max(Math.Max(_realScale.x, _realScale.y), _realScale.z); // Good enough estimate, CelestialBodies use this for size anyway
         double tan = Math.Tan(Camera.main.fieldOfView * Mathf.Deg2Rad * 0.5);
         double sqrScreenSize = radius * radius / (sqrCameraDistance * tan * tan);
         return (float)(sqrScreenSize * Screen.height * Screen.height);
@@ -290,14 +290,7 @@ public class ScaledTransform : MonoBehaviour
         inScaledSpace = true;
         if (doubleRigidbody != null)
             doubleRigidbody.active = true;
-        for (int i = 0; i < trackedColliders.Length; i++)
-        {
-            trackedColliders[i].gameObject.layer = scaledSpaceLayer;
-        }
-        for (int i = 0; i < trackedRenderers.Length; i++)
-        {
-            trackedRenderers[i].gameObject.layer = scaledSpaceLayer;
-        }
+        UpdateVisualComponents();
         FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateTransformByEvent; // Prevent double update from multiple consecutive calls
         FloatingWorldOrigin.Instance.cameraTC.OnPositionChange += UpdateTransformByEvent; // Need to maintain illusion if camera moves
         UpdateInScaledSpace(FloatingWorldOrigin.Instance.worldOriginPosition);
@@ -314,15 +307,34 @@ public class ScaledTransform : MonoBehaviour
             doubleRigidbody.active = false;
         transform.position = (_realPosition - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3();
         transform.localScale = _realScale.ToVector3();
-        for (int i = 0; i < trackedColliders.Length; i++)
-        {
-            trackedColliders[i].gameObject.layer = originalColliderLayers[i];
-        }
-        for (int i = 0; i < trackedRenderers.Length; i++)
-        {
-            trackedRenderers[i].gameObject.layer = originalRendererLayers[i];
-        }
+        UpdateVisualComponents();
         FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateTransformByEvent; // ScaledTransform and Transform match so dont need to maintain illusion
+    }
+
+    public void UpdateVisualComponents()
+    {
+        if (inScaledSpace)
+        {
+            for (int i = 0; i < trackedColliders.Length; i++)
+            {
+                trackedColliders[i].gameObject.layer = scaledSpaceLayer;
+            }
+            for (int i = 0; i < trackedRenderers.Length; i++)
+            {
+                trackedRenderers[i].gameObject.layer = scaledSpaceLayer;
+            }
+        }
+        else
+        {
+            for (int i = 0; i < trackedColliders.Length; i++)
+            {
+                trackedColliders[i].gameObject.layer = originalColliderLayers[i];
+            }
+            for (int i = 0; i < trackedRenderers.Length; i++)
+            {
+                trackedRenderers[i].gameObject.layer = originalRendererLayers[i];
+            }
+        }
     }
 
     public Renderer[] GetTrackedRenderers()
@@ -342,9 +354,9 @@ public class ScaledTransform : MonoBehaviour
     
     public Vector3d GetChildRealPosition(Vector3 childPosition)
     {
-        Vector3d offset = (transform.position - childPosition).ToVector3d();
+        Vector3d offset = (childPosition - transform.position).ToVector3d();
         if (doubleRigidbody.scaledTransform.inScaledSpace)
             offset *= doubleRigidbody.scaledTransform.scaleFactor;
-        return _realPosition - offset;
+        return _realPosition + offset;
     }
 }

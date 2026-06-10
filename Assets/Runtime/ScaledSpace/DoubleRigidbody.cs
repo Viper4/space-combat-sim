@@ -135,6 +135,8 @@ public class DoubleRigidbody : MonoBehaviour
             FloatingWorldOrigin.Instance.OnOriginShift += OnOriginShift;
         }
         prevPos = scaledTransform.realPosition;
+
+        CheckSpeed();
     }
 
     public void AddCollider(ScaledCollider newCollider)
@@ -167,6 +169,8 @@ public class DoubleRigidbody : MonoBehaviour
             return;
         prevPos = scaledTransform.realPosition;
 
+        CheckSpeed();
+
         AddForce(gravityAcceleration, ForceMode.Acceleration);
 
         if (_active)
@@ -183,37 +187,32 @@ public class DoubleRigidbody : MonoBehaviour
                 Quaternion delta = Quaternion.AngleAxis((float)(angle * Mathf.Rad2Deg), axis);
                 transform.rotation = delta * transform.rotation;
             }
-
-            double sqrSpeed = _velocity.sqrMagnitude;
-            // Can only use rigidbody when speed is below threshold and in world space
-            if (speedThreshold != -1 && !scaledTransform.inScaledSpace)
-            {
-                if (sqrSpeed < speedThreshold * speedThreshold)
-                {
-                    active = false;
-                }
-            }
-
-            if (sqrSpeed > 0.0001)
-                ScaledSpacePhysics.Instance.UpdateGridPos(this);
         }
         else
         {
             Vector3 rigidbodyVelocity = attachedRigidbody.linearVelocity;
             _velocity = rigidbodyVelocity.ToVector3d();
             _angularVelocity = attachedRigidbody.angularVelocity.ToVector3d();
-            if (speedThreshold != -1 && !scaledTransform.inScaledSpace)
-            {
-                float sqrAngularSpeed = rigidbodyVelocity.sqrMagnitude;
-                if (sqrAngularSpeed > speedThreshold * speedThreshold)
-                {
-                    active = true;
-                }
-            }
+        }
 
-            float sqrSpeed = rigidbodyVelocity.sqrMagnitude;
-            if (sqrSpeed > 0.0001f)
-                ScaledSpacePhysics.Instance.UpdateGridPos(this);
+        if ((prevPos - scaledTransform.realPosition).sqrMagnitude > 0.001)
+        {
+            ScaledSpacePhysics.Instance.UpdateGridPos(this);
+        }
+    }
+
+    private void CheckSpeed()
+    {
+        if (speedThreshold == -1)
+            return;
+        if (_velocity.sqrMagnitude > speedThreshold * speedThreshold)
+        {
+            active = true;
+        }
+        else if (!scaledTransform.inScaledSpace)
+        {
+            // Can only switch to rigidbody when below threshold and in world space
+            active = false;
         }
     }
 

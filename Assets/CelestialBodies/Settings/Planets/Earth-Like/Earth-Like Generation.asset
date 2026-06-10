@@ -22,5 +22,5 @@ MonoBehaviour:
   calculateMass: 1
   density: 5513
   initialAngularVelocityRange:
-  - {x: 0, y: -0.00008, z: 0}
+  - {x: 0, y: 0.0000725, z: 0}
   - {x: 0, y: 0.00008, z: 0}

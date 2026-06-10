@@ -10,6 +10,7 @@ public class RadarTarget : NetworkBehaviour
     [HideInInspector] public DoubleRigidbody doubleRigidbody { get; private set; }
     [Header("RadarTarget")] public string team;
     public AlertSystem alertSystem;
+    public bool alertWhenTargeting = true;
 
     // Assuming only one player with one rader and HUD
     [HideInInspector] public RadarIcon radarIcon;

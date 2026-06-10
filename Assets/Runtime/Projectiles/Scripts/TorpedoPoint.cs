@@ -26,7 +26,8 @@ public class TorpedoPoint : MonoBehaviour
     {
         hasTorpedo = false;
         staticMesh.enabled = false;
-        Torpedo torpedo = Instantiate(torpedoPrefab, transform.position, transform.rotation).GetComponent<Torpedo>();
+        Torpedo torpedo = Instantiate(torpedoPrefab).GetComponent<Torpedo>();
+        torpedo.transform.rotation = transform.rotation;
         torpedo.GetComponent<Collider>().enabled = false;
         RadarTarget torpedoTarget = torpedo.GetComponent<RadarTarget>();
         torpedo.name = torpedoPrefab.name + " " + (index + 1);
@@ -43,5 +44,9 @@ public class TorpedoPoint : MonoBehaviour
         torpedoTarget.doubleRigidbody.velocity = initialVelocity;
         torpedoTarget.doubleRigidbody.AddRelativeForce(launchVelocity, ForceMode.VelocityChange);
         torpedoTarget.doubleRigidbody.scaledTransform.realPosition = launchPosition;
+        Vector3d shipPos = FloatingWorldOrigin.Instance.GetComponent<ScaledTransform>().realPosition;
+        Debug.Log($"Ship pos: {shipPos}");
+        Debug.Log($"Torp launch: {launchPosition}, actual: {torpedoTarget.doubleRigidbody.scaledTransform.realPosition}");
+        Debug.Log($"Ship distance: {(shipPos - launchPosition).magnitude}, launch error distance: {(launchPosition - torpedoTarget.doubleRigidbody.scaledTransform.realPosition).magnitude}");
     }
 }

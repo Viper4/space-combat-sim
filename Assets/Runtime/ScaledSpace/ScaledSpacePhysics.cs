@@ -17,7 +17,6 @@ public class ScaledSpacePhysics : MonoBehaviour
     public event Action<DoubleRigidbody> PrePhysicsStep;
 
     public float restitution = 0.5f;
-    [SerializeField] private bool debugDraw = false;
     
     [SerializeField] private int maxGridLevels;
     [SerializeField] private double baseGridCellSize;
@@ -367,6 +366,28 @@ public class ScaledSpacePhysics : MonoBehaviour
 
         collision.colliderA.doubleRigidbody.scaledTransform.realPosition -= correction * invMassA;
         collision.colliderB.doubleRigidbody.scaledTransform.realPosition += correction * invMassB;
+    }
+
+    public List<ScaledCollider> GetOverlapSphere(Vector3d position, double radius, int layerMask, bool ignoreTriggers)
+    {
+        List<ScaledCollider> overlaps = new List<ScaledCollider>();
+        foreach(ScaledCollider collider in hGrid.GetOverlapCandidates(position, radius))
+        {
+            if (ignoreTriggers && collider.isTrigger)
+                continue;
+            if (((1 << collider.gameObject.layer) & layerMask) == 0)
+                continue;
+            double minDistance = collider.GetRadius() + radius;
+
+            Vector3d colliderPos = collider.GetRealCenter();
+            Vector3d relativePosition = colliderPos - position;
+
+            if (relativePosition.sqrMagnitude < minDistance * minDistance)
+            {
+                overlaps.Add(collider);
+            }
+        }
+        return overlaps;
     }
 
     public struct CollisionInfo

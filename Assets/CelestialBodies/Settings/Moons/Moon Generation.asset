@@ -17,8 +17,8 @@ MonoBehaviour:
   sphere: 1
   random: 1
   scaleRange:
-  - {x: 300, y: 0, z: 0}
-  - {x: 2000000, y: 0, z: 0}
+  - {x: 1700000, y: 0, z: 0}
+  - {x: 1800000, y: 0, z: 0}
   calculateMass: 1
   density: 3344
   initialAngularVelocityRange:

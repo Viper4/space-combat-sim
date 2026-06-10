@@ -17,7 +17,6 @@ GameObject:
   - component: {fileID: 4194929419073694645}
   - component: {fileID: 1271243615205478191}
   - component: {fileID: 824532636656329706}
-  - component: {fileID: -8788644159219920209}
   - component: {fileID: 3432351637793023832}
   m_Layer: 0
   m_Name: Asteroid 1
@@ -102,14 +101,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ecefe1d978853f4f91e593a040236b7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  scaledTransform: {fileID: 0}
   originalLayer: 0
   generationSettingsFoldout: 1
   generationSettings: {fileID: 11400000, guid: 0be72f32df323dc4fb7839601af70aec, type: 2}
   gravity: 0
   gravitySettingsFoldout: 1
   gravitySettings: {fileID: 0}
-  systemCenter: {fileID: 0}
-  scaledTransform: {fileID: 0}
+  orbitTarget: {fileID: 0}
+  pauseUpdates: 0
 --- !u!54 &6356004437463594846
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -218,30 +218,12 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   team: 
   alertSystem: {fileID: 0}
+  alertWhenTargeting: 1
   radarIcon: {fileID: 0}
   turretsTargeting: 0
   stealthDistance: -1
   useScaleForBounds: 1
   boundsRenderers: []
---- !u!114 &-8788644159219920209
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4028611689432565048}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
-  center:
-    x: 0
-    y: 0
-    z: 0
-  radius: -1
-  isTrigger: 0
-  hGridLevel: -1
 --- !u!114 &3432351637793023832
 MonoBehaviour:
   m_ObjectHideFlags: 0

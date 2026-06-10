@@ -882,12 +882,12 @@ namespace SpaceStuff
 
     public static class SpaceMath
     {
-        private const double kilo = 1e3;
-        private const double mega = 1e6;
-        private const double giga = 1e9;
-        private const double astronomicalUnit = 1.495978707e11;
-        private const double lightYear = 9.46073e15;
-        private const double c = 2.99792458e8;
+        public const double kilo = 1e3;
+        public const double mega = 1e6;
+        public const double giga = 1e9;
+        public const double astronomicalUnit = 1.495978707e11;
+        public const double lightYear = 9.46073e15;
+        public const double c = 2.99792458e8;
 
         private const int minute = 60;
         private const int hour = 3600;
@@ -895,6 +895,27 @@ namespace SpaceStuff
         private const int year = 31536000;
 
         private const float epsilon = 0.0001f;
+
+        public static Vector3d Rotate(this Vector3d vector, Quaternion rotation)
+        {
+            float num = rotation.x * 2f;
+            float num2 = rotation.y * 2f;
+            float num3 = rotation.z * 2f;
+            float num4 = rotation.x * num;
+            float num5 = rotation.y * num2;
+            float num6 = rotation.z * num3;
+            float num7 = rotation.x * num2;
+            float num8 = rotation.x * num3;
+            float num9 = rotation.y * num3;
+            float num10 = rotation.w * num;
+            float num11 = rotation.w * num2;
+            float num12 = rotation.w * num3;
+            Vector3d result = default;
+            result.x = (1f - (num5 + num6)) * vector.x + (num7 - num12) * vector.y + (num8 + num11) * vector.z;
+            result.y = (num7 + num12) * vector.x + (1f - (num4 + num6)) * vector.y + (num9 - num10) * vector.z;
+            result.z = (num8 - num11) * vector.x + (num9 + num10) * vector.y + (1f - (num4 + num5)) * vector.z;
+            return result;
+        }
 
         /// <summary>
         /// Normalizes an angle in degrees to the range [-180, 180].
@@ -1044,26 +1065,26 @@ namespace SpaceStuff
         /// <param name="distance">Distance in meters</param>
         /// <param name="decimals">Number of decimal places to display</param>
         /// <returns>Formatted distance string</returns>
-        public static string DistanceToFormattedString(double distance, int decimals = 0)
+        public static string DistanceToFormattedString(double distance, string format)
         {
             if (distance < kilo)
             {
-                return distance.ToString("F2") + "m";
+                return distance.ToString(format) + "m";
             }
             else if (distance < mega)
             {
-                return (distance / kilo).ToString("F2") + "km";
+                return (distance / kilo).ToString(format) + "km";
             }
-            else if (distance < giga)
+            else if (distance < c * 100.0)
             {
-                return (distance / giga).ToString("F2") + "Gm";
+                return (distance / c).ToString(format) + "ls";
             }
-            else if (distance < astronomicalUnit)
+            else if (distance < astronomicalUnit * 100.0)
             {
-                return (distance / astronomicalUnit).ToString("F2") + "au";
+                return (distance / astronomicalUnit).ToString(format) + "au";
             }
 
-            return (distance / lightYear).ToString("F2") + "ly";
+            return (distance / lightYear).ToString(format) + "ly";
         }
 
         /// <summary>
@@ -1072,20 +1093,20 @@ namespace SpaceStuff
         /// <param name="speed">Speed in meters per second</param>
         /// <param name="decimals">Number of decimal places to display</param>
         /// <returns>Formatted speed string</returns>
-        public static string SpeedToFormattedString(double speed, int decimals = 0)
+        public static string SpeedToFormattedString(double speed, string format)
         {
             double absSpeed = Math.Abs(speed);
 
             if (absSpeed < kilo)
             {
-                return speed.ToString("F2") + "m/s";
+                return speed.ToString(format) + "m/s";
             }
             else if (absSpeed < 0.01 * c)
             {
-                return (speed / kilo).ToString("F2") + "km/s";
+                return (speed / kilo).ToString(format) + "km/s";
             }
 
-            return (speed / c).ToString("F2") + "c";
+            return (speed / c).ToString(format) + "c";
         }
 
         /// <summary>
@@ -1094,25 +1115,25 @@ namespace SpaceStuff
         /// <param name="seconds"></param>
         /// <param name="decimals">Number of decimal places to display</param>
         /// <returns>Formatted time string</returns>
-        public static string SecondsToFormattedString(double seconds, int decimals = 0)
+        public static string SecondsToFormattedString(double seconds, string format)
         {
             if(seconds >= year)
             {
-                return (seconds / year).ToString("F2") + "years";
+                return (seconds / year).ToString(format) + "years";
             }
             else if(seconds >= day)
             {
-                return (seconds / day).ToString("F2") + "days";
+                return (seconds / day).ToString(format) + "days";
             }
             else if(seconds >= hour)
             {
-                return (seconds / hour).ToString("F2") + "hours";
+                return (seconds / hour).ToString(format) + "hours";
             }
             else if(seconds >= minute)
             {
-                return (seconds / minute).ToString("F2") + "minutes";
+                return (seconds / minute).ToString(format) + "minutes";
             }
-            return seconds.ToString("F2") + "seconds";
+            return seconds.ToString(format) + "seconds";
         }
 
         public static Vector3d ToVector3d(this Vector3 vector)

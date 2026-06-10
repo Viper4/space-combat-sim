@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using SpaceStuff;
 using UnityEngine;
 
+[RequireComponent(typeof(ScaledTransform))]
 public class CelestialBodyGenerator : MonoBehaviour
 {
     public bool autoUpdate = true;
@@ -21,25 +23,48 @@ public class CelestialBodyGenerator : MonoBehaviour
     private ShapeSettings shapeSettings;
     public ColorSettings originalColorSettings;
     private ColorSettings colorSettings;
-    [SerializeField] bool cloneSettings;
+    [SerializeField] private bool cloneSettings;
 
     [HideInInspector] public bool shapeSettingsFoldout;
     [HideInInspector] public bool colorSettingsFoldout;
 
-    ShapeGenerator shapeGenerator;
-    ColorGenerator colorGenerator;
+    private ShapeGenerator shapeGenerator;
+    private ColorGenerator colorGenerator;
 
-    [SerializeField, Range(1, 32)] int rootLOD = 1;
-    TerrainChunk[] rootChunks;
+    [SerializeField, Range(1, 32)] private int rootLOD = 1;
+    private TerrainChunk[] rootChunks;
 
-    [SerializeField] Vector2 seedRange = new Vector2(-999, 999);
+    [SerializeField] private Vector2 seedRange = new Vector2(-999, 999);
 
-    [SerializeField] bool forceGenerateMeshColliders;
+    [SerializeField] private bool forceGenerateMeshColliders;
+
+    public bool initialized {get; private set;} = false;
+    public bool generated {get; private set;} = false;
+
+    private ScaledTransform scaledTransform;
+
+    public void DestroyGeneratedChunks()
+    {
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = transform.GetChild(i);
+            if (child.name.Contains("Mesh"))
+            {
+                if (Application.isEditor)
+                    DestroyImmediate(child.gameObject);
+                else
+                    Destroy(child.gameObject);
+            }
+        }
+        rootChunks = null;
+        generated = false;
+    }
 
     private void Init()
     {
         shapeGenerator = new ShapeGenerator();
         colorGenerator = new ColorGenerator();
+        scaledTransform = GetComponent<ScaledTransform>();
         Material bodyMaterial;
         if (cloneSettings)
         {
@@ -53,39 +78,22 @@ public class CelestialBodyGenerator : MonoBehaviour
             colorSettings = originalColorSettings;
             bodyMaterial = colorSettings.material;
         }
-
+        Vector3 floatRealScale = scaledTransform.realScale.ToVector3();
         foreach (ShapeSettings.FilterLayer filterLayer in shapeSettings.filterLayers)
         {
             if (filterLayer.applyScale)
             {
-                filterLayer.filterSettings.simplexNoiseSettings.scale = transform.localScale;
-                filterLayer.filterSettings.ridgeNoiseSettings.scale = transform.localScale;
-                filterLayer.filterSettings.perlinNoiseSettings.scale = transform.localScale;
-                filterLayer.filterSettings.craterSettings.scale = transform.localScale;
+                filterLayer.filterSettings.simplexNoiseSettings.scale = floatRealScale;
+                filterLayer.filterSettings.ridgeNoiseSettings.scale = floatRealScale;
+                filterLayer.filterSettings.perlinNoiseSettings.scale = floatRealScale;
+                filterLayer.filterSettings.craterSettings.scale = floatRealScale;
             }
         }
 
         shapeGenerator.UpdateSettings(shapeSettings);
         colorGenerator.UpdateSettings(colorSettings, bodyMaterial);
 
-        int childCount = transform.childCount;
-        int childIndex = 0;
-        for (int i = 0; i < childCount; i++)
-        {
-            Transform child = transform.GetChild(childIndex);
-            if (child.name.Contains("Mesh"))
-            {
-                if (Application.isEditor)
-                    DestroyImmediate(child.gameObject);
-                else
-                    Destroy(child.gameObject);
-            }
-            else
-            {
-                childIndex++;
-                //childCount--;
-            }
-        }
+        DestroyGeneratedChunks();
 
         rootChunks = new TerrainChunk[6 * rootLOD * rootLOD];
 
@@ -104,8 +112,9 @@ public class CelestialBodyGenerator : MonoBehaviour
                     arrayIndex++;
                 }
             }
-
         }
+
+        initialized = true;
     }
 
     public bool UpdateQuadTrees(Camera camera)
@@ -123,6 +132,7 @@ public class CelestialBodyGenerator : MonoBehaviour
         Init();
         GenerateMeshes();
         GenerateColors();
+        generated = true;
     }
 
     public void GenerateRandomCelestialBody()
@@ -163,6 +173,7 @@ public class CelestialBodyGenerator : MonoBehaviour
         }
         GenerateMeshes();
         GenerateColors();
+        generated = true;
     }
 
     private Vector3 RandomSeed()

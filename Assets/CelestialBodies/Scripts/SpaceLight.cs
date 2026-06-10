@@ -9,7 +9,7 @@ public class SpaceLight : MonoBehaviour
 {
     private const double sigma = 5.67e-8;
 
-    private ScaledTransform scaledTransform;
+    public ScaledTransform scaledTransform {get; private set;}
     private TransformChange transformChange;
     private Material materialClone;
 
@@ -22,7 +22,7 @@ public class SpaceLight : MonoBehaviour
     [SerializeField] private float cellTemperatureOffset = 1000f;
 
     private float temperature;
-    private Color mainColor;
+    public Color mainColor {get; private set;}
     private Color cellColor;
     private double luminosity;
 
@@ -63,7 +63,7 @@ public class SpaceLight : MonoBehaviour
         Destroy(materialClone);
     }
 
-    public void Init(float radius)
+    public void Init(double radius)
     {
         // L = 4piR^2sigmaT^4
         // f = L / (4piD^2)

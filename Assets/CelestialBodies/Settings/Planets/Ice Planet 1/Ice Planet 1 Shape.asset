@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 783d31327df308f4a83c508760868385, type: 3}
   m_Name: Ice Planet 1 Shape
   m_EditorClassIdentifier: 
+  radius: 1
   meshFilterResolution: 200
   levelOfDetail: 4
-  complexMeshCollider: 1
+  complexMeshCollider: 0
   meshColliderResolution: 200
   filterLayers:
   - enabled: 1

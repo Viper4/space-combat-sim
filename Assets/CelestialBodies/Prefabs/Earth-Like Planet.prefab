@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 4011333338206696670}
   - component: {fileID: 6248478014903184728}
   - component: {fileID: 5997540040479759170}
+  - component: {fileID: 5668315382189292086}
   m_Layer: 0
   m_Name: Earth-Like Planet
   m_TagString: CelestialBody
@@ -101,14 +102,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ecefe1d978853f4f91e593a040236b7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  scaledTransform: {fileID: 0}
   originalLayer: 0
   generationSettingsFoldout: 1
   generationSettings: {fileID: 11400000, guid: c38d34bdf206c384b8828cb3e206e8ac, type: 2}
   gravity: 1
   gravitySettingsFoldout: 1
   gravitySettings: {fileID: 11400000, guid: 93543632662977245b446f7412747eaf, type: 2}
-  systemCenter: {fileID: 0}
-  scaledTransform: {fileID: 0}
+  orbitTarget: {fileID: 0}
+  pauseUpdates: 0
 --- !u!54 &7669569056236028977
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -217,11 +219,31 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   team: 
   alertSystem: {fileID: 0}
+  alertWhenTargeting: 1
   radarIcon: {fileID: 0}
   turretsTargeting: 0
   stealthDistance: -1
   useScaleForBounds: 1
   boundsRenderers: []
+--- !u!114 &5668315382189292086
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4255873868048831807}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
+    z: 0
+  radius: -1
+  isTrigger: 0
+  hGridLevel: -1
 --- !u!1001 &6213586387416295118
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -230,6 +252,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 5661668052468481612}
     m_Modifications:
+    - target: {fileID: 3625234357283199520, guid: 7d90a6f345e94814897e10cb69bf2905, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 3625234357283199520, guid: 7d90a6f345e94814897e10cb69bf2905, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 3625234357283199520, guid: 7d90a6f345e94814897e10cb69bf2905, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 2.5
+      objectReference: {fileID: 0}
     - target: {fileID: 3625234357283199520, guid: 7d90a6f345e94814897e10cb69bf2905, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -270,6 +304,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 9098520370726733692, guid: 7d90a6f345e94814897e10cb69bf2905, type: 3}
+      propertyPath: planet
+      value: 
+      objectReference: {fileID: 2216603855058342242}
     - target: {fileID: 9098520370726733692, guid: 7d90a6f345e94814897e10cb69bf2905, type: 3}
       propertyPath: radius
       value: 14136

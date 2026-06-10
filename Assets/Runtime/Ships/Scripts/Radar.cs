@@ -6,12 +6,14 @@ using System;
 
 public class Radar : MonoBehaviour
 {
+    private bool active = false;
+    private bool hologramActive = false;
+
     [SerializeField] private Ship ship;
     [SerializeField] private ShipGUI shipGUI;
     [SerializeField] private HUDSystem _HUDSystem;
     [SerializeField] private AlertSystem alertSystem;
 
-    public bool active = true;
     [SerializeField] private float[] radarRanges;
     private int rangeIndex = 0;
     [SerializeField] private float[] iconRadii;
@@ -38,7 +40,21 @@ public class Radar : MonoBehaviour
     [SerializeField] private Color celestialBodyColor;
     [SerializeField] private Color celestialBodyEmission;
 
-    private bool hologramActive = false;
+    [Serializable]
+    public struct ConfigSetting
+    {
+        public string tag;
+        public bool on;
+        public double radius;
+    }
+
+    [SerializeField] private ConfigSetting[] detectInits;
+    [SerializeField] private ConfigSetting[] alertInits;
+    [SerializeField] private ConfigSetting[] killInits;
+
+    private Dictionary<string, ConfigSetting> detectConfigs = new Dictionary<string, ConfigSetting>();
+    private Dictionary<string, ConfigSetting> alertConfigs = new Dictionary<string, ConfigSetting>();
+    private Dictionary<string, ConfigSetting> killConfigs = new Dictionary<string, ConfigSetting>();
 
     private void Start()
     {
@@ -47,6 +63,21 @@ public class Radar : MonoBehaviour
             RadarIcon newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
             newIcon.Init(iconParent.transform.position, transform.rotation, friendlyShipColor, friendlyShipEmission, "", true);
             ship.radarIcon = newIcon;
+        }
+        for(int i = 0; i < detectInits.Length; i++)
+        {
+            string tag = detectInits[i].tag;
+            detectConfigs.Add(tag, detectInits[i]);
+        }
+        for(int i = 0; i < alertInits.Length; i++)
+        {
+            string tag = alertInits[i].tag;
+            alertConfigs.Add(tag, alertInits[i]);
+        }
+        for(int i = 0; i < killInits.Length; i++)
+        {
+            string tag = killInits[i].tag;
+            killConfigs.Add(tag, killInits[i]);
         }
     }
 
@@ -72,9 +103,10 @@ public class Radar : MonoBehaviour
 
                 if (sqrDistance > (radarRanges[rangeIndex] * radarRanges[rangeIndex])
                 || (radarTarget.stealthDistance >= 0f && sqrDistance > radarTarget.stealthDistance * radarTarget.stealthDistance))
-                {
                     continue;
-                }
+
+                if (detectConfigs.TryGetValue(radarTarget.tag, out var detectConfig) && !detectConfig.on)
+                    continue;
 
                 double distance = Math.Sqrt(sqrDistance);
                 Vector3d direction = relativePosition / distance;
@@ -90,8 +122,11 @@ public class Radar : MonoBehaviour
 
                     if (radarTarget.radarIcon != null)
                     {
-                        radarTarget.radarIcon.UpdateIcon(iconParent.transform.position + offset, radarTarget.transform.rotation, radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, 2));
-                        if (radarTarget.transform.CompareTag("CelestialBody"))
+                        radarTarget.radarIcon.UpdateIcon(
+                            iconParent.transform.position + offset, 
+                            radarTarget.transform.rotation, 
+                            radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, "F2"));
+                        if (radarTarget.CompareTag("CelestialBody"))
                         {
                             Vector3d realScale = radarTarget.doubleRigidbody.scaledTransform.realScale;
                             iconScale = new Vector3(
@@ -107,10 +142,20 @@ public class Radar : MonoBehaviour
                         RadarIcon newIcon;
                         Color iconColor;
                         Color iconEmission;
-                        switch (radarTarget.transform.tag)
+                        if (alertConfigs.TryGetValue(radarTarget.tag, out var alertConfig) && alertConfig.on)
+                        {
+                            if (radarTarget.alertWhenTargeting)
+                            {
+                                alertSystem.NewContact();
+                            }
+                            else
+                            {
+                                alertSystem.NewSpecialContact();
+                            }
+                        }
+                        switch (radarTarget.tag)
                         {
                             case "Ship":
-                                alertSystem.NewContact();
                                 newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
                                 if (radarTarget.team == ship.team)
                                 {
@@ -124,7 +169,6 @@ public class Radar : MonoBehaviour
                                 }
                                 break;
                             case "Projectile":
-                                alertSystem.NewContact();
                                 newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
                                 if (radarTarget.team == ship.team)
                                 {
@@ -138,7 +182,6 @@ public class Radar : MonoBehaviour
                                 }
                                 break;
                             case "Torpedo":
-                                alertSystem.NewContact();
                                 newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
                                 if (radarTarget.team == ship.team)
                                 {
@@ -163,6 +206,10 @@ public class Radar : MonoBehaviour
                                 );
                                 break;
                             default:
+                                if (radarTarget.alertWhenTargeting)
+                                    alertSystem.NewContact();
+                                else
+                                    alertSystem.NewSpecialContact();
                                 newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
                                 iconColor = Color.white;
                                 iconEmission = Color.white;
@@ -175,7 +222,7 @@ public class Radar : MonoBehaviour
                             radarTarget.transform.rotation, 
                             iconColor, 
                             iconEmission, 
-                            radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, 2),
+                            radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, "F2"),
                             false
                         );
                         radarTarget.radarIcon = newIcon;
@@ -192,11 +239,11 @@ public class Radar : MonoBehaviour
 
                     double arrivalTime = SpaceMath.CalculateArrivalTime(distance, closingVelocity, closingAcceleration);
 
-                    string ETA = arrivalTime < 0.0 ? "Never" : SpaceMath.SecondsToFormattedString(arrivalTime, 2);
+                    string ETA = arrivalTime < 0.0 ? "Never" : SpaceMath.SecondsToFormattedString(arrivalTime, "F2");
                     string details = "<b>" + radarTarget.name + "</b>" +
-                        "\nDST " + SpaceMath.DistanceToFormattedString(distance, 2) +
-                        "\nSPD " + SpaceMath.SpeedToFormattedString((float)radarTarget.doubleRigidbody.velocity.magnitude, 2) +
-                        "\nCLS " + SpaceMath.SpeedToFormattedString(closingVelocity, 2) +
+                        "\nDST " + SpaceMath.DistanceToFormattedString(distance, "F2") +
+                        "\nSPD " + SpaceMath.SpeedToFormattedString((float)radarTarget.doubleRigidbody.velocity.magnitude, "F2") +
+                        "\nCLS " + SpaceMath.SpeedToFormattedString(closingVelocity, "F2") +
                         "\nETA " + ETA;
 
                     double predictTime = arrivalTime < 0.0 ? distance / 25.0 : arrivalTime;
@@ -286,5 +333,45 @@ public class Radar : MonoBehaviour
         {
             targetsInTrigger.Remove(otherRadarTarget.GetID());
         }
+    }
+
+    public void SetDetectOn(string tag)
+    {
+        if (!detectConfigs.TryGetValue(tag, out var config))
+            return;
+        config.on = true;
+        detectConfigs[tag] = config;
+    }
+
+    public void SetDetectOff(string tag)
+    {
+        if (!detectConfigs.TryGetValue(tag, out var config))
+            return;
+        config.on = false;
+        detectConfigs[tag] = config;
+    }
+
+    public void SetDetectRadius(string tag, double radius)
+    {
+        if (!detectConfigs.TryGetValue(tag, out var config))
+            return;
+        config.radius = radius;
+        detectConfigs[tag] = config;
+    }
+
+    public void SetAlertOn(string tag)
+    {
+        if (!alertConfigs.TryGetValue(tag, out var config))
+            return;
+        config.on = true;
+        alertConfigs[tag] = config;
+    }
+
+    public void SetAlertOff(string tag)
+    {
+        if (!alertConfigs.TryGetValue(tag, out var config))
+            return;
+        config.on = false;
+        alertConfigs[tag] = config;
     }
 }

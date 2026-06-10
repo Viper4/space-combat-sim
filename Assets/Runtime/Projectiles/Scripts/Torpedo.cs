@@ -17,7 +17,6 @@ public class Torpedo : Projectile
     [SerializeField] private float engineForce = 10000f;
     [SerializeField] private float thrusterForce = 100f;
 
-    [SerializeField] private float lateralDampGain = 1.0f;
     [SerializeField] private float proportionalGain = 16.0f;
     [SerializeField] private float integralGain = 0.0f;
     [SerializeField] private float derivativeGain = 4.0f;
@@ -30,7 +29,7 @@ public class Torpedo : Projectile
     [SerializeField] private float explosionForce = 100f;
     [SerializeField] private float minDamage = 25f;
     [SerializeField] private float maxDamage = 75f;
-
+    
     [SerializeField] private RadarTarget target;
     [SerializeField] private float navigationConstant = 4f;
     private float thrusterTorque;
@@ -142,14 +141,18 @@ public class Torpedo : Projectile
         yield return new WaitForSeconds(delay);
         active = true;
         _collider.enabled = true;
-        if (target != null && target.alertSystem != null)
+        if (thisRadarTarget.alertWhenTargeting && target != null && target.alertSystem != null)
             target.alertSystem.AddTorpedoLock();
     }
 
     public void SetTarget(RadarTarget newTarget)
     {
+        if (thisRadarTarget.alertWhenTargeting && target != null && target.alertSystem != null)
+            target.alertSystem.RemoveTorpedoLock();
         target = newTarget;
-        
+        if (thisRadarTarget.alertWhenTargeting && target != null && target.alertSystem != null)
+            target.alertSystem.AddTorpedoLock();
+
         if (target == thisRadarTarget)
         {
             Detonate(doubleRigidbody.scaledTransform.realPosition);
@@ -177,85 +180,58 @@ public class Torpedo : Projectile
 
         Collider[] colliders = new Collider[128];
         HashSet<Transform> hitTransforms = new HashSet<Transform>();
-        int hits = Physics.OverlapSphereNonAlloc(transform.position, explosionRadius, colliders, ~ignoreLayers, QueryTriggerInteraction.Ignore);
-        for (int i = 0; i < hits; i++)
+        List<ScaledCollider> overlapColliders = ScaledSpacePhysics.Instance.GetOverlapSphere(contactPoint, explosionRadius, ~ignoreLayers, true);
+        foreach(ScaledCollider collider in overlapColliders)
         {
-            Rigidbody hitRigidbody = colliders[i].attachedRigidbody;
-            if (hitRigidbody != doubleRigidbody.attachedRigidbody && !hitTransforms.Contains(hitRigidbody.transform))
+            DoubleRigidbody otherRB = collider.doubleRigidbody;
+            if (otherRB == doubleRigidbody || hitTransforms.Contains(otherRB.transform))
+                continue;
+            float damage = CalculateDamage((float)(collider.GetRealCenter() - contactPoint).sqrMagnitude);
+            switch (collider.tag)
             {
-                double sqrDistance;
-                if (hitRigidbody.TryGetComponent<ScaledTransform>(out var otherScaledTransform))
-                {
-                    sqrDistance = (contactPoint - otherScaledTransform.realPosition).sqrMagnitude;
-                }
-                else
-                {
-                    sqrDistance = (contactPoint - hitRigidbody.transform.position.ToVector3d()).sqrMagnitude;
-                }
+                case "Ship":
+                    Ship ship = otherRB.GetComponent<Ship>();
 
-                if (sqrDistance > explosionRadius * explosionRadius)
-                    continue;
-                float damage = CalculateDamage((float)sqrDistance);
-                switch (hitRigidbody.tag)
-                {
-                    case "Ship":
-                        Ship ship = hitRigidbody.GetComponent<Ship>();
+                    // Apply damage
+                    if (ship.shields != null)
+                    {
+                        ship.shields.Damage(damage, renderContactPoint);
+                    }
+                    else
+                    {
+                        ship.statSystem.Damage(damage);
+                    }
 
-                        // Apply damage
-                        if (ship.shields != null)
-                        {
-                            ship.shields.Damage(damage, renderContactPoint);
-                        }
-                        else
-                        {
-                            ship.statSystem.Damage(damage);
-                        }
+                    // Apply force
+                    otherRB.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
+                    break;
+                case "Torpedo":
+                    Torpedo otherTorpedo = otherRB.GetComponent<Torpedo>();
+                    if (otherTorpedo != this)
+                        otherTorpedo.Detonate(contactPoint);
+                    break;
+                case "Shields": // Should work fine for ship shields too
+                    // Apply damage
+                    otherRB.GetComponent<Shields>().Damage(damage, renderContactPoint);
 
-                        // Apply force
-                        ship.doubleRigidbody.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
-                        break;
-                    case "Torpedo":
-                        Torpedo otherTorpedo = hitRigidbody.GetComponent<Torpedo>();
-                        if (otherTorpedo != this)
-                            otherTorpedo.Detonate(contactPoint);
-                        break;
-                    case "Shields": // Should work fine for ship shields too
-                        // Apply damage
-                        hitRigidbody.GetComponent<Shields>().Damage(damage, renderContactPoint);
+                    // Apply force
+                    otherRB.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
+                    break;
+                case "Projectile":
+                    // Bullets and projectiles are super lightweight, so just destroy them
+                    Destroy(otherRB.gameObject);
+                    break;
+                default:
+                    // Apply damage
+                    if (otherRB.TryGetComponent<StatSystem>(out var statSystem))
+                        statSystem.Damage(damage);
 
-                        // Apply force
-                        if (hitRigidbody.TryGetComponent<DoubleRigidbody>(out var shieldDoubleRigidbody))
-                        {
-                            shieldDoubleRigidbody.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
-                        }
-                        else
-                        {
-                            hitRigidbody.AddExplosionForce(explosionForce, renderContactPoint, explosionRadius, 0, ForceMode.Impulse);
-                        }
-                        break;
-                    case "Projectile":
-                        // Bullets and projectiles are super lightweight, so just destroy them
-                        Destroy(hitRigidbody.gameObject);
-                        break;
-                    default:
-                        // Apply damage
-                        if (hitRigidbody.TryGetComponent<StatSystem>(out var statSystem))
-                            statSystem.Damage(damage);
-
-                        // Apply force
-                        if (hitRigidbody.TryGetComponent<DoubleRigidbody>(out var doubleRigidbody))
-                        {
-                            doubleRigidbody.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
-                        }
-                        else
-                        {
-                            hitRigidbody.AddExplosionForce(explosionForce, renderContactPoint, explosionRadius, 0, ForceMode.Impulse);
-                        }
-                        break;
-                }
-
-                hitTransforms.Add(hitRigidbody.transform);
+                    // Apply force
+                    otherRB.AddExplosionForce(explosionForce, contactPoint, explosionRadius, 0, ForceMode.Impulse);
+                    break;
             }
+
+            hitTransforms.Add(otherRB.transform);
         }
 
         if (target != null && target.alertSystem != null)

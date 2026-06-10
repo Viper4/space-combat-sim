@@ -1,17 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
+using SpaceStuff;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshRenderer))]
 public class Atmosphere : MonoBehaviour
 {
-    MeshRenderer meshRenderer;
-    [SerializeField] Material sourceMaterial;
-    Material material;
-
-    [SerializeField] float radius;
-
-    public Transform lightSource;
+    [SerializeField] private ScaledTransform planet;
+    [SerializeField] private SpaceLight lightSource;
+    private MeshRenderer meshRenderer;
+    [SerializeField] private Material sourceMaterial;
+    private Material material;
 
     private void OnValidate()
     {
@@ -43,19 +42,13 @@ public class Atmosphere : MonoBehaviour
 
     private void UpdateMaterial()
     {
-        material.SetVector("_LightDirection", (transform.position - lightSource.position).normalized);
-        material.SetVector("_PlanetPosition", transform.position);
-        material.SetFloat("_PlanetRadius", radius - 2);
-        material.SetFloat("_AtmosphereRadius", radius);
-
-        Vector3 worldScale = new Vector3(radius * 2, radius * 2, radius * 2);
-        if (transform.parent != null)
-        {
-            transform.localScale = transform.parent.InverseTransformVector(worldScale);
-        }
-        else
-        {
-            transform.localScale = worldScale;
-        }
+        if (planet == null || lightSource == null || lightSource.scaledTransform == null)
+            return;
+        float radius = Mathf.Max(planet.transform.localScale.x, planet.transform.localScale.y, planet.transform.localScale.z);
+        material.SetVector("_LightDirection", (planet.realPosition - lightSource.scaledTransform.realPosition).normalized.ToVector3());
+        material.SetColor("_LightColor", lightSource.mainColor);
+        material.SetVector("_PlanetPosition", planet.transform.position);
+        material.SetFloat("_PlanetRadius", radius);
+        material.SetFloat("_AtmosphereRadius", radius + 2);
     }
 }

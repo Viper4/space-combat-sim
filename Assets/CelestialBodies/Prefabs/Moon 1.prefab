@@ -101,14 +101,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ecefe1d978853f4f91e593a040236b7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  scaledTransform: {fileID: 0}
   originalLayer: 0
   generationSettingsFoldout: 1
   generationSettings: {fileID: 11400000, guid: 9d8268b4c96e5cc42b857afaddf81fd4, type: 2}
   gravity: 1
   gravitySettingsFoldout: 0
   gravitySettings: {fileID: 11400000, guid: 6d7804aa2b56200498e97388c7364617, type: 2}
-  systemCenter: {fileID: 0}
-  scaledTransform: {fileID: 0}
+  orbitTarget: {fileID: 0}
+  pauseUpdates: 0
 --- !u!54 &7988712374659034346
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -217,6 +218,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   team: 
   alertSystem: {fileID: 0}
+  alertWhenTargeting: 1
   radarIcon: {fileID: 0}
   turretsTargeting: 0
   stealthDistance: -1

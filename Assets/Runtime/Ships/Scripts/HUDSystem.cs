@@ -15,6 +15,9 @@ public class HUDSystem : MonoBehaviour
     public RectTransform combatPanel;
     [SerializeField] private float combatHUDDistance = 1.0f;
     [SerializeField, Tooltip("Distance away from camera center HUD objects will show details text.")] private float detailsDistance = 0.05f;
+    [SerializeField] private RectTransform targetDirMarker;
+    [SerializeField, Tooltip("Radius away from center of screen to show marker.")] private float targetDirMarkerRadius = 1.0f;
+    [SerializeField] private float targetDirMarkerDistance = 1.0f;
 
     private Dictionary<uint, HUDObject> radarIDHUDPair = new Dictionary<uint, HUDObject>();
 
@@ -81,6 +84,36 @@ public class HUDSystem : MonoBehaviour
 
         HUDObject.UpdateObject(position, quad, details, true, predicted);
         return true;
+    }
+
+    public void SetTargetDirectionMarkerActive(bool active)
+    {
+        if (targetDirMarker.gameObject.activeSelf != active)
+            targetDirMarker.gameObject.SetActive(active);
+    }
+
+    public void UpdateTargetDirectionMarker(Vector3d targetPosition)
+    {
+        Camera cam = Camera.main;
+
+        Vector3d camRealPos = FloatingWorldOrigin.Instance.worldOriginPosition + cam.transform.position.ToVector3d();
+
+        Vector3 worldDirection = (targetPosition - camRealPos).normalized.ToVector3();
+        Vector3 localDirection = cam.transform.InverseTransformDirection(worldDirection);
+        Vector2 screenDirection = new Vector2(localDirection.x, localDirection.y);
+
+        if (localDirection.z >= 0f && screenDirection.sqrMagnitude < targetDirMarkerDistance * targetDirMarkerDistance)
+        {
+            SetTargetDirectionMarkerActive(false);
+            return;
+        }
+        SetTargetDirectionMarkerActive(true);
+
+        screenDirection.Normalize();
+
+        targetDirMarker.anchoredPosition = screenDirection * targetDirMarkerRadius;
+        float angle = Mathf.Atan2(screenDirection.y, screenDirection.x) * Mathf.Rad2Deg - 90f;
+        targetDirMarker.localRotation = Quaternion.Euler(0f, 0f, angle);
     }
 
     public bool TryGetValue(uint id, out HUDObject HUDObject)

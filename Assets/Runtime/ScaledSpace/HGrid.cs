@@ -191,4 +191,38 @@ public class HGrid
             }
         }
     }
+
+    public IEnumerable<ScaledCollider> GetOverlapCandidates(Vector3d position, double radius)
+    {
+        for (int level = 0; level < maxLevels; level++)
+        {
+            double cellSize = levelCellSizes[level];
+
+            // Largest collider radius that could exist at this level.
+            double maxColliderRadius = cellSize * 0.5;
+
+            // Get min and max positions of biggest possible spheres at this level that could overlap this sphere with position and radius
+            // AABB stretched over this space
+            Vector3d min = position - Vector3d.one * (radius + maxColliderRadius);
+            Vector3d max = position + Vector3d.one * (radius + maxColliderRadius);
+
+            GridCell minCell = GetCell(min, cellSize);
+            GridCell maxCell = GetCell(max, cellSize);
+
+            for (int x = minCell.x; x <= maxCell.x; x++)
+            for (int y = minCell.y; y <= maxCell.y; y++)
+            for (int z = minCell.z; z <= maxCell.z; z++)
+            {
+                GridCell cell = new GridCell(x, y, z);
+
+                if (!levels[level].TryGetValue(cell, out var list))
+                    continue;
+
+                foreach (ScaledCollider collider in list)
+                {
+                    yield return collider;
+                }
+            }
+        }
+    }
 }

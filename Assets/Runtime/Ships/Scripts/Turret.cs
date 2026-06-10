@@ -44,7 +44,6 @@ public class Turret : MonoBehaviour
     public RadarTarget currentTarget;
 
     [SerializeField, Range(0, 1), Tooltip("0=only use velocity to estimate target arrival time, 1=acceleration dominant estimate of arrival time")] private float accelerationHeuristic = 0.5f;
-    [SerializeField] private int predictionIterations = 4;
     [SerializeField] private string explosiveTag;
 
     public float explosionRadius = 20f;
@@ -282,8 +281,7 @@ public class Turret : MonoBehaviour
             tracerCounter = 0;
         }
 
-        Vector3d offset = (firePoint.position - turretSystem.transform.position).ToVector3d();
-        projectileRB.scaledTransform.realPosition = turretSystem.ship.doubleRigidbody.scaledTransform.realPosition + offset;
+        projectileRB.scaledTransform.realPosition = turretSystem.ship.doubleRigidbody.scaledTransform.GetChildRealPosition(firePoint.position);
 
         if (!turretSystem.ship.doubleRigidbody.scaledTransform.inScaledSpace)
         {

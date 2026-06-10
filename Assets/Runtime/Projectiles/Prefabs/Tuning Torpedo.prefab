@@ -269,6 +269,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   team: 
   alertSystem: {fileID: 0}
+  alertWhenTargeting: 1
   radarIcon: {fileID: 0}
   turretsTargeting: 0
   stealthDistance: -1
@@ -316,10 +317,6 @@ MonoBehaviour:
   rocketParticles: {fileID: 8936523408150303402}
   collideSpeedThreshold: 100
   explosionPrefab: {fileID: 3982350210874365306, guid: 38256d267e02f9045b36a61ca4903a4d, type: 3}
-  explosionRadius: 30
-  explosionForce: 100
-  minDamage: 30
-  maxDamage: 1000
   target: {fileID: 0}
   navigationConstant: 4
   desiredForward: {x: 0, y: 0, z: 0}

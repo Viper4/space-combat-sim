@@ -29,6 +29,21 @@ public class ScaledCollider : MonoBehaviour
         ScaledSpacePhysics.Instance.RegisterCollider(this);
     }
 
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = isTrigger ? Color.blue : Color.red;
+
+        if (doubleRigidbody == null)
+        {
+            doubleRigidbody = GetComponent<DoubleRigidbody>();
+        }
+
+        Vector3d rotatedOffset = new Vector3d(center.x * transform.localScale.x, center.y * transform.localScale.y, center.z * transform.localScale.z);
+        rotatedOffset = rotatedOffset.Rotate(doubleRigidbody.transform.rotation);
+
+        Gizmos.DrawWireSphere(transform.position + rotatedOffset.ToVector3(), (float)radius);
+    }
+
     public Vector3d GetLocalCenter()
     {
         return center;
@@ -37,14 +52,16 @@ public class ScaledCollider : MonoBehaviour
     public Vector3d GetRealCenter()
     {
         Vector3d scale = doubleRigidbody.scaledTransform.realScale;
-        return doubleRigidbody.scaledTransform.realPosition + new Vector3d(center.x * scale.x, center.y * scale.y, center.z * scale.z);
+        Vector3d rotatedOffset = new Vector3d(center.x * scale.x, center.y * scale.y, center.z * scale.z);
+        rotatedOffset = rotatedOffset.Rotate(doubleRigidbody.transform.rotation);
+        return doubleRigidbody.scaledTransform.realPosition + rotatedOffset;
     }
 
     public double GetRadius()
     {
         if (radius < 0)
         {
-            Vector3d scale = doubleRigidbody.scaledTransform.realScale * 2.0;
+            Vector3d scale = doubleRigidbody.scaledTransform.realScale;
             return Math.Max(Math.Max(scale.x, scale.y), scale.z);
         }
         return radius;

@@ -5568,8 +5568,7 @@ MonoBehaviour:
   health: 100
   maxHealth: 100
   damageAnimation: {fileID: 0}
-  healthBars: []
-  healthTexts: []
+  healthIndicator: {fileID: 0}
   damageParticles: {fileID: 7945612027888559361}
   onDamage:
     m_PersistentCalls:

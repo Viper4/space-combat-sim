@@ -157,8 +157,9 @@ public class TerrainChunk
             for (int x = 0; x < filterResolution; x++)
             {
                 Vector3 vertexPosition = GetPointOnCubeSphere(new Vector2(x, y) / (filterResolution - 1));
-                uv[i] = new Vector2(x, y);
-                //uv[i] = new Vector2(colorGenerator.BiomePercentFromPoint(GetPointOnCubeSphere(new Vector2(x, y) / (filterResolution - 1))), 0);
+                // uv[i] = new Vector2(x, y);
+                uv[i] = new Vector2(colorGenerator.BiomePercentFromPoint(vertexPosition), 0f);
+                // uv[i] = Vector2.one;
                 i++;
             }
         }

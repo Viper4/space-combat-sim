@@ -18,6 +18,7 @@ public class CelestialBodyGeneratorEditor : Editor
 
             if (celestialBody.autoUpdate && check.changed)
             {
+                celestialBody.GetComponent<ScaledTransform>();
                 celestialBody.GenerateCelestialBody();
             }
         }

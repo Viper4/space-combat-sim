@@ -42,6 +42,6 @@ public class FloatingWorldOrigin : MonoBehaviour
         OnOriginShift?.Invoke(shift);
         worldOriginPosition += shift;
         transform.position = Vector3.zero;
-        Debug.Log($"Shifted floating origin {transform.name} to {worldOriginPosition}");
+        Debug.Log($"{transform.name} shifted world origin to {worldOriginPosition}");
     }
 }

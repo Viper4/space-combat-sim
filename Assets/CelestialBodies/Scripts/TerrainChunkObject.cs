@@ -4,12 +4,12 @@ using UnityEngine;
 
 public class TerrainChunkObject : MonoBehaviour
 {
-    TerrainChunk chunk;
+    private TerrainChunk chunk;
     public MeshFilter meshFilter;
     public MeshCollider meshCollider;
     public MeshRenderer meshRenderer;
-    BoxCollider boxCollider;
-    int collidersInTrigger = 0;
+    private BoxCollider boxCollider;
+    private int collidersInTrigger = 0;
 
     public void Init(TerrainChunk chunk)
     {

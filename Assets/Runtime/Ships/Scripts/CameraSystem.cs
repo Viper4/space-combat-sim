@@ -72,6 +72,7 @@ public class CameraSystem : MonoBehaviour
 
             cam.Rotate(Vector3.right, pitchInput * rotateSpeed * Time.deltaTime, Space.Self);
             cam.Rotate(Vector3.up, yawInput * rotateSpeed * Time.deltaTime, Space.Self);
+            cam.localRotation = Quaternion.Euler(Mathf.Clamp(cam.localEulerAngles.x, -90f, 90f), cam.localEulerAngles.y, cam.localEulerAngles.z);
         }
     }
 

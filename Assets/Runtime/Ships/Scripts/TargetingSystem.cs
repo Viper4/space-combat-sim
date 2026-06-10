@@ -49,19 +49,19 @@ public class TargetingSystem : MonoBehaviour
             crosshairHovering = false;
         }
 
-        if (GameManager.Instance.offlineMode)
+        if (lockedTarget != null)
         {
-            if (lockedTarget != null)
-            {
-                targetName.text = lockedTarget.name;
-                targetModel.rotation = lockedTarget.transform.rotation;
-                if (lockedTarget.doubleRigidbody.velocity != Vector3d.zero)
-                    targetDirectionPivot.rotation = Quaternion.LookRotation(lockedTarget.doubleRigidbody.velocity.ToVector3(), transform.up);
-            }
-            else if (targetModel != null)
-            {
-                RemoveTarget();
-            }
+            targetName.text = lockedTarget.name;
+            targetModel.rotation = lockedTarget.transform.rotation;
+            if (lockedTarget.doubleRigidbody.velocity != Vector3d.zero)
+                targetDirectionPivot.rotation = Quaternion.LookRotation(lockedTarget.doubleRigidbody.velocity.ToVector3(), transform.up);
+
+            _HUDSystem.UpdateTargetDirectionMarker(lockedTarget.doubleRigidbody.scaledTransform.realPosition);
+
+        }
+        else if (targetModel != null)
+        {
+            RemoveTarget();
         }
     }
 
@@ -72,6 +72,7 @@ public class TargetingSystem : MonoBehaviour
             if (lockedTarget.alertSystem != null)
                 lockedTarget.alertSystem.RemoveRadarLock();
             lockedTarget = null;
+            _HUDSystem.SetTargetDirectionMarkerActive(false);
         }
         if (targetModel != null)
         {

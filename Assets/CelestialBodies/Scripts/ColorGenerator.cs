@@ -32,7 +32,7 @@ public class ColorGenerator
     {
         float heightPercent = (pointOnUnitSphere.y + 1) * 0.5f;
         heightPercent += (biomeFilter.Evaluate(pointOnUnitSphere) - settings.biomeColorSettings.offset) * settings.biomeColorSettings.strength;
-        float biomeIndex = 0;
+        float biomeIndex = 0f;
         int numBiomes = settings.biomeColorSettings.biomes.Length;
         float blendRange = settings.biomeColorSettings.blend * 0.5f + 0.001f;
 
@@ -40,9 +40,12 @@ public class ColorGenerator
         {
             float distance = heightPercent - settings.biomeColorSettings.biomes[i].startHeight;
             float weight = Mathf.InverseLerp(-blendRange, blendRange, distance) * settings.biomeColorSettings.biomes[i].weightMultiplier;
-            biomeIndex *= 1 - weight;
+            biomeIndex *= 1f - weight;
             biomeIndex += i * weight;
+
+            float result = biomeIndex / Mathf.Max(1, numBiomes - 1);
         }
+        
         return biomeIndex / Mathf.Max(1, numBiomes - 1);
     }
 
@@ -50,7 +53,7 @@ public class ColorGenerator
     {
         if(materialInstance != null)
         {
-            Color[] colors = new Color[texture.width * texture.height];
+            Color32[] colors = new Color32[texture.width * texture.height];
             int colorIndex = 0;
             foreach (ColorSettings.BiomeColorSettings.Biome biome in settings.biomeColorSettings.biomes)
             {
@@ -63,7 +66,7 @@ public class ColorGenerator
                 }
             }
 
-            texture.SetPixels(colors);
+            texture.SetPixels32(colors);
             texture.Apply();
             materialInstance.SetTexture("_MainTexture", texture);
         }

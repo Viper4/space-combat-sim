@@ -1,17 +1,17 @@
 using SpaceStuff;
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-[RequireComponent(typeof(ScaledTransform)), RequireComponent(typeof(DoubleRigidbody))]
+[RequireComponent(typeof(ScaledTransform), typeof(DoubleRigidbody))]
 public class CelestialBody : MonoBehaviour
 {
     private const float v = 4 / 3 * Mathf.PI;
 
-    private CelestialBodyGenerator generator;
+    [HideInInspector] public ScaledTransform scaledTransform;
     private DoubleRigidbody doubleRigidbody;
+    private CelestialBodyGenerator generator;
     [SerializeField] private int originalLayer;
 
     [HideInInspector] public bool generationSettingsFoldout;
@@ -20,35 +20,26 @@ public class CelestialBody : MonoBehaviour
     public bool gravity = true;
     [HideInInspector] public bool gravitySettingsFoldout;
     [ConditionalHide("gravity")] public GravitySettings gravitySettings;
-    private Vector3 scale = Vector3.zero;
+    private Vector3d scale = Vector3d.zero;
     private float surfaceGravity;
-    public CelestialBody systemCenter;
-    [HideInInspector] public ScaledTransform scaledTransform;
+    [SerializeField] private CelestialBody orbitTarget;
 
     private bool initialized;
+    public bool pauseUpdates = false;
 
-    private void Start()
+    private void Awake()
     {
         scaledTransform = GetComponent<ScaledTransform>();
         doubleRigidbody = GetComponent<DoubleRigidbody>();
         if (TryGetComponent(out generator))
         {
-            if(!generationSettings.random)
-                scale = Vector3.one;
-
-            if (generationSettings.autoGenerate)
-            {
-                if (generationSettings.random)
-                    generator.GenerateRandomCelestialBody();
-                else
-                    generator.GenerateCelestialBody();
-                scaledTransform.ResetVisualComponents(originalLayer);
-            }
+            if (!generationSettings.random)
+                scale = Vector3d.one;
         }
         else
         {
             if (!generationSettings.random)
-                scale = transform.localScale;
+                scale = scaledTransform.realScale;
         }
 
         if (generationSettings.random)
@@ -82,7 +73,7 @@ public class CelestialBody : MonoBehaviour
                 randomY = Mathf.Lerp(generationSettings.scaleRange[0].y, generationSettings.scaleRange[1].y, randomYt);
                 randomZ = Mathf.Lerp(generationSettings.scaleRange[0].z, generationSettings.scaleRange[1].z, randomZt);
             }
-            scale = new Vector3(randomX, randomY, randomZ);
+            scale = new Vector3d(randomX, randomY, randomZ);
         }
 
         if (gravity)
@@ -97,26 +88,23 @@ public class CelestialBody : MonoBehaviour
             else
             {
                 // Ensure gravity is proportional to scale
-                float tX = Mathf.InverseLerp(generationSettings.scaleRange[0].x, generationSettings.scaleRange[1].x, scale.x);
+                float tX = Mathf.InverseLerp(generationSettings.scaleRange[0].x, generationSettings.scaleRange[1].x, (float)scale.x);
                 float tY = tX;
                 float tZ = tX;
                 if (!generationSettings.sphere)
                 {
-                    tY = Mathf.InverseLerp(generationSettings.scaleRange[0].y, generationSettings.scaleRange[1].y, scale.y);
-                    tZ = Mathf.InverseLerp(generationSettings.scaleRange[0].z, generationSettings.scaleRange[1].z, scale.z);
+                    tY = Mathf.InverseLerp(generationSettings.scaleRange[0].y, generationSettings.scaleRange[1].y, (float)scale.y);
+                    tZ = Mathf.InverseLerp(generationSettings.scaleRange[0].z, generationSettings.scaleRange[1].z, (float)scale.z);
                 }
                 surfaceGravity = Mathf.Lerp(gravitySettings.surfaceGravityRange.x, gravitySettings.surfaceGravityRange.y, (tX + tY + tZ) / 3);
             }
         }
 
-        scaledTransform.realScale = scale.ToVector3d();
+        scaledTransform.realScale = scale;
 
         if(generationSettings.calculateMass)
-            doubleRigidbody.attachedRigidbody.mass = generationSettings.density * v * scale.x * scale.x * scale.x;
-        if(systemCenter != null)
-        {
-            StartCoroutine(SetOrbitalVelocity());
-        }
+            doubleRigidbody.attachedRigidbody.mass = (float)(generationSettings.density * v * scale.x * scale.x * scale.x);
+
         Vector3 min = generationSettings.initialAngularVelocityRange[0];
         Vector3 max = generationSettings.initialAngularVelocityRange[1];
 
@@ -127,6 +115,11 @@ public class CelestialBody : MonoBehaviour
         }
 
         initialized = true;
+
+        if(orbitTarget != null)
+        {
+            StartCoroutine(SetOrbitalVelocity());
+        }
     }
 
     public bool Initialized()
@@ -134,35 +127,107 @@ public class CelestialBody : MonoBehaviour
         return initialized;
     }
 
+    public void SetOrbit(CelestialBody toOrbit)
+    {
+        orbitTarget = toOrbit;
+        StartCoroutine(SetOrbitalVelocity());
+    }
+
     /* shipMass * g = (shipMass * v^2) / distance
      * v = sqrt(distance * g)
      */
-    IEnumerator SetOrbitalVelocity()
+    private IEnumerator SetOrbitalVelocity()
     {
-        yield return new WaitUntil(() => systemCenter.Initialized());
+        yield return new WaitUntil(orbitTarget.Initialized);
 
-        Vector3d toCenter = systemCenter.scaledTransform.realPosition - scaledTransform.realPosition;
-        Vector3d perpendicular = Vector3d.Cross(toCenter, systemCenter.transform.up.ToVector3d()).normalized;
-        double g = systemCenter.CalculateGravityAcceleration(scaledTransform.realPosition);
-        double distance = Vector3d.Distance(scaledTransform.realPosition, systemCenter.scaledTransform.realPosition);
+        Vector3d posA = scaledTransform.realPosition;
+        Vector3d posB = orbitTarget.scaledTransform.realPosition;
+        double distance;
+        double g;
+        if (orbitTarget.orbitTarget == this)
+        {
+            // Handle binary systems
+            double massA = doubleRigidbody.attachedRigidbody.mass;
+            double massB = orbitTarget.doubleRigidbody.attachedRigidbody.mass;
+            Vector3d barycenter = (posA * massA + posB * massB) / (massA + massB);
+
+            Vector3d rA = posA - barycenter;
+            Vector3d rB = posB - barycenter;
+            distance = rA.magnitude + rB.magnitude;
+
+            // orbital plane
+            Vector3d axis = Vector3d.Cross(rA, rB);
+            if (axis.sqrMagnitude < 1e-10)
+                axis = Vector3d.up;
+            axis = axis.normalized;
+
+            Vector3d dirA = Vector3d.Cross(axis, rA).normalized;
+            Vector3d dirB = Vector3d.Cross(axis, rB).normalized;
+
+            g = orbitTarget.CalculateGravityAcceleration(posA);
+
+            double orbitalSpeed = Math.Sqrt(g * (massA + massB) / distance);
+
+            // velocities (opposite directions, mass-weighted)
+            Vector3d vA = dirA * orbitalSpeed * (massB / (massA + massB));
+            Vector3d vB = -dirB * orbitalSpeed * (massA / (massA + massB));
+
+            doubleRigidbody.velocity = vA;
+            orbitTarget.doubleRigidbody.velocity = vB;
+            yield break;
+        }
+
+        // Treat A as secondary body, B as primary
+
+        Vector3d toCenter = posB - posA;
+        Vector3d perpendicular = Vector3d.Cross(toCenter, orbitTarget.transform.up.ToVector3d()).normalized;
+
+        g = orbitTarget.CalculateGravityAcceleration(scaledTransform.realPosition);
+        distance = toCenter.magnitude;
+
         Vector3d orbitVelocity = Math.Sqrt(distance * g) * perpendicular;
-        doubleRigidbody.velocity = orbitVelocity;
+
+        // Inherit target's velocity to handle nested orbits
+        doubleRigidbody.velocity = orbitTarget.doubleRigidbody.velocity + orbitVelocity;
     }
 
     private void FixedUpdate()
     {
-        if (!generationSettings.simple)
+        if (generator == null || pauseUpdates)
+            return;
+        if (scaledTransform.visible)
         {
-            if (generator.UpdateQuadTrees(Camera.main))
+            if (!generator.generated && generationSettings.autoGenerate)
             {
+                if (!generator.initialized && generationSettings.random)
+                    generator.GenerateRandomCelestialBody();
+                else
+                    generator.GenerateCelestialBody();
                 scaledTransform.ResetVisualComponents(originalLayer);
+                scaledTransform.UpdateVisualComponents();
+            }
+
+            if (!generationSettings.simple)
+            {
+                if (generator.UpdateQuadTrees(Camera.main))
+                {
+                    scaledTransform.ResetVisualComponents(originalLayer);
+                    scaledTransform.UpdateVisualComponents();
+                }
+            }
+        }
+        else
+        {
+            if (generator.generated)
+            {
+                generator.DestroyGeneratedChunks();
             }
         }
     }
 
     public void ApplyGravity(DoubleRigidbody other)
     {
-        if (other == doubleRigidbody || !gravity)
+        if (!gravity || other == doubleRigidbody || (gravitySettings.affectedLayers.value & (1 << other.gameObject.layer)) == 0)
             return;
 
         Vector3d gravityDirection = (scaledTransform.realPosition - other.scaledTransform.realPosition).normalized;

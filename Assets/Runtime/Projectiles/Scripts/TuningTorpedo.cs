@@ -26,11 +26,6 @@ public class TuningTorpedo : Projectile
 
     [SerializeField, Tooltip("Collisions with a relative speed above this will detonate the torpedo.")] private float collideSpeedThreshold = 100f;
     [SerializeField] private GameObject explosionPrefab;
-    [SerializeField] private float explosionRadius = 15f;
-    [SerializeField] private float explosionForce = 100f;
-    [SerializeField] private float minDamage = 25f;
-    [SerializeField] private float maxDamage = 75f;
-
     [SerializeField] private RadarTarget target;
     [SerializeField] private float navigationConstant = 4f;
     private float thrusterTorque;

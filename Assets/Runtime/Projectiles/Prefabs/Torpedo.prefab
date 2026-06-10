@@ -17,6 +17,8 @@ GameObject:
   - component: {fileID: 4633688431431094526}
   - component: {fileID: 2821699641902407001}
   - component: {fileID: 6829326925194150218}
+  - component: {fileID: 5523896917430819422}
+  - component: {fileID: 1404306499154668698}
   - component: {fileID: 2848928438514413154}
   - component: {fileID: 6577287821693102537}
   - component: {fileID: 3063794515001352480}
@@ -244,8 +246,46 @@ MonoBehaviour:
   center:
     x: 0
     y: 0
+    z: -0.9
+  radius: 0.12
+  isTrigger: 0
+  hGridLevel: -1
+--- !u!114 &5523896917430819422
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6316366540338611349}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
+    z: 0.9
+  radius: 0.12
+  isTrigger: 0
+  hGridLevel: -1
+--- !u!114 &1404306499154668698
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6316366540338611349}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
     z: 0
-  radius: 0.25
+  radius: 0.12
   isTrigger: 0
   hGridLevel: -1
 --- !u!114 &2848928438514413154
@@ -287,7 +327,6 @@ MonoBehaviour:
   _collider: {fileID: 2688048666450355157}
   engineForce: 50000
   thrusterForce: 500
-  lateralDampGain: 1
   proportionalGain: 5.118147
   integralGain: 0
   derivativeGain: 3.921913
@@ -340,6 +379,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   team: 
   alertSystem: {fileID: 0}
+  alertWhenTargeting: 1
   radarIcon: {fileID: 0}
   turretsTargeting: 0
   stealthDistance: -1
