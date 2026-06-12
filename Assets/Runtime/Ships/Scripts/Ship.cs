@@ -1,37 +1,49 @@
 using System;
+using FishNet.Object;
 using SpaceStuff;
 using TMPro;
 using UnityEngine;
 
-public class Ship : RadarTarget
+[RequireComponent(typeof(DoubleRigidbody), typeof(RadarTarget))]
+public class Ship : NetworkBehaviour
 {
-    [Header("Ship")] public StatSystem statSystem;
-    public Transform pilotPoint;
-    [SerializeField] protected bool isPilot;
-    [SerializeField] private CameraControl cameraControl;
+    [Header("Ship")]
+    public DoubleRigidbody doubleRigidbody;
+    public RadarTarget radarTarget;
+    public StatSystem statSystem;
+    public Shields shields;
+    [SerializeField, Tooltip("Minimum collision speed for ship to take damage")] private float minCollideSpeed = 5f;
+    [SerializeField] private float collideDamageScale = 0.01f;
+    [SerializeField, Tooltip("Local Z position at the front tip of the ship")] private float maxLocalZ;
 
-    public GameObject radarModel;
-    [SerializeField] protected ParticleSystem rocketTrail;
-
+    [Header("HUD stuff")]
+    public GameObject hologramPrefab;
     [SerializeField] private Transform velocityDirectionPivot;
     [SerializeField] private TextMeshProUGUI speedText;
 
-    [SerializeField] private float engineForce = 50f;
-    [SerializeField] private float engineLaunchForce = 50f;
-    [SerializeField] private float thrusterForce = 10f;
-    private bool launchMode = false;
+    [Header("Visual/Audio effects")]
+    [SerializeField] private CameraControl cameraControl;
     [SerializeField] private AudioSource thrusterAudioSource;
     [SerializeField] private float thrusterVolumeScale = 1.0f;
     [SerializeField] private AudioSource engineAudioSource;
     [SerializeField] private float engineVolumeScale = 0.8f;
+    [SerializeField] private ParticleSystem rocketTrail;
+    [SerializeField] private float engineTrailScale = 1.0f;
     [SerializeField] private AudioClip normalEngineClip;
     [SerializeField] private AudioClip launchEngineClip;
 
+    [Header("Ship controls")]
+    [SerializeField] private float engineForce = 50f;
+    [SerializeField] private float engineLaunchForce = 50f;
+    [SerializeField] private float thrusterForce = 10f;
     [SerializeField, Tooltip("Thruster distance from ship's x axis (Pitch)")] private float thrusterRadiusX = 5f;
     [SerializeField, Tooltip("Thruster distance from ship's y axis (Yaw)")] private float thrusterRadiusY = 5f;
     [SerializeField, Tooltip("Thruster distance from ship's z axis (Roll)")] private float thrusterRadiusZ = 1f;
     private Vector3 thrusterTorque;
     private bool rollMode = true;
+    private bool launchMode = false;
+    private float fuel = 100f;
+    [SerializeField] private float maxFuel = 100f;
 
     private bool autoStabilizeRot = false;
     private bool autoStabilizePos = false;
@@ -48,22 +60,58 @@ public class Ship : RadarTarget
     private PIDController yMovePID;
     private PIDController zMovePID;
 
-    protected float fuel = 100f;
-    [SerializeField] private float maxFuel = 100f;
-
-    [SerializeField, Tooltip("Minimum collision speed for ship to take damage")] private float minCollideSpeed = 5f;
-    [SerializeField] private float collideDamageScale = 0.01f;
-    [SerializeField, Tooltip("Local Z position at the front tip of the ship")] private float maxLocalZ;
-    public Shields shields;
-
     private bool moving = false;
     private bool rotating = false;
 
-    protected override void Start()
+    public struct ShipInputData
     {
-        base.Start();
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        public Vector3 move;
+        public Vector2 look;
+    }
+
+    private ShipInputData currentInput;
+    [SerializeField] private float inputSendRate = 20f;
+    private float inputSendTimer;
+
+    private bool ShouldSimulateShip => IsOffline || IsServerInitialized || IsOwner;
+
+    private void ReadLocalInput()
+    {
+        currentInput.move = GameManager.Instance.inputActions.Player.Move.ReadValue<Vector3>();
+        currentInput.look = Vector2.zero;
+        if (Cursor.lockState == CursorLockMode.Locked)
+        {
+            currentInput.look = GameManager.Instance.inputActions.Player.Look.ReadValue<Vector2>();
+            currentInput.look = GameManager.Instance.gameSettings.sensitivity * GameManager.Instance.sensitivityScale * currentInput.look;
+        }
+    }
+
+    private void SendInputToServer()
+    {
+        inputSendTimer += Time.fixedDeltaTime;
+        if (inputSendTimer >= 1f / Mathf.Max(1f, inputSendRate))
+        {
+            inputSendTimer -= 1f / Mathf.Max(1f, inputSendRate);
+            SetInputServerRpc(currentInput);
+        }
+    }
+
+    [ServerRpc]
+    private void SetInputServerRpc(ShipInputData input)
+    {
+        currentInput = input;
+    }
+
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+        doubleRigidbody.OnScaledCollisionEnter += OnScaledCollide;
+    }
+
+    private void Start()
+    {
+        doubleRigidbody = GetComponent<DoubleRigidbody>();
+        radarTarget = GetComponent<RadarTarget>();
 
         thrusterTorque = new Vector3(thrusterForce * thrusterRadiusX, thrusterForce * thrusterRadiusY, thrusterForce * thrusterRadiusZ);
 
@@ -74,21 +122,27 @@ public class Ship : RadarTarget
         xMovePID = new PIDController(P, I, D);
         yMovePID = new PIDController(P, I, D);
         zMovePID = new PIDController(P, I, D);
-
-        doubleRigidbody.OnScaledCollisionEnter += OnScaledCollide;
     }
 
-    protected override void FixedUpdate()
+    private void FixedUpdate()
     {
-        base.FixedUpdate();
-        if (!isPilot || (!IsOwner && !GameManager.Instance.offlineMode))
+        if (!IsServerInitialized && !IsOwner && !IsOffline)
             return;
+
+        if (IsOwner || IsOffline)
+        {
+            ReadLocalInput();
+            if (!IsOffline)
+                SendInputToServer();
+        }
+
+        if (!ShouldSimulateShip)
+            return;
+
         // Calculate local force to apply
         Vector3d finalForce;
 
-        // Translation inputs
-        Vector3 desiredMove = GameManager.Instance.inputActions.Player.Move.ReadValue<Vector3>();
-        desiredMove = Vector3.ClampMagnitude(desiredMove, 1f); // Prevent from moving faster than max force allows
+        Vector3 desiredMove = Vector3.ClampMagnitude(currentInput.move, 1f); // Prevent from moving faster than max force allows
         moving = desiredMove.x != 0 || desiredMove.y != 0 || desiredMove.z != 0;
 
         double forceX = desiredMove.x * thrusterForce;
@@ -124,25 +178,95 @@ public class Ship : RadarTarget
             float fx = xMovePID.GetOutput(error.x, Time.fixedDeltaTime);
             float fy = yMovePID.GetOutput(error.y, Time.fixedDeltaTime);
             float fz = zMovePID.GetOutput(error.z, Time.fixedDeltaTime);
-            Vector3 desired = new Vector3(fx, fy, fz);
-            desired = Vector3.ClampMagnitude(desired, 1f);
+            desiredMove = new Vector3(fx, fy, fz);
+            desiredMove = Vector3.ClampMagnitude(desiredMove, 1f);
 
             // Use engine to go forward (+z) and thrusters to go backward (-z)
             finalForce = new Vector3d(
-                desired.x * thrusterForce, 
-                desired.y * thrusterForce, 
-                desired.z * thrusterForce
+                desiredMove.x * thrusterForce,
+                desiredMove.y * thrusterForce,
+                desiredMove.z * thrusterForce
             );
 
-            if (desired.z > 0)
+            if (desiredMove.z > 0)
             {
                 if (launchMode)
-                    finalForce.z = desired.z * engineLaunchForce;
+                    finalForce.z = desiredMove.z * engineLaunchForce;
                 else
-                    finalForce.z = desired.z * engineForce;
+                    finalForce.z = desiredMove.z * engineForce;
             }
         }
 
+        if (finalForce.sqrMagnitude > 0.0001)
+            doubleRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
+
+        // Calculate local torque to apply
+        Vector3d desiredRotate;
+
+        // Rotation inputs for pitch and roll
+        Vector2 lookInput = Vector2.ClampMagnitude(currentInput.look, 1f); // Prevent from rotating faster than max torque allows
+        desiredRotate = new Vector3d(-lookInput.y, 0.0, 0.0);
+        if (rollMode)
+            desiredRotate.z = -lookInput.x;
+        else
+            desiredRotate.y = lookInput.x;
+        rotating = currentInput.look.x != 0 || currentInput.look.y != 0;
+
+        if (autoStabilizeRot && !rotating)
+        {
+            Vector3 localAngularVelocity = transform.InverseTransformDirection(doubleRigidbody.angularVelocity.ToVector3());
+            Vector3 error = stableLocalAngularVelocity - localAngularVelocity;
+
+            float tx = xRotatePID.GetOutput(error.x, Time.fixedDeltaTime);
+            float ty = yRotatePID.GetOutput(error.y, Time.fixedDeltaTime);
+            float tz = zRotatePID.GetOutput(error.z, Time.fixedDeltaTime);
+            desiredRotate = new Vector3d(tx, ty, tz);
+            desiredRotate = Vector3d.ClampMagnitude(desiredRotate, 1f);
+        }
+
+        Vector3d finalTorque = new Vector3d(
+            desiredRotate.x * thrusterTorque.x,
+            desiredRotate.y * thrusterTorque.y,
+            desiredRotate.z * thrusterTorque.z
+        );
+
+        if (finalTorque.sqrMagnitude > 0.0001)
+            doubleRigidbody.AddRelativeTorque(finalTorque, ForceMode.Force);
+
+        if (IsOwner)
+        {
+            UpdateOwnerEffects(finalForce, desiredRotate, finalTorque);
+        }
+        else
+        {
+            UpdateServerEffects(finalForce);
+        }
+    }
+
+    private void UpdateServerEffects(Vector3d finalForce)
+    {
+        // Visual effects for force
+        bool hasForce = finalForce.sqrMagnitude > 0.0001;
+
+        if (hasForce && finalForce.z > 0.0)
+        {
+            // Main engine effects
+            float t = (float)finalForce.z / engineLaunchForce;
+            if (!rocketTrail.gameObject.activeSelf)
+            {
+                rocketTrail.gameObject.SetActive(true);
+            }
+            rocketTrail.transform.localScale = t * engineTrailScale * Vector3.one;
+        }
+        else if (rocketTrail.gameObject.activeSelf)
+        {
+            rocketTrail.gameObject.SetActive(false);
+        }
+    }
+
+    private void UpdateOwnerEffects(Vector3d finalForce, Vector3d desiredRotate, Vector3d finalTorque)
+    {
+        // Visual effects for force
         bool hasForce = finalForce.sqrMagnitude > 0.0001;
 
         if (hasForce)
@@ -170,12 +294,14 @@ public class Ship : RadarTarget
             // Main engine effects
             if (usingMainEngine)
             {
+                float t = (float)finalForce.z / engineLaunchForce;
                 if (!rocketTrail.gameObject.activeSelf)
                 {
                     rocketTrail.gameObject.SetActive(true);
                 }
+                rocketTrail.transform.localScale = t * engineTrailScale * Vector3.one;
                 engineAudioSource.clip = launchMode ? launchEngineClip : normalEngineClip;
-                engineAudioSource.volume = (float)finalForce.z / engineLaunchForce * engineVolumeScale;
+                engineAudioSource.volume = t * engineVolumeScale;
                 if (!engineAudioSource.isPlaying)
                     engineAudioSource.Play();
             }
@@ -184,58 +310,17 @@ public class Ship : RadarTarget
                 engineAudioSource.volume = 0f;
                 rocketTrail.gameObject.SetActive(false);
             }
-
-            doubleRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
         }
-        else
+        else if (rocketTrail.gameObject.activeSelf)
         {
-            if (rocketTrail.gameObject.activeSelf)
-            {
-                engineAudioSource.volume = 0f;
-                rocketTrail.gameObject.SetActive(false);
-            }
+            engineAudioSource.volume = 0f;
+            rocketTrail.gameObject.SetActive(false);
         }
-
-        // Calculate local torque to apply
-        Vector3d desiredRotate = Vector3d.zero;
-
-        // Rotation inputs for pitch and roll
-        Vector2 lookDelta = Vector2.zero;
-        if (Cursor.lockState == CursorLockMode.Locked) // Dont rotate ship while player is using mouse to interact with switches/UI
-        {
-            lookDelta = GameManager.Instance.inputActions.Player.Look.ReadValue<Vector2>();
-            Vector2 desiredLook = GameManager.Instance.playerSettings.sensitivity * GameManager.Instance.sensitivityScale * lookDelta;
-            desiredLook = Vector2.ClampMagnitude(desiredLook, 1f); // Prevent from rotating faster than max torque allows
-            desiredRotate = new Vector3d(-desiredLook.y, 0.0, 0.0);
-            if (rollMode)
-                desiredRotate.z = -desiredLook.x;
-            else
-                desiredRotate.y = desiredLook.x;
-        }
-        rotating = lookDelta.x != 0 || lookDelta.y != 0;
-
-        if (autoStabilizeRot && !rotating)
-        {
-            Vector3 localAngularVelocity = transform.InverseTransformDirection(doubleRigidbody.angularVelocity.ToVector3());
-            Vector3 error = stableLocalAngularVelocity - localAngularVelocity;
-
-            float tx = xRotatePID.GetOutput(error.x, Time.fixedDeltaTime);
-            float ty = yRotatePID.GetOutput(error.y, Time.fixedDeltaTime);
-            float tz = zRotatePID.GetOutput(error.z, Time.fixedDeltaTime);
-            desiredRotate = new Vector3d(tx, ty, tz);
-            desiredRotate = Vector3d.ClampMagnitude(desiredRotate, 1f);
-        }
-
-        Vector3d finalTorque = new Vector3d(
-            desiredRotate.x * thrusterTorque.x, 
-            desiredRotate.y * thrusterTorque.y, 
-            desiredRotate.z * thrusterTorque.z
-        );
-        bool hasTorque = finalTorque.sqrMagnitude > 0.0001;
-
+        
+        // Audio effects for torque
+        bool hasTorque = desiredRotate.sqrMagnitude > 0.0001;
         if (hasTorque)
         {
-            doubleRigidbody.AddRelativeTorque(finalTorque, ForceMode.Force);
             if (!hasForce)
             {
                 thrusterAudioSource.transform.position = transform.position;
@@ -251,10 +336,12 @@ public class Ship : RadarTarget
             thrusterAudioSource.volume = 0f;
         }
 
+        // Update speed HUD UI
         speedText.text = "SPD " + SpaceMath.SpeedToFormattedString(doubleRigidbody.velocity.magnitude, "F2");
         if (doubleRigidbody.velocity != Vector3d.zero)
             velocityDirectionPivot.rotation = Quaternion.LookRotation(doubleRigidbody.velocity.ToVector3(), transform.up);
 
+        // Update camera movement
         if (cameraControl != null)
         {
             Rigidbody rb = doubleRigidbody.attachedRigidbody;
@@ -264,8 +351,6 @@ public class Ship : RadarTarget
 
             // Local-space angular acceleration: α = I⁻¹τ
             // First rotate torque into the principal-axis frame, divide, then rotate back to local.
-            // Skipping the pre-rotation (the original bug) gives wrong results when
-            // inertiaTensorRotation is non-identity.
             Vector3 localAngAcc = Vector3.zero;
             if (hasTorque)
             {
@@ -282,10 +367,23 @@ public class Ship : RadarTarget
         }
     }
 
+    [ObserversRpc]
+    private void ApplyCollideDamageToObservers(float damage, Vector3 contactPoint)
+    {
+        if (shields != null)
+            shields.Damage(damage, contactPoint);
+        else
+            statSystem.Damage(damage);
+    }
+
     private void OnScaledCollide(ScaledSpacePhysics.CollisionInfo collisionInfo)
     {
+        if (!IsServerInitialized && !IsOffline)
+            return;
+
         if (collisionInfo.transformB.CompareTag("Projectile") || collisionInfo.transformB.CompareTag("Torpedo"))
             return;
+            
         float massB = collisionInfo.colliderB.doubleRigidbody.attachedRigidbody.mass;
         if (massB < 0.5f)
             return;
@@ -303,10 +401,8 @@ public class Ship : RadarTarget
 
         float damage = attenuation * impulse * collideDamageScale;
 
-        if (shields != null)
-            shields.Damage(damage, (collisionInfo.contactPoint - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3());
-        else
-            statSystem.Damage(damage);
+        if (!IsOffline)
+            ApplyCollideDamageToObservers(damage, (collisionInfo.contactPoint - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3());
 
         Debug.Log(
             $"Impulse: {impulse:F1}, " +
@@ -315,6 +411,9 @@ public class Ship : RadarTarget
 
     private void OnCollisionEnter(Collision collision)
     {
+        if (!IsServerInitialized && !IsOffline)
+            return;
+
         if (collision.transform.CompareTag("Projectile") || collision.transform.CompareTag("Torpedo"))
             return;
 
@@ -335,30 +434,51 @@ public class Ship : RadarTarget
         float attenuation = Mathf.Clamp01((-relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
 
         float damage = attenuation * impulse * collideDamageScale;
-
-        if (shields != null)
-            shields.Damage(damage, contact.point);
-        else
-            statSystem.Damage(damage);
+        if (!IsOffline)
+            ApplyCollideDamageToObservers(damage, contact.point);
 
         Debug.Log(
             $"Impulse: {impulse:F1}, " +
             $"damage: {damage:F1}");
     }
 
+    [ServerRpc]
+    private void SendAutoRotStabilizationToServer(bool autoStabilizeRot)
+    {
+        this.autoStabilizeRot = autoStabilizeRot;
+    }
+
     public void SetAutoRotStabilization(int state)
     {
         autoStabilizeRot = state == 1;
+        if (IsOwner)
+            SendAutoRotStabilizationToServer(autoStabilizeRot);
+    }
+
+    [ServerRpc]
+    private void SendAutoPosStabilizationToServer(bool autoStabilizePos)
+    {
+        this.autoStabilizePos = autoStabilizePos;
     }
 
     public void SetAutoPosStabilization(int state)
     {
         autoStabilizePos = state == 1;
+        if (IsOwner)
+            SendAutoPosStabilizationToServer(autoStabilizePos);
+    }
+
+    [ServerRpc]
+    private void SendRelativeVelocityToServer(bool useRelativeVelocity)
+    {
+        this.useRelativeVelocity = useRelativeVelocity;
     }
 
     public void ToggleRelativeVelocity(int state)
     {
         useRelativeVelocity = state == 1;
+        if (IsOwner)
+            SendRelativeVelocityToServer(useRelativeVelocity);
     }
 
     public void SetStableConfiguration(int state)
@@ -383,19 +503,34 @@ public class Ship : RadarTarget
         }
     }
 
+    [ServerRpc]
+    private void SendRollYawToggleToServer(bool rollMode)
+    {
+        this.rollMode = rollMode;
+    }
+
     public void ToggleRollYaw(int state)
     {
         rollMode = state == 0;
+        if (IsOwner)
+            SendRollYawToggleToServer(rollMode);
+    }
+
+    [ServerRpc]
+    private void SendLaunchModeToServer(bool launchMode)
+    {
+        this.launchMode = launchMode;
     }
 
     public void ToggleLaunchMode(int state)
     {
         launchMode = state == 1;
+        if (IsOwner)
+            SendLaunchModeToServer(launchMode);
     }
 
-    public override void OnDestroy()
+    private void OnDestroy()
     {
-        base.OnDestroy();
         doubleRigidbody.OnScaledCollisionEnter -= OnScaledCollide;
     }
 }

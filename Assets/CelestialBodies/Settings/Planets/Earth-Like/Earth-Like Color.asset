@@ -243,4 +243,4 @@ MonoBehaviour:
         weightMultiplier: 1
     offset: 1
     strength: 0.2
-    blend: 0.1
+    blend: 0.5

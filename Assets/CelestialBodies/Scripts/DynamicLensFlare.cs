@@ -31,6 +31,9 @@ public class DynamicLensFlare : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (FloatingWorldOrigin.Instance == null)
+            return;
+            
         Vector3d realCamPosition = FloatingWorldOrigin.Instance.worldOriginPosition + Camera.main.transform.position.ToVector3d();
         double sqrDistance = (lightScaledTransform.realPosition - realCamPosition).sqrMagnitude;
         if (sqrDistance > distanceRange.y * distanceRange.y || sqrDistance < distanceRange.x * distanceRange.x)

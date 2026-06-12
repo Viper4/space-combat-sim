@@ -8,7 +8,7 @@ using System.Linq;
 
 /// <summary>
 /// Manages collision detection and response for objects in scaled space.
-/// Treats all objects as spheres with radius = Max(realScale.x, realScale.y, realScale.z)
+/// Treats all objects as spheres
 /// </summary>
 public class ScaledSpacePhysics : MonoBehaviour
 {
@@ -71,11 +71,14 @@ public class ScaledSpacePhysics : MonoBehaviour
     {
         HashSet<Pair> currentCollisions = new HashSet<Pair>();
 
-        bool shiftOrigin = FloatingWorldOrigin.Instance.OverShiftThreshold();
-        if (shiftOrigin)
-            FloatingWorldOrigin.Instance.ShiftOrigin();
+        if (FloatingWorldOrigin.Instance != null)
+        {
+            bool shiftOrigin = FloatingWorldOrigin.Instance.OverShiftThreshold();
+            if (shiftOrigin)
+                FloatingWorldOrigin.Instance.ShiftOrigin();
+        }
         
-        // Insert all rigidbodies into hierarchical grid for collision detection, and run other logic per doubleRigidbody
+        // Run logic per DoubleRigidbody
         long getCandidatesTicks = 0;
         long physicsStepTicks = 0;
         Stopwatch stopwatch = new Stopwatch();

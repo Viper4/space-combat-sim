@@ -7,7 +7,7 @@ using System;
 public class ScaledTransform : MonoBehaviour
 {
     private DoubleRigidbody doubleRigidbody;
-    private TransformChange transformChange;
+    [SerializeField] private TransformChange transformChange;
 
     [SerializeField] private Vector3d _realPosition; // Actual world position
     public Vector3d realPosition 
@@ -54,7 +54,6 @@ public class ScaledTransform : MonoBehaviour
     private void Awake()
     {
         TryGetComponent(out doubleRigidbody);
-        transformChange = GetComponent<TransformChange>();
 
         ResetVisualComponents();
         
@@ -81,6 +80,11 @@ public class ScaledTransform : MonoBehaviour
         }
 
         SetTrackedComponentsActive(visible);
+    }
+
+    private void OnDestroy()
+    {
+        FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateTransformByEvent;
     }
 
     private void OnValidate()
@@ -198,6 +202,8 @@ public class ScaledTransform : MonoBehaviour
 
     private void UpdateTransform(bool forceWorldTransformUpdate)
     {
+        if (FloatingWorldOrigin.Instance == null)
+            return;
         Vector3d originPosition = FloatingWorldOrigin.Instance.worldOriginPosition;
         if (FloatingWorldOrigin.Instance.transform == transform)
         {
@@ -285,7 +291,7 @@ public class ScaledTransform : MonoBehaviour
     private void SwitchToScaledSpace()
     {
         // Floating origin should never be in scaled space since we assume the origin has the camera
-        if (FloatingWorldOrigin.Instance.transform == transform || !gameObject.activeSelf || inScaledSpace)
+        if (FloatingWorldOrigin.Instance == null || FloatingWorldOrigin.Instance.transform == transform || !gameObject.activeSelf || inScaledSpace)
             return;
         inScaledSpace = true;
         if (doubleRigidbody != null)
@@ -345,11 +351,6 @@ public class ScaledTransform : MonoBehaviour
     public Collider[] GetTrackedColliders()
     {
         return (Collider[])trackedColliders.Clone();
-    }
-
-    private void OnDestroy()
-    {
-        FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateTransformByEvent;
     }
     
     public Vector3d GetChildRealPosition(Vector3 childPosition)

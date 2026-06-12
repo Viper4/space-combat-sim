@@ -62,7 +62,7 @@ public class Radar : MonoBehaviour
         {
             RadarIcon newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
             newIcon.Init(iconParent.transform.position, transform.rotation, friendlyShipColor, friendlyShipEmission, "", true);
-            ship.radarIcon = newIcon;
+            ship.radarTarget.radarIcon = newIcon;
         }
         for(int i = 0; i < detectInits.Length; i++)
         {
@@ -88,7 +88,7 @@ public class Radar : MonoBehaviour
             for (int i = targetsInTrigger.Count - 1; i >= 0; i--)
             {
                 uint targetID = targetsInTrigger[i];
-                if (targetID == ship.GetID())
+                if (targetID == ship.radarTarget.GetID())
                 {
                     targetsInTrigger.RemoveAt(i);
                     continue;
@@ -157,7 +157,7 @@ public class Radar : MonoBehaviour
                         {
                             case "Ship":
                                 newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                if (radarTarget.team == ship.team)
+                                if (radarTarget.team == ship.radarTarget.team)
                                 {
                                     iconColor = friendlyShipColor;
                                     iconEmission = friendlyShipEmission;
@@ -170,7 +170,7 @@ public class Radar : MonoBehaviour
                                 break;
                             case "Projectile":
                                 newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                if (radarTarget.team == ship.team)
+                                if (radarTarget.team == ship.radarTarget.team)
                                 {
                                     iconColor = friendlyProjectileColor;
                                     iconEmission = friendlyProjectileEmission;
@@ -183,7 +183,7 @@ public class Radar : MonoBehaviour
                                 break;
                             case "Torpedo":
                                 newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                if (radarTarget.team == ship.team)
+                                if (radarTarget.team == ship.radarTarget.team)
                                 {
                                     iconColor = friendlyProjectileColor;
                                     iconEmission = friendlyProjectileEmission;
@@ -231,7 +231,7 @@ public class Radar : MonoBehaviour
 
                 if (_HUDSystem.radarHudActive)
                 {
-                    Vector3d relativeAcceleration = radarTarget.acceleration - ship.acceleration;
+                    Vector3d relativeAcceleration = radarTarget.acceleration - ship.radarTarget.acceleration;
                     Vector3d relativeVelocity = radarTarget.doubleRigidbody.velocity - ship.doubleRigidbody.velocity;
                     // Negative closing => moving away, Positive closing => coming closer
                     double closingVelocity = -Vector3d.Dot(relativeVelocity, direction);
@@ -255,7 +255,7 @@ public class Radar : MonoBehaviour
                         switch (radarTarget.transform.tag)
                         {
                             case "Ship":
-                                if (radarTarget.team == ship.team)
+                                if (radarTarget.team == ship.radarTarget.team)
                                 {
                                     newHUDObject.SetColor(friendlyShipColor);
                                 }
@@ -265,7 +265,7 @@ public class Radar : MonoBehaviour
                                 }
                                 break;
                             case "Projectile":
-                                if (radarTarget.team == ship.team)
+                                if (radarTarget.team == ship.radarTarget.team)
                                 {
                                     newHUDObject.SetColor(friendlyProjectileColor);
                                 }
@@ -275,7 +275,7 @@ public class Radar : MonoBehaviour
                                 }
                                 break;
                             case "Torpedo":
-                                if (radarTarget.team == ship.team)
+                                if (radarTarget.team == ship.radarTarget.team)
                                 {
                                     newHUDObject.SetColor(friendlyProjectileColor);
                                 }
@@ -316,7 +316,7 @@ public class Radar : MonoBehaviour
                 break;
         }
         triggerCollider.radius = radarRanges[rangeIndex];
-        ship.radarIcon.model.localScale = 2 * iconRadii[rangeIndex] * Vector3.one;
+        ship.radarTarget.radarIcon.model.localScale = 2 * iconRadii[rangeIndex] * Vector3.one;
     }
 
     private void OnTriggerEnter(Collider other)

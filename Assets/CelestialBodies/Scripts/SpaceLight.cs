@@ -72,6 +72,9 @@ public class SpaceLight : MonoBehaviour
 
     private void UpdateLight()
     {
+        if (Camera.main == null)
+            return;
+            
         Vector3 direction = Camera.main.transform.position - transform.position;
         worldLight.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
 

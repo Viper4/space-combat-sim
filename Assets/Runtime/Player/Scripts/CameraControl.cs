@@ -42,17 +42,20 @@ public class CameraControl : MonoBehaviour
 
     private void Start()
     {
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        
         invSqrShakeThreshold = 1f / (shakeThreshold * shakeThreshold);
         if (shipTransform != null)
         {
-            baseLocalPos = shipTransform.InverseTransformPoint(freePoint.position);
-            baseLocalRot = Quaternion.Inverse(shipTransform.rotation) * freePoint.rotation;
+            baseLocalPos = shipTransform.InverseTransformPoint(lockedPoint.position);
+            baseLocalRot = Quaternion.Inverse(shipTransform.rotation) * lockedPoint.rotation;
         }
         else
         {
             // Camera is not a child of the ship — fall back to world space.
-            baseLocalPos = freePoint.position;
-            baseLocalRot = freePoint.rotation;
+            baseLocalPos = lockedPoint.position;
+            baseLocalRot = lockedPoint.rotation;
         }
     }
 

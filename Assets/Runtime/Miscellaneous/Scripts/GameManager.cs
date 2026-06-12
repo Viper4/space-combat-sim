@@ -1,17 +1,14 @@
 using System.Collections.Generic;
-using Unity.Netcode;
 using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    public bool offlineMode = false;
-
     //public Dictionary<ulong, NetworkObject> trackedNetworkObjects = new Dictionary<ulong, NetworkObject>();
 
     public InputActions inputActions;
-    public PlayerSettings playerSettings;
+    public GameSettings gameSettings;
     public float sensitivityScale = 0.02f;
     [SerializeField] private bool loadSettings = true;
 
@@ -27,7 +24,7 @@ public class GameManager : MonoBehaviour
 
             SaveSystem.Init();
             if (loadSettings)
-                playerSettings = SaveSystem.LoadPlayerSettings("profile1");
+                gameSettings = SaveSystem.LoadGameSettings("profile1");
         }
         else
         {

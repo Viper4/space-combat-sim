@@ -1,5 +1,5 @@
 [System.Serializable]
-public class PlayerSettings
+public class GameSettings
 {
     public float sensitivity;
     public float fieldOfView;

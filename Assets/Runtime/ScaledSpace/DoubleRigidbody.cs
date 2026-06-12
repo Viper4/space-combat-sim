@@ -2,11 +2,11 @@ using UnityEngine;
 using SpaceStuff;
 using System;
 using System.Collections.Generic;
+using System.Collections;
 
 [RequireComponent(typeof(Rigidbody), typeof(ScaledTransform))]
 public class DoubleRigidbody : MonoBehaviour
 {
-
     public static float speedLimit = 2.99792458e8f; // Speed of light in m/s
 
     public ScaledTransform scaledTransform {get; private set;}
@@ -56,7 +56,7 @@ public class DoubleRigidbody : MonoBehaviour
     }
 
     public Rigidbody attachedRigidbody {get; private set;}
-    [SerializeField, Tooltip("Switch to rigidbody if speed is below this threshold, DoubleRigidbody if above")] private float speedThreshold = -1;
+    [SerializeField, Tooltip("Switch to rigidbody if speed is below this threshold, DoubleRigidbody if above. Always DoubleRigidbody if negative.")] private float speedThreshold = -1;
 
     [SerializeField] private Vector3d _velocity;
     public Vector3d velocity
@@ -129,14 +129,28 @@ public class DoubleRigidbody : MonoBehaviour
         scaledTransform = GetComponent<ScaledTransform>();
         attachedRigidbody = GetComponent<Rigidbody>();
         scaledColliders = new List<ScaledCollider>();
-        
-        if (transform != FloatingWorldOrigin.Instance.transform)
-        {
-            FloatingWorldOrigin.Instance.OnOriginShift += OnOriginShift;
-        }
         prevPos = scaledTransform.realPosition;
 
         CheckSpeed();
+        StartCoroutine(WaitAddOriginShiftListener());
+    }
+
+    private IEnumerator WaitAddOriginShiftListener()
+    {
+        yield return new WaitUntil(() => FloatingWorldOrigin.Instance != null);
+        FloatingWorldOrigin.Instance.OnOriginShift += OnOriginShift;
+    }
+
+    private void OnDestroy()
+    {
+        // Clear all event listeners
+        OnScaledCollisionEnter = null;
+        OnScaledCollisionExit = null;
+        OnScaledTriggerEnter = null;
+        OnScaledTriggerExit = null;
+
+        if (FloatingWorldOrigin.Instance != null)
+            FloatingWorldOrigin.Instance.OnOriginShift -= OnOriginShift;
     }
 
     public void AddCollider(ScaledCollider newCollider)
@@ -204,7 +218,11 @@ public class DoubleRigidbody : MonoBehaviour
     private void CheckSpeed()
     {
         if (speedThreshold == -1)
+        {
+            if (!_active)
+                active = true;
             return;
+        }
         if (_velocity.sqrMagnitude > speedThreshold * speedThreshold)
         {
             active = true;
@@ -367,13 +385,12 @@ public class DoubleRigidbody : MonoBehaviour
                 offset /= distance;
             }
 
-            /*double attenuation = explosionRadius <= 0 ? 1.0 : Math.Max(0.0, 1.0 - distance / explosionRadius);
+            double attenuation = explosionRadius <= 0 ? 1.0 : Math.Max(0.0, 1.0 - distance / explosionRadius);
 
             if (attenuation <= 0)
                 return;
 
-            Vector3d force = offset * (explosionForce * attenuation);*/
-            Vector3d force = offset * explosionForce;
+            Vector3d force = offset * (explosionForce * attenuation);
 
             // Apply at explosion center to generate torque
             AddForceAtPosition(force, adjustedExplosionPos, forceMode);
@@ -428,17 +445,6 @@ public class DoubleRigidbody : MonoBehaviour
             if (sqrDistance < scaledTransform.scaledSpaceThreshold * scaledTransform.scaledSpaceThreshold)
                 transform.position -= shift.ToVector3();
         }
-    }
-
-    private void OnDestroy()
-    {
-        // Clear all event listeners
-        OnScaledCollisionEnter = null;
-        OnScaledCollisionExit = null;
-        OnScaledTriggerEnter = null;
-        OnScaledTriggerExit = null;
-
-        FloatingWorldOrigin.Instance.OnOriginShift -= OnOriginShift;
     }
 
     public void IgnoreDoubleRigidbody(DoubleRigidbody other, bool ignore)

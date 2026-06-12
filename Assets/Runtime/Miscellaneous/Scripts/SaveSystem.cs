@@ -10,7 +10,7 @@ public static class SaveSystem
 
     private static readonly string playerSettingsExtension = ".playersettings";
 
-    public static readonly PlayerSettings defaultPlayerSettings = new PlayerSettings
+    public static readonly GameSettings defaultGameSettings = new GameSettings
     {
         sensitivity = 50,
         fieldOfView = 60,
@@ -24,14 +24,14 @@ public static class SaveSystem
         Directory.CreateDirectory(SETTINGS_FOLDER);
     }
 
-    public static void SavePlayerSettings(this PlayerSettings fromSettings, string fileName)
+    public static void SaveGameSettings(this GameSettings fromSettings, string fileName)
     {
         string json = JsonUtility.ToJson(fromSettings, prettyPrint: true);
 
         File.WriteAllText(SETTINGS_FOLDER + fileName + playerSettingsExtension, json);
     }
 
-    public static PlayerSettings LoadPlayerSettings(string fileName)
+    public static GameSettings LoadGameSettings(string fileName)
     {
         string path = SETTINGS_FOLDER + fileName + playerSettingsExtension;
         if (File.Exists(path))
@@ -40,13 +40,13 @@ public static class SaveSystem
 
             if (!string.IsNullOrWhiteSpace(json))
             {
-                return JsonUtility.FromJson<PlayerSettings>(json);
+                return JsonUtility.FromJson<GameSettings>(json);
             }
         }
 
         Debug.LogWarning("Could not find file '" + SETTINGS_FOLDER + fileName + playerSettingsExtension + "', saving and loading defaults.");
-        defaultPlayerSettings.SavePlayerSettings(fileName);
-        return defaultPlayerSettings;
+        defaultGameSettings.SaveGameSettings(fileName);
+        return defaultGameSettings;
     }
 
     public static void DeleteFile(string fullFileName)

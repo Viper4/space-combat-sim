@@ -231,7 +231,7 @@ public class TurretSystem : MonoBehaviour
         if (!other.TryGetComponent<RadarTarget>(out var target))
             return;
 
-        if (target.team == ship.team)
+        if (target.team == ship.radarTarget.team)
             return;
 
         targetsInRange.Add(target.GetID());

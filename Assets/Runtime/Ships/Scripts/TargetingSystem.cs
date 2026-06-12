@@ -102,9 +102,9 @@ public class TargetingSystem : MonoBehaviour
         targetModelParent.gameObject.SetActive(lockedTarget != null);
 
         GameObject newTargetModel;
-        if (lockedTarget.transform.CompareTag("Ship"))
+        if (lockedTarget.CompareTag("Ship"))
         {
-            newTargetModel = Instantiate(lockedTarget.GetComponent<Ship>().radarModel, targetModelParent, false);
+            newTargetModel = Instantiate(lockedTarget.GetComponent<Ship>().hologramPrefab, targetModelParent, false);
         }
         else
         {

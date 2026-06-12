@@ -56,7 +56,7 @@ public class TorpedoSystem : MonoBehaviour
             {
                 launchAudio.ResetPlay(true);
                 Vector3d launchPosition = ship.doubleRigidbody.scaledTransform.GetChildRealPosition(torpedoPoints[i].transform.position);
-                launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(launchPosition, ship.doubleRigidbody.velocity, targetingSystem.lockedTarget, i, ship.team);
+                launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(launchPosition, ship.doubleRigidbody.velocity, targetingSystem.lockedTarget, i, ship.radarTarget.team);
                 UpdateTorpedoUI(i, false);
                 break;
             }

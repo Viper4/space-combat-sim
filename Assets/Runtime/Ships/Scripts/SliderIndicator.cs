@@ -20,8 +20,7 @@ public class SliderIndicator : MonoBehaviour
     [SerializeField] private TextType textType = TextType.Raw;
     [SerializeField] private string textFormat = "F2";
 
-    [SerializeField] private float[] thresholds;
-    [SerializeField] private Color[] thresholdColors;
+    [SerializeField] private Gradient progressGradient;
 
     private void Awake()
     {
@@ -29,24 +28,12 @@ public class SliderIndicator : MonoBehaviour
         {
             fillImages.Add(slider.fillRect.GetComponent<Image>());
         }
-        if (thresholds.Length != thresholdColors.Length)
-        {
-            Debug.LogWarning($"{name}'s SliderIndicator has {thresholds.Length} thresholds but {thresholdColors.Length} threshold colors.");
-        }
     }
 
     public void UpdateUI(float numerator, float denominator)
     {
         float percent = numerator / denominator;
-        Color color = Color.clear;
-        for (int i = 0; i < thresholds.Length; i++)
-        {
-            if (percent <= thresholds[i])
-            {
-                color = thresholdColors[i];
-                break;
-            }
-        }
+        Color color = progressGradient.Evaluate(percent);
         if (sliders.Count > 0)
         {
             for (int i = 0; i < sliders.Count; i++)

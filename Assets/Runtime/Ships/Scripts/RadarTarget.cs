@@ -1,9 +1,8 @@
 using UnityEngine;
 using SpaceStuff;
-using Unity.Netcode;
 
 [RequireComponent(typeof(DoubleRigidbody))]
-public class RadarTarget : NetworkBehaviour
+public class RadarTarget : MonoBehaviour
 {
     private uint id;
 
@@ -28,7 +27,7 @@ public class RadarTarget : NetworkBehaviour
     public Renderer[] boundsRenderers;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    protected virtual void Start()
+    private void Start()
     {
         doubleRigidbody = GetComponent<DoubleRigidbody>();
 
@@ -42,18 +41,14 @@ public class RadarTarget : NetworkBehaviour
         id = RadarRegistry.Register(this);
     }
 
-    protected virtual void FixedUpdate()
+    private void FixedUpdate()
     {
-        if (IsOwner || GameManager.Instance.offlineMode)
-        {
-            acceleration = (doubleRigidbody.velocity - lastVelocity) * inverseFixedDeltaTime;
-            lastVelocity = doubleRigidbody.velocity;
-        }
+        acceleration = (doubleRigidbody.velocity - lastVelocity) * inverseFixedDeltaTime;
+        lastVelocity = doubleRigidbody.velocity;
     }
 
-    public override void OnDestroy()
+    private void OnDestroy()
     {
-        base.OnDestroy();
         RadarRegistry.Unregister(id);
     }
 
