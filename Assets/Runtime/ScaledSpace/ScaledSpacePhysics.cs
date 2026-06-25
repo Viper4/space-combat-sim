@@ -4,7 +4,7 @@ using SpaceStuff;
 using System;
 using System.Diagnostics;
 using Debug = UnityEngine.Debug;
-using System.Linq;
+using System.Collections;
 
 /// <summary>
 /// Manages collision detection and response for objects in scaled space.
@@ -14,15 +14,18 @@ public class ScaledSpacePhysics : MonoBehaviour
 {
     public static ScaledSpacePhysics Instance { get; private set; }
     
-    public event Action<DoubleRigidbody> PrePhysicsStep;
+    public event Action<ScaledRigidbody> GravityStep;
 
-    public float restitution = 0.5f;
+    public const double percent = 0.2;
+    public const double slop = 0.01;
+    public const double restitutionThreshold = 1.0;
     
     [SerializeField] private int maxGridLevels;
     [SerializeField] private double baseGridCellSize;
     [SerializeField] private int cellScalingFactor;
     public HGrid hGrid;
-    private Dictionary<uint, ScaledCollider> scaledColliders = new Dictionary<uint, ScaledCollider>();
+    private Dictionary<uint, int> colliderIndexMap = new Dictionary<uint, int>();
+    private List<ScaledCollider> scaledColliders = new List<ScaledCollider>();
     private HashSet<Pair> previousCollisions = new HashSet<Pair>();
 
     private void Awake()
@@ -38,20 +41,40 @@ public class ScaledSpacePhysics : MonoBehaviour
 
     public void RegisterCollider(ScaledCollider collider)
     {
-        if (!scaledColliders.ContainsKey(collider.id))
-        {
-            scaledColliders.Add(collider.id, collider);
-            hGrid.UpdatePosition(collider);
-        }
+        if (colliderIndexMap.ContainsKey(collider.id))
+            return;
+        colliderIndexMap.Add(collider.id, scaledColliders.Count);
+        scaledColliders.Add(collider);
+        hGrid.UpdatePosition(collider);
+    }
+
+    private IEnumerator WaitToRemoveCollider(ScaledCollider collider)
+    {
+        yield return new WaitForEndOfFrame(); // Avoid changing the scaledColliders while iterating it
+        int index = colliderIndexMap[collider.id];
+
+        int lastIndex = scaledColliders.Count - 1;
+
+        ScaledCollider last = scaledColliders[lastIndex];
+
+        // Swap collider to remove to end of list for fast removal and maintain indices
+        scaledColliders[index] = last;
+        colliderIndexMap[last.id] = index;
+
+        scaledColliders.RemoveAt(lastIndex);
+        colliderIndexMap.Remove(collider.id);
+        hGrid.Delete(collider);
     }
 
     public void UnregisterCollider(ScaledCollider collider)
     {
-        scaledColliders.Remove(collider.id);
-        hGrid.Delete(collider);
+        if (this == null || !colliderIndexMap.ContainsKey(collider.id))
+            return;
+
+        StartCoroutine(WaitToRemoveCollider(collider));
     }
 
-    public void UpdateGridSize(DoubleRigidbody rb)
+    public void UpdateGridSize(ScaledRigidbody rb)
     {
         foreach(ScaledCollider collider in rb.scaledColliders)
         {
@@ -59,7 +82,7 @@ public class ScaledSpacePhysics : MonoBehaviour
         }
     }
 
-    public void UpdateGridPos(DoubleRigidbody rb)
+    public void UpdateGridPos(ScaledRigidbody rb)
     {
         foreach(ScaledCollider collider in rb.scaledColliders)
         {
@@ -67,50 +90,41 @@ public class ScaledSpacePhysics : MonoBehaviour
         }
     }
 
+    public void InvokeGravityStep(ScaledRigidbody scaledRigidbody)
+    {
+        GravityStep?.Invoke(scaledRigidbody);
+    }
+
     private void FixedUpdate()
     {
         HashSet<Pair> currentCollisions = new HashSet<Pair>();
 
-        if (FloatingWorldOrigin.Instance != null)
-        {
-            bool shiftOrigin = FloatingWorldOrigin.Instance.OverShiftThreshold();
-            if (shiftOrigin)
-                FloatingWorldOrigin.Instance.ShiftOrigin();
-        }
-        
-        // Run logic per DoubleRigidbody
-        long getCandidatesTicks = 0;
-        long physicsStepTicks = 0;
+        // Run logic per ScaledRigidbody
         Stopwatch stopwatch = new Stopwatch();
-        stopwatch.Start();
-        ScaledCollider[] values = scaledColliders.Values.ToArray();
-        foreach (ScaledCollider collider in values)
-        {
-            if (collider.doubleRigidbody.finishedStep)
-                continue;
-            collider.doubleRigidbody.ClearGravity();
-            PrePhysicsStep?.Invoke(collider.doubleRigidbody);
-            collider.doubleRigidbody.PhysicsStep(Time.fixedDeltaTime);
-            collider.doubleRigidbody.finishedStep = true;
-        }
-        stopwatch.Stop();
-        physicsStepTicks = stopwatch.ElapsedTicks;
-        long collisionCheckTicks = 0;
         Stopwatch stopwatch1 = new Stopwatch();
+        Stopwatch stopwatch2 = new Stopwatch();
+        long fullLoopTicks = 0;
+        long getCandidatesTicks = 0;
+        long collisionCheckTicks = 0;
+
         stopwatch.Reset();
         stopwatch.Start();
-        foreach (ScaledCollider collider in values)
+        foreach (ScaledCollider collider in scaledColliders)
         {
+            stopwatch1.Reset();
+            stopwatch1.Start();
             foreach (ScaledCollider candidate in hGrid.GetCandidates(collider))
             {
-                // key's 1st 32-bit half is the min id uint, 2nd 32-bit half is the max id uint
-                Pair collisionKey = new Pair(Math.Min(collider.id, candidate.id), Math.Max(collider.id, candidate.id));
-
-                if ((!collider.doubleRigidbody.active && !candidate.doubleRigidbody.active) || currentCollisions.Contains(collisionKey))
+                Pair collisionKey = collider.id < candidate.id ? new Pair(collider.id, candidate.id) : new Pair(candidate.id, collider.id);
+                if ((!collider.scaledRigidbody.active && !candidate.scaledRigidbody.active) || currentCollisions.Contains(collisionKey))
                     continue;
+                bool usingUnity = !collider.overrideUnity && !candidate.overrideUnity && (!collider.scaledRigidbody.active || !candidate.scaledRigidbody.active);
+                bool bothInWorldSpace = !collider.scaledRigidbody.scaledTransform.inScaledSpace && !candidate.scaledRigidbody.scaledTransform.inScaledSpace;
+                if (usingUnity && bothInWorldSpace)
+                    continue; // If either collider is using Unity rigidbody and both are in world space, should defer to unity physics to handle collisions
 
-                stopwatch1.Reset();
-                stopwatch1.Start();
+                stopwatch2.Reset();
+                stopwatch2.Start();
 
                 if (collider.isTrigger || candidate.isTrigger)
                 {
@@ -120,8 +134,8 @@ public class ScaledSpacePhysics : MonoBehaviour
 
                         if (!previousCollisions.Contains(collisionKey))
                         {
-                            collider.doubleRigidbody.RaiseTriggerEnter(candidate);
-                            candidate.doubleRigidbody.RaiseTriggerEnter(collider);
+                            collider.scaledRigidbody.RaiseTriggerEnter(candidate);
+                            candidate.scaledRigidbody.RaiseTriggerEnter(collider);
                         }
                     }
                 }
@@ -130,6 +144,7 @@ public class ScaledSpacePhysics : MonoBehaviour
                     if (CheckCollision(collider, candidate, out CollisionInfo collision))
                     {
                         currentCollisions.Add(collisionKey);
+                        ResolveCollision(ref collision);
 
                         // Track new collisions
                         if (!previousCollisions.Contains(collisionKey))
@@ -142,51 +157,51 @@ public class ScaledSpacePhysics : MonoBehaviour
                             collisionInfoForB.transformB = collider.transform;
                             // Also need to invert normal for the second RB
                             collisionInfoForB.normal = -collision.normal;
-                            collider.doubleRigidbody.RaiseCollisionEnter(collision);
-                            candidate.doubleRigidbody.RaiseCollisionEnter(collisionInfoForB);
+                            collider.scaledRigidbody.RaiseCollisionEnter(collision);
+                            candidate.scaledRigidbody.RaiseCollisionEnter(collisionInfoForB);
                         }
-                        ResolveCollision(collision);
                     }
                 }
                 
-                stopwatch1.Stop();
-                collisionCheckTicks += stopwatch1.ElapsedTicks;
+                stopwatch2.Stop();
+                collisionCheckTicks += stopwatch2.ElapsedTicks;
             }
-            collider.doubleRigidbody.finishedStep = false;
+            stopwatch1.Stop();
+            getCandidatesTicks += stopwatch1.ElapsedTicks;
         }
         stopwatch.Stop();
-        getCandidatesTicks = stopwatch.ElapsedTicks;
-        //Debug.Log($"Physics Step ticks: {physicsStepTicks}, Get candidates loop ticks: {getCandidatesTicks}, Check Collision ticks: {collisionCheckTicks}");
+        fullLoopTicks = stopwatch.ElapsedTicks;
+        // Debug.Log($"Full loop ticks: {fullLoopTicks}, Get candidates loop ticks: {getCandidatesTicks - collisionCheckTicks}, Check Collision ticks: {collisionCheckTicks}");
 
         // Detect collision exits
         foreach (Pair collision in previousCollisions)
         {
-            if (!currentCollisions.Contains(collision) 
-            && scaledColliders.TryGetValue(collision.idA, out var colliderA) 
-            && scaledColliders.TryGetValue(collision.idB, out var colliderB))
+            if (!currentCollisions.Contains(collision)
+                && colliderIndexMap.TryGetValue(collision.idA, out int indexA)
+                && colliderIndexMap.TryGetValue(collision.idB, out int indexB))
             {
+                ScaledCollider colliderA = scaledColliders[indexA];
+                ScaledCollider colliderB = scaledColliders[indexB];
                 if (colliderA.isTrigger)
                 {
-                    colliderA.doubleRigidbody.RaiseTriggerExit(colliderB);
+                    colliderA.scaledRigidbody.RaiseTriggerExit(colliderB);
                 }
                 else
                 {
-                    colliderA.doubleRigidbody.RaiseCollisionExit(colliderB);
+                    colliderA.scaledRigidbody.RaiseCollisionExit(colliderB);
                 }
                 if (colliderB.isTrigger)
                 {
-                    colliderB.doubleRigidbody.RaiseTriggerExit(colliderA);
+                    colliderB.scaledRigidbody.RaiseTriggerExit(colliderA);
                 }
                 else
                 {
-                    colliderB.doubleRigidbody.RaiseCollisionExit(colliderA);
+                    colliderB.scaledRigidbody.RaiseCollisionExit(colliderA);
                 }
             }
         }
 
         previousCollisions = currentCollisions;
-
-        Physics.SyncTransforms();
     }
 
     private bool CheckTrigger(ScaledCollider a, ScaledCollider b)
@@ -209,8 +224,8 @@ public class ScaledSpacePhysics : MonoBehaviour
 
         // CCD: sweep from prevPos to realPos (retroactive)
         // displacement = realPos - prevPos = what PhysicsStep just added
-        Vector3d startPosA = a.doubleRigidbody.prevPos + a.GetLocalCenter();
-        Vector3d startPosB = b.doubleRigidbody.prevPos + b.GetLocalCenter();
+        Vector3d startPosA = a.scaledRigidbody.prevPos + a.GetLocalCenter();
+        Vector3d startPosB = b.scaledRigidbody.prevPos + b.GetLocalCenter();
         Vector3d dispA = posA - startPosA;
         Vector3d dispB = posB - startPosB;
 
@@ -250,7 +265,7 @@ public class ScaledSpacePhysics : MonoBehaviour
         double radiusB = b.GetRadius();
         double minDistance = radiusA + radiusB;
 
-        // Positions at END of frame (after PhysicsStep)
+        // Positions at END of frame (after ScaledRigidbody.FixedUpdate)
         Vector3d posA = a.GetRealCenter();
         Vector3d posB = b.GetRealCenter();
         Vector3d relativePosition = posB - posA;
@@ -264,52 +279,51 @@ public class ScaledSpacePhysics : MonoBehaviour
             // Overlapping at end of frame — standard intersection
             collided = true;
             distance = Math.Sqrt(sqrDistance);
-            Debug.Log($"Intersect Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}");
+            Debug.Log($"[ScaledSpacePhysics] Intersect Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
         }
         else
         {
             // CCD: sweep from prevPos to realPos (retroactive)
-            // displacement = realPos - prevPos = what PhysicsStep just added
-            Vector3d startPosA = a.doubleRigidbody.prevPos + a.GetLocalCenter();
-            Vector3d startPosB = b.doubleRigidbody.prevPos + b.GetLocalCenter();
+            // displacement = realPos - prevPos = what ScaledRigidbody.FixedUpdate just added
+            Vector3d startPosA = a.scaledRigidbody.prevPos + a.GetLocalCenter();
+            Vector3d startPosB = b.scaledRigidbody.prevPos + b.GetLocalCenter();
             Vector3d dispA = posA - startPosA;
             Vector3d dispB = posB - startPosB;
 
-            // Use start-of-frame positions as the sweep origin
-            Vector3d relPos0 = startPosB - startPosA;  // relative pos at frame start
-            Vector3d relDisp = dispB - dispA;           // relative displacement over frame
-            
-            // Quick reject: objects moving apart at frame start
-            double bCoeff = 2.0 * Vector3d.Dot(relPos0, relDisp);
-            if (bCoeff >= 0)
+            Vector3d relPos0 = startPosB - startPosA;
+            Vector3d relDisp = dispB - dispA;
+
+            double aCoeff   = Vector3d.Dot(relDisp, relDisp);
+            double halfB    = Vector3d.Dot(relPos0, relDisp);   // bCoeff/2
+            double bCoeff   = 2.0 * halfB;
+            double r0Sq     = Vector3d.Dot(relPos0, relPos0);
+            double minDistSq = minDistance * minDistance;
+            double cCoeff   = r0Sq - minDistSq;
+
+            // Reject: separating at frame start
+            if (bCoeff >= 0.0)
                 return false;
 
-            // Only need CCD if relative displacement exceeds the gap
-            double gap = Math.Sqrt(relPos0.sqrMagnitude) - minDistance;
-            if (gap < 0)
-                gap = 0; // prevPos already overlapping — handled next frame
-            double sqrRelDisp = relDisp.sqrMagnitude;
-            if (sqrRelDisp <= gap * gap)
+            // Reject: already overlapping — let discrete solver handle it
+            if (cCoeff < 0.0)
                 return false;
 
-            // Quadratic: |relPos0 + relDisp*t|² = minDistance²,  t ∈ [0,1]
-            double aCoeff = Vector3d.Dot(relDisp, relDisp);
-            double cCoeff = Vector3d.Dot(relPos0, relPos0) - minDistance * minDistance;
+            // Reject: closest approach along sweep exceeds minDistance (no sqrt needed)
+            // |relPos0 × relDisp|² = |relPos0|²|relDisp|² - (relPos0·relDisp)²
+            double crossSq = aCoeff * r0Sq - halfB * halfB;
+            if (crossSq > minDistSq * aCoeff)
+                return false;
 
             double t = SpaceMath.SolveQuadratic(aCoeff, bCoeff, cCoeff);
-            if (t < 0.0)
+            if (t < 0.0 || t > 1.0)   // t > 1 = collision outside this frame
                 return false;
 
             collided = true;
-
-            // Interpolate positions to moment of contact for normal/contact point
             posA = startPosA + dispA * t;
             posB = startPosB + dispB * t;
             relativePosition = posB - posA;
-            // |relativePosition| == minDistance by construction, so distance = minDistance
-            // penetration will be 0 — velocity impulse handles separation; position
-            // correction is handled because ResolveCollision moves realPosition directly
-            Debug.Log($"CCD Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}");
+
+            Debug.Log($"[ScaledSpacePhysics] CCD Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
         }
 
         if (!collided)
@@ -334,12 +348,15 @@ public class ScaledSpacePhysics : MonoBehaviour
         return true;
     }
 
-    private void ResolveCollision(CollisionInfo collision)
+    private void ResolveCollision(ref CollisionInfo collision)
     {
-        if (collision.colliderA.doubleRigidbody.isKinematic && collision.colliderB.doubleRigidbody.isKinematic)
+        if (collision.colliderA.scaledRigidbody.isKinematic && collision.colliderB.scaledRigidbody.isKinematic)
             return;
-        Vector3d velocityA = collision.colliderA.doubleRigidbody.velocity;
-        Vector3d velocityB = collision.colliderB.doubleRigidbody.velocity;
+        Vector3d rA = collision.contactPoint - collision.colliderA.scaledRigidbody.scaledTransform.realPosition;
+        Vector3d rB = collision.contactPoint - collision.colliderB.scaledRigidbody.scaledTransform.realPosition;
+
+        Vector3d velocityA = collision.colliderA.scaledRigidbody.velocity + Vector3d.Cross(collision.colliderA.scaledRigidbody.angularVelocity, rA);
+        Vector3d velocityB = collision.colliderB.scaledRigidbody.velocity + Vector3d.Cross(collision.colliderB.scaledRigidbody.angularVelocity, rB);
         Vector3d relativeVelocity = velocityB - velocityA;
 
         double velocityAlongNormal = Vector3d.Dot(relativeVelocity, collision.normal);
@@ -349,26 +366,24 @@ public class ScaledSpacePhysics : MonoBehaviour
             return;
 
         // Calculate impulse magnitude
-        double invMassA = collision.colliderA.doubleRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderA.doubleRigidbody.attachedRigidbody.mass;
-        double invMassB = collision.colliderB.doubleRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderB.doubleRigidbody.attachedRigidbody.mass;
+        double invMassA = collision.colliderA.scaledRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderA.scaledRigidbody.attachedRigidbody.mass;
+        double invMassB = collision.colliderB.scaledRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderB.scaledRigidbody.attachedRigidbody.mass;
 
-        double impulseMagnitude = -(1.0 + restitution) * velocityAlongNormal / (invMassA + invMassB);
+        float avgRestitution = Math.Abs(velocityAlongNormal) < restitutionThreshold ? 0f : (collision.colliderA.restitution + collision.colliderB.restitution) * 0.5f;
+        double impulseMagnitude = -(1.0 + avgRestitution) * velocityAlongNormal / (invMassA + invMassB);
 
         // Apply impulses
-        Vector3d impulse = collision.normal * impulseMagnitude;
+        collision.impulse = collision.normal * impulseMagnitude;
         
-        collision.colliderA.doubleRigidbody.AddForceAtPosition(-impulse, collision.contactPoint, ForceMode.Impulse);
-        collision.colliderB.doubleRigidbody.AddForceAtPosition(impulse, collision.contactPoint, ForceMode.Impulse);
+        collision.colliderA.scaledRigidbody.AddForceAtPosition(-collision.impulse, collision.contactPoint, ForceMode.Impulse);
+        collision.colliderB.scaledRigidbody.AddForceAtPosition(collision.impulse, collision.contactPoint, ForceMode.Impulse);
 
         // Resolve intersection
-        const double percent = 0.2;
-        const double slop = 0.01;
-
         double correctionMagnitude = Math.Max(collision.penetration - slop, 0.0) * percent / (invMassA + invMassB);
         Vector3d correction = correctionMagnitude * collision.normal;
 
-        collision.colliderA.doubleRigidbody.scaledTransform.realPosition -= correction * invMassA;
-        collision.colliderB.doubleRigidbody.scaledTransform.realPosition += correction * invMassB;
+        collision.colliderA.scaledRigidbody.scaledTransform.realPosition -= correction * invMassA;
+        collision.colliderB.scaledRigidbody.scaledTransform.realPosition += correction * invMassB;
     }
 
     public List<ScaledCollider> GetOverlapSphere(Vector3d position, double radius, int layerMask, bool ignoreTriggers)
@@ -429,6 +444,11 @@ public class ScaledSpacePhysics : MonoBehaviour
         /// Distance needed to move the objects apart along the collision normal so they are just touching
         /// </summary>
         public double penetration;
+
+        /// <summary>
+        /// The impulse of the collision relative to A (impulse force applied to B).
+        /// </summary>
+        public Vector3d impulse;
     }
 
     public struct Pair

@@ -37,11 +37,11 @@ public class ShapeGenerator
         {
             if (settings.filterLayers[i].enabled)
             {
-                float mask = settings.filterLayers[i].useFirstLayerAsMask ? firstLayerValue : 1;
+                float mask = settings.filterLayers[i].useFirstLayerAsMask ? firstLayerValue : 1f;
                 elevation += filters[i].Evaluate(pointOnUnitSphere) * mask;
             }
         }
-        elevation = (1 + elevation) * settings.radius;
+        elevation = (1f + elevation) * settings.radius;
         elevationMinMax.AddValue(elevation);
         return elevation * pointOnUnitSphere;
     }

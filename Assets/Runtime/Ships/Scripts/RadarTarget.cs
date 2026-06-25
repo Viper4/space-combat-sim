@@ -1,12 +1,12 @@
 using UnityEngine;
 using SpaceStuff;
 
-[RequireComponent(typeof(DoubleRigidbody))]
+[RequireComponent(typeof(ScaledRigidbody))]
 public class RadarTarget : MonoBehaviour
 {
     private uint id;
 
-    [HideInInspector] public DoubleRigidbody doubleRigidbody { get; private set; }
+    [HideInInspector] public ScaledRigidbody scaledRigidbody { get; private set; }
     [Header("RadarTarget")] public string team;
     public AlertSystem alertSystem;
     public bool alertWhenTargeting = true;
@@ -29,11 +29,11 @@ public class RadarTarget : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     private void Start()
     {
-        doubleRigidbody = GetComponent<DoubleRigidbody>();
+        scaledRigidbody = GetComponent<ScaledRigidbody>();
 
         if (!useScaleForBounds && (boundsRenderers == null || boundsRenderers.Length == 0))
         {
-            boundsRenderers = doubleRigidbody.scaledTransform.GetTrackedRenderers();
+            boundsRenderers = scaledRigidbody.scaledTransform.GetTrackedRenderers();
         }
 
         inverseFixedDeltaTime = 1f / Time.fixedDeltaTime;
@@ -43,8 +43,8 @@ public class RadarTarget : MonoBehaviour
 
     private void FixedUpdate()
     {
-        acceleration = (doubleRigidbody.velocity - lastVelocity) * inverseFixedDeltaTime;
-        lastVelocity = doubleRigidbody.velocity;
+        acceleration = (scaledRigidbody.velocity - lastVelocity) * inverseFixedDeltaTime;
+        lastVelocity = scaledRigidbody.velocity;
     }
 
     private void OnDestroy()

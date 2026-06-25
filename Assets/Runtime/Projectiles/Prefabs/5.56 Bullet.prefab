@@ -17,7 +17,6 @@ GameObject:
   - component: {fileID: 6115539312548483283}
   - component: {fileID: 9008321704609613152}
   - component: {fileID: 9044496995838638813}
-  - component: {fileID: 4843936539018863421}
   - component: {fileID: 1289931754431887923}
   m_Layer: 2
   m_Name: 5.56 Bullet
@@ -280,7 +279,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
   _isKinematic: 0
-  speedThreshold: 100
+  speedThreshold: -1
   _velocity:
     x: 0
     y: 0
@@ -289,8 +288,11 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  finishedStep: 0
   prevPos:
+    x: 0
+    y: 0
+    z: 0
+  inverseInertiaTensor:
     x: 0
     y: 0
     z: 0
@@ -306,11 +308,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5aac20b61ed518040bf2b72986307e9c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ignoreLayers:
-    serializedVersion: 2
-    m_Bits: 36
-  destroyDelay: 11
   damageAmount: 10
+  destroyDelay: 11
 --- !u!114 &9044496995838638813
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -323,7 +322,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 660b2028be04cb445a20efd3df3e65c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScaledTransform
-  transformChange: {fileID: 4843936539018863421}
   _realPosition:
     x: 0
     y: 0.6000000238418579
@@ -337,22 +335,9 @@ MonoBehaviour:
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 10
+  dynamicScaleFactor: 0
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
---- !u!114 &4843936539018863421
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1854897518929172335}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 76ec2b68975954c45b1d10e424648641, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TransformChange
-  trackPosition: 1
-  trackRotation: 0
 --- !u!114 &1289931754431887923
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -371,4 +356,6 @@ MonoBehaviour:
     z: 0
   radius: 0.01
   isTrigger: 0
+  restitution: 0
   hGridLevel: -1
+  overrideUnity: 1

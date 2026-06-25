@@ -15,8 +15,7 @@ public class CelestialBodyEditor : Editor
         base.OnInspectorGUI();
 
         DrawSettingsEditor(celestialBody.generationSettings, ref celestialBody.generationSettingsFoldout, ref generationEditor);
-        if(celestialBody.gravity)
-            DrawSettingsEditor(celestialBody.gravitySettings, ref celestialBody.gravitySettingsFoldout, ref gravityEditor);
+        DrawSettingsEditor(celestialBody.gravitySettings, ref celestialBody.gravitySettingsFoldout, ref gravityEditor);
     }
 
     void DrawSettingsEditor(Object settings, ref bool foldout, ref Editor editor)

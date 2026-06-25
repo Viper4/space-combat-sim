@@ -15,6 +15,7 @@ public class AsteroidField : MonoBehaviour
 
     private IEnumerator Start()
     {
+        yield return new WaitWhile(() => FloatingWorldOrigin.Instance == null);
         for (int i = 0; i < numberOfObjects; i++)
         {
             GameObject obj = Instantiate(asteroidPrefab, transform);

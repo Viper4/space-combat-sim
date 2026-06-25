@@ -34,10 +34,11 @@ public class DynamicLensFlare : MonoBehaviour
         if (FloatingWorldOrigin.Instance == null)
             return;
             
-        Vector3d realCamPosition = FloatingWorldOrigin.Instance.worldOriginPosition + Camera.main.transform.position.ToVector3d();
+        Vector3d realCamPosition = FloatingWorldOrigin.Instance.GetRealCameraPosition();
         double sqrDistance = (lightScaledTransform.realPosition - realCamPosition).sqrMagnitude;
         if (sqrDistance > distanceRange.y * distanceRange.y || sqrDistance < distanceRange.x * distanceRange.x)
         {
+            // Too close or too far so disable lens flare
             lensFlare.enabled = false;
             return;
         }

@@ -5,7 +5,7 @@ using UnityEngine;
 [CreateAssetMenu()]
 public class GravitySettings : ScriptableObject
 {
-    public Vector2 surfaceGravityRange = new Vector2(9.807f, 9.807f);
+    public bool applyGravity = false;
     public LayerMask affectedLayers;
     public bool autoOrient = true;
     public float autoOrientSpeed = 5;

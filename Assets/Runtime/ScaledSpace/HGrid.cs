@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SpaceStuff;
 using UnityEngine;
 
@@ -95,7 +96,10 @@ public class HGrid
     private void Remove(ScaledCollider collider, int level, GridCell cell)
     {
         if(!levels[level].TryGetValue(cell, out var list))
+        {
+            Debug.Log($"Failed to remove {collider.id} {collider.name}");
             return;
+        }
         list.Remove(collider);
     }
 
@@ -111,7 +115,7 @@ public class HGrid
         // Effective radius = collider radius + distance traveled this frame.
         // This places fast-moving objects into a coarser level whose cell size
         // is large enough to contain the entire swept path in one cell.
-        double displacement = collider.doubleRigidbody.velocity.magnitude * Time.fixedDeltaTime;
+        double displacement = collider.scaledRigidbody.velocity.magnitude * Time.fixedDeltaTime;
         double effectiveRadius = collider.GetRadius() + displacement;
         int newLevel = GetLevel(effectiveRadius);
 
@@ -140,7 +144,7 @@ public class HGrid
     public void UpdateSize(ScaledCollider collider)
     {
         // Keep velocity inflation consistent with UpdatePosition
-        double displacement = collider.doubleRigidbody.velocity.magnitude * Time.fixedDeltaTime;
+        double displacement = collider.scaledRigidbody.velocity.magnitude * Time.fixedDeltaTime;
         int newLevel = GetLevel(collider.GetRadius() + displacement);
         int prevLevel = collider.hGridLevel;
 
@@ -159,7 +163,7 @@ public class HGrid
     {
         if (collider.hGridLevel == -1)
         {
-            double displacement = collider.doubleRigidbody.velocity.magnitude * Time.fixedDeltaTime;
+            double displacement = collider.scaledRigidbody.velocity.magnitude * Time.fixedDeltaTime;
             collider.hGridLevel = GetLevel(collider.GetRadius() + displacement);
         }
 
@@ -170,7 +174,6 @@ public class HGrid
         for (int level = collider.hGridLevel; level < maxLevels; level++)
         {
             GridCell center = GetCell(pos, levelCellSizes[level]);
-
             // 3×3×3 neighborhood is sufficient: the inflation guarantee means a fast
             // object's prevPos and realPos both map to the same cell or one neighbor
             // at that object's level (displacement ≤ cellSize/2 by GetLevel's invariant).
@@ -182,7 +185,7 @@ public class HGrid
                 if (!levels[level].TryGetValue(cell, out var list))
                     continue;
 
-                foreach (ScaledCollider other in list)
+                foreach (ScaledCollider other in list) // ToList to avoid collection getting modified while iterating (this is slow though)
                 {
                     if (collider.id == other.id || collider.IsIgnoring(other.id) || other.IsIgnoring(collider.id))
                         continue;

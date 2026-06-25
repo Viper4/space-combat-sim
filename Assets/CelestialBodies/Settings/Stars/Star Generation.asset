@@ -14,13 +14,167 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   simple: 1
   autoGenerate: 1
+  randomShapeGeneration: 0
   sphere: 1
-  random: 1
-  scaleRange:
-  - {x: 695000000, y: 0, z: 0}
-  - {x: 700000000, y: 0, z: 0}
-  calculateMass: 1
-  density: 1408
   initialAngularVelocityRange:
   - {x: 0, y: 0, z: 0}
   - {x: 0, y: 0, z: 0}
+  bodyType: 1
+  scaleRange:
+  - {x: 486990000, y: 0, z: 0}
+  - {x: 1.3914e+9, y: 0, z: 0}
+  densityRange: {x: 200, y: 5000}
+  starDistributions:
+  - starType: 0
+    weight: 30
+    minMass: 0.01
+    maxMass: 0.08
+    minTemperature: 700
+    maxTemperature: 2400
+    setRadius: 1
+    minRadius: 0.08
+    maxRadius: 0.15
+  - starType: 1
+    weight: 76
+    minMass: 0.08
+    maxMass: 0.45
+    minTemperature: 2400
+    maxTemperature: 3700
+    setRadius: 0
+    minRadius: 0
+    maxRadius: 0
+  - starType: 2
+    weight: 12
+    minMass: 0.45
+    maxMass: 0.8
+    minTemperature: 3700
+    maxTemperature: 5200
+    setRadius: 0
+    minRadius: 0
+    maxRadius: 0
+  - starType: 3
+    weight: 7
+    minMass: 0.8
+    maxMass: 1.1
+    minTemperature: 5200
+    maxTemperature: 6000
+    setRadius: 0
+    minRadius: 0
+    maxRadius: 0
+  - starType: 4
+    weight: 3
+    minMass: 1.1
+    maxMass: 1.6
+    minTemperature: 6000
+    maxTemperature: 7500
+    setRadius: 0
+    minRadius: 0
+    maxRadius: 0
+  - starType: 5
+    weight: 1.5
+    minMass: 1.6
+    maxMass: 2.4
+    minTemperature: 7500
+    maxTemperature: 10000
+    setRadius: 0
+    minRadius: 0
+    maxRadius: 0
+  - starType: 6
+    weight: 0.5
+    minMass: 2.4
+    maxMass: 16
+    minTemperature: 10000
+    maxTemperature: 30000
+    setRadius: 0
+    minRadius: 0
+    maxRadius: 0
+  - starType: 7
+    weight: 0.05
+    minMass: 16
+    maxMass: 150
+    minTemperature: 30000
+    maxTemperature: 55000
+    setRadius: 0
+    minRadius: 0
+    maxRadius: 0
+  - starType: 8
+    weight: 4
+    minMass: 0.3
+    maxMass: 8
+    minTemperature: 3100
+    maxTemperature: 5000
+    setRadius: 1
+    minRadius: 10
+    maxRadius: 200
+  - starType: 9
+    weight: 0.4
+    minMass: 7
+    maxMass: 25
+    minTemperature: 10000
+    maxTemperature: 30000
+    setRadius: 1
+    minRadius: 5
+    maxRadius: 30
+  - starType: 10
+    weight: 0.15
+    minMass: 10
+    maxMass: 40
+    minTemperature: 3200
+    maxTemperature: 4500
+    setRadius: 1
+    minRadius: 200
+    maxRadius: 1500
+  - starType: 11
+    weight: 0.08
+    minMass: 15
+    maxMass: 60
+    minTemperature: 10000
+    maxTemperature: 50000
+    setRadius: 1
+    minRadius: 25
+    maxRadius: 100
+  - starType: 12
+    weight: 0.02
+    minMass: 10
+    maxMass: 50
+    minTemperature: 25000
+    maxTemperature: 100000
+    setRadius: 1
+    minRadius: 1
+    maxRadius: 20
+  - starType: 13
+    weight: 0.02
+    minMass: 10
+    maxMass: 50
+    minTemperature: 2100
+    maxTemperature: 3200
+    setRadius: 1
+    minRadius: 100
+    maxRadius: 500
+  - starType: 14
+    weight: 8
+    minMass: 0.17
+    maxMass: 1.4
+    minTemperature: 5000
+    maxTemperature: 80000
+    setRadius: 1
+    minRadius: 0.008
+    maxRadius: 0.02
+  - starType: 15
+    weight: 0.5
+    minMass: 1.1
+    maxMass: 2.3
+    minTemperature: 100000
+    maxTemperature: 1000000
+    setRadius: 1
+    minRadius: 0.000014
+    maxRadius: 0.000015
+  - starType: 16
+    weight: 0.02
+    minMass: 1.1
+    maxMass: 2.3
+    minTemperature: 500000
+    maxTemperature: 10000000
+    setRadius: 1
+    minRadius: 0.000014
+    maxRadius: 0.000015

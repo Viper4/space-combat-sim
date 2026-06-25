@@ -15,8 +15,7 @@ MonoBehaviour:
   radius: 1
   meshFilterResolution: 200
   levelOfDetail: 3
-  complexMeshCollider: 0
-  meshColliderResolution: 200
+  meshColliderResolution: 0
   filterLayers:
   - enabled: 1
     useFirstLayerAsMask: 0
@@ -55,13 +54,16 @@ MonoBehaviour:
         scale: {x: 1, y: 1, z: 1}
         seed: {x: 0, y: 0, z: 0}
         strength: 2
-        craters: 250
-        minCraterRadius: 0.015
-        maxCraterRadius: 0.15
+        craters: 1000
+        minCraterRadius: 0.005
+        maxCraterRadius: 0.125
         craterFloor: 0.5
-        sizeDistribution: 3
+        sizeDistribution: 2
         ridgeHeight: 1
         ridgeWidth: 0.05
+        rimBlend: 0.025
+        floorSmoothness: 0.1
+        blendRandomness: 0.05
       valleyNoiseSettings:
         scale: {x: 0, y: 0, z: 0}
         seed: {x: 0, y: 0, z: 0}
@@ -116,6 +118,9 @@ MonoBehaviour:
         sizeDistribution: 3
         ridgeHeight: 1
         ridgeWidth: 0.05
+        rimBlend: 0.05
+        floorSmoothness: 0.05
+        blendRandomness: 0.01
       valleyNoiseSettings:
         scale: {x: 0, y: 0, z: 0}
         seed: {x: 0, y: 0, z: 0}

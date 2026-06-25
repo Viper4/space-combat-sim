@@ -3,11 +3,9 @@ using UnityEngine;
 using System.Collections.Generic;
 using System;
 
-[RequireComponent(typeof(TransformChange))]
 public class ScaledTransform : MonoBehaviour
 {
-    private DoubleRigidbody doubleRigidbody;
-    [SerializeField] private TransformChange transformChange;
+    private ScaledRigidbody scaledRigidbody;
 
     [SerializeField] private Vector3d _realPosition; // Actual world position
     public Vector3d realPosition 
@@ -19,10 +17,13 @@ public class ScaledTransform : MonoBehaviour
         set
         {
             _realPosition = value;
-            UpdateTransform(true);
+            if (!inScaledSpace && FloatingWorldOrigin.Instance != null)
+            {
+                UpdateInWorldSpace(FloatingWorldOrigin.Instance.scaledTransform.realPosition, true);
+            }
         }
     }
-    [SerializeField] private Vector3d _realScale; // Actual world scale
+    [SerializeField] private Vector3d _realScale = Vector3d.one; // Actual world scale
     public Vector3d realScale
     {
         get
@@ -31,10 +32,9 @@ public class ScaledTransform : MonoBehaviour
         }
         set
         {
-            if (_realScale != value && doubleRigidbody != null)
-                ScaledSpacePhysics.Instance.UpdateGridSize(doubleRigidbody);
+            if (_realScale != value && scaledRigidbody != null)
+                ScaledSpacePhysics.Instance.UpdateGridSize(scaledRigidbody);
             _realScale = value;
-            UpdateTransform(true);
         }
     }
     [SerializeField, Tooltip("Tracked colliders/renderers are disabled at screen sizes below this")] private float minScreenPixelSize = 3f;
@@ -48,12 +48,14 @@ public class ScaledTransform : MonoBehaviour
 
     public bool inScaledSpace = false;
     public double scaleFactor = 1000;
+    [SerializeField] private bool dynamicScaleFactor;
+    
     public float worldSpaceThreshold = 3900;
     public float scaledSpaceThreshold = 4100;
 
     private void Awake()
     {
-        TryGetComponent(out doubleRigidbody);
+        TryGetComponent(out scaledRigidbody);
 
         ResetVisualComponents();
         
@@ -67,24 +69,8 @@ public class ScaledTransform : MonoBehaviour
             inScaledSpace = true;
             SwitchToWorldSpace();
         }
-        if (doubleRigidbody != null)
-        {
-            if (doubleRigidbody.active)
-            {
-                SwitchToDoubleRigidbody();
-            }
-            else
-            {
-                SwitchToRigidbody();
-            }
-        }
 
         SetTrackedComponentsActive(visible);
-    }
-
-    private void OnDestroy()
-    {
-        FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateTransformByEvent;
     }
 
     private void OnValidate()
@@ -167,20 +153,10 @@ public class ScaledTransform : MonoBehaviour
         visible = value;
     }
 
-    /// <summary>
-    /// Returns the square of the size of the object assumed to be a sphere with radius=max(realScale.x, realScale.y, realScale.z) on screen in pixels based on its given square distance from the camera's realPosition.
-    /// </summary>
-    /// <param name="sqrCameraDistance">Square distance from the camera in the actual world (using realPosition)</param>
-    /// <returns>Pixel size squared</returns>
-    public float GetSquarePixelSize(double sqrCameraDistance)
+    private void LateUpdate()
     {
-        // screenSize ≈ objectRadius / (distance * tan(FOV/2))
-        if (sqrCameraDistance <= 0)
-            return 1.0f;
-        double radius = Math.Max(Math.Max(_realScale.x, _realScale.y), _realScale.z); // Good enough estimate, CelestialBodies use this for size anyway
-        double tan = Math.Tan(Camera.main.fieldOfView * Mathf.Deg2Rad * 0.5);
-        double sqrScreenSize = radius * radius / (sqrCameraDistance * tan * tan);
-        return (float)(sqrScreenSize * Screen.height * Screen.height);
+        // LateUpdate to wait for everything else to finish applying changes to realPosition and camera is done applying transform position changes
+        UpdateTransform();
     }
 
     private void UpdateTransformEditor()
@@ -200,18 +176,12 @@ public class ScaledTransform : MonoBehaviour
         }
     }
 
-    private void UpdateTransform(bool forceWorldTransformUpdate)
+    private void UpdateTransform()
     {
-        if (FloatingWorldOrigin.Instance == null)
+        // Floating origin's transform position should always stay static
+        if (FloatingWorldOrigin.Instance == null || FloatingWorldOrigin.Instance.scaledTransform == this)
             return;
-        Vector3d originPosition = FloatingWorldOrigin.Instance.worldOriginPosition;
-        if (FloatingWorldOrigin.Instance.transform == transform)
-        {
-            if (FloatingWorldOrigin.Instance.OverShiftThreshold())
-                return; // Let ScaledSpacePhysics handle origin shift, don't update origin's transform.position to outside of shiftThreshold
-            UpdateInWorldSpace(originPosition, forceWorldTransformUpdate);
-            return;
-        }
+        Vector3d originPosition = FloatingWorldOrigin.Instance.scaledTransform.realPosition;
 
         double sqrDistance = (_realPosition - originPosition).sqrMagnitude;
         if (inScaledSpace)
@@ -226,13 +196,8 @@ public class ScaledTransform : MonoBehaviour
             if (sqrDistance > scaledSpaceThreshold * scaledSpaceThreshold)
                 SwitchToScaledSpace();
             else
-                UpdateInWorldSpace(originPosition, forceWorldTransformUpdate);
+                UpdateInWorldSpace(originPosition, scaledRigidbody != null && scaledRigidbody.active);
         }
-    }
-
-    private void UpdateTransformByEvent()
-    {
-        UpdateTransform(false);
     }
 
     private void UpdateInScaledSpace(Vector3d originPosition)
@@ -243,7 +208,8 @@ public class ScaledTransform : MonoBehaviour
         Vector3d realCamPos = originPosition + renderCamPos;
         Vector3d offset = _realPosition - realCamPos; // Unscaled offset from camera to object
 
-        float sqrPixelSize = GetSquarePixelSize(offset.sqrMagnitude);
+        double radius = Math.Max(Math.Max(_realScale.x, _realScale.y), _realScale.z); // Good enough estimate, CelestialBodies use this for size anyway
+        double sqrPixelSize = SpaceMath.CalculateSquarePixelSize(offset.sqrMagnitude, radius);
         if (sqrPixelSize < minScreenPixelSize * minScreenPixelSize)
         {
             if (visible)
@@ -261,60 +227,45 @@ public class ScaledTransform : MonoBehaviour
         transform.localScale = (_realScale / scaleFactor).ToVector3();
     }
 
-    private void UpdateInWorldSpace(Vector3d originPosition, bool forceUpdateTransform)
+    private void UpdateInWorldSpace(Vector3d originPosition, bool updateRenderPosition)
     {
-        if (forceUpdateTransform || doubleRigidbody == null || doubleRigidbody.active)
+        transform.localScale = _realScale.ToVector3();
+        if (updateRenderPosition)
         {
-            // Assume Editor changes realPosition (doubleRigidbody == null) and DoubleRigidbody changes realPosition with velocity
+            // Assume Editor changes realPosition (scaledRigidbody == null) and ScaledRigidbody changes realPosition with velocity
             transform.position = (_realPosition - originPosition).ToVector3();
-            transform.localScale = _realScale.ToVector3();
         }
         else
         {
             // Rigidbody changes transform.position with linearVelocity
             _realPosition = originPosition + transform.position.ToVector3d();
-            _realScale = transform.localScale.ToVector3d();
         }
-    }
-
-    public void SwitchToDoubleRigidbody()
-    {
-        transformChange.OnPositionChange -= UpdateTransformByEvent; // doubleRigidbody takes over movement updates
-    }
-
-    public void SwitchToRigidbody()
-    {
-        transformChange.OnPositionChange -= UpdateTransformByEvent; // Prevent double update from multiple consecutive calls
-        transformChange.OnPositionChange += UpdateTransformByEvent; // doubleRigidbody no longer updates position, so track movement manually
     }
 
     private void SwitchToScaledSpace()
     {
         // Floating origin should never be in scaled space since we assume the origin has the camera
-        if (FloatingWorldOrigin.Instance == null || FloatingWorldOrigin.Instance.transform == transform || !gameObject.activeSelf || inScaledSpace)
+        if (FloatingWorldOrigin.Instance == null || FloatingWorldOrigin.Instance.scaledTransform == this || !gameObject.activeSelf || inScaledSpace)
             return;
         inScaledSpace = true;
-        if (doubleRigidbody != null)
-            doubleRigidbody.active = true;
+        if (scaledRigidbody != null)
+            scaledRigidbody.active = true;
         UpdateVisualComponents();
-        FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateTransformByEvent; // Prevent double update from multiple consecutive calls
-        FloatingWorldOrigin.Instance.cameraTC.OnPositionChange += UpdateTransformByEvent; // Need to maintain illusion if camera moves
-        UpdateInScaledSpace(FloatingWorldOrigin.Instance.worldOriginPosition);
+        UpdateInScaledSpace(FloatingWorldOrigin.Instance.scaledTransform.realPosition);
     }
 
     private void SwitchToWorldSpace()
     {
-        if (!gameObject.activeSelf || !inScaledSpace)
+        if (!gameObject.activeSelf || !inScaledSpace || FloatingWorldOrigin.Instance == null)
             return;
         if (!visible)
             SetTrackedComponentsActive(true);
         inScaledSpace = false;
-        if (doubleRigidbody != null)
-            doubleRigidbody.active = false;
-        transform.position = (_realPosition - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3();
+        if (scaledRigidbody != null)
+            scaledRigidbody.active = false;
+        transform.position = (_realPosition - FloatingWorldOrigin.Instance.scaledTransform.realPosition).ToVector3();
         transform.localScale = _realScale.ToVector3();
         UpdateVisualComponents();
-        FloatingWorldOrigin.Instance.cameraTC.OnPositionChange -= UpdateTransformByEvent; // ScaledTransform and Transform match so dont need to maintain illusion
     }
 
     public void UpdateVisualComponents()
@@ -353,11 +304,29 @@ public class ScaledTransform : MonoBehaviour
         return (Collider[])trackedColliders.Clone();
     }
     
-    public Vector3d GetChildRealPosition(Vector3 childPosition)
+    /// <summary>
+    /// Transforms position from render space to real space for this ScaledTransform.
+    /// </summary>
+    /// <param name="renderPoint"></param>
+    /// <returns>Vector3d realPoint</returns>
+    public Vector3d TransformRenderPoint(Vector3 renderPoint)
     {
-        Vector3d offset = (childPosition - transform.position).ToVector3d();
-        if (doubleRigidbody.scaledTransform.inScaledSpace)
-            offset *= doubleRigidbody.scaledTransform.scaleFactor;
+        Vector3d offset = (renderPoint - transform.position).ToVector3d();
+        if (scaledRigidbody.scaledTransform.inScaledSpace)
+            offset *= scaledRigidbody.scaledTransform.scaleFactor;
         return _realPosition + offset;
+    }
+
+    /// <summary>
+    /// Transforms position from real space to render space for this ScaledTransform.
+    /// </summary>
+    /// <param name="realPoint"></param>
+    /// <returns>Vector3 renderPoint</returns>
+    public Vector3 TransformRealPoint(Vector3d realPoint)
+    {
+        Vector3d offset = realPoint - _realPosition;
+        if (scaledRigidbody.scaledTransform.inScaledSpace)
+            offset /= scaledRigidbody.scaledTransform.scaleFactor;
+        return transform.position + offset.ToVector3();
     }
 }

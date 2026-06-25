@@ -4,8 +4,11 @@ using UnityEngine;
 using SpaceStuff;
 using System;
 using Random = UnityEngine.Random;
+using FishNet.Object;
+using FishNet.Connection;
 
-public class Turret : MonoBehaviour
+[RequireComponent(typeof(StatSystem))]
+public class Turret : NetworkBehaviour
 {
     [Header("Turret")] public StatSystem statSystem;
     [SerializeField] private TurretSystem turretSystem;
@@ -18,8 +21,6 @@ public class Turret : MonoBehaviour
     public Transform platform;
     public Transform barrel;
     public Transform firePoint;
-    [SerializeField] private Transform casingPoint;
-    [SerializeField] private float casingRandomness = 0.1f;
 
     [SerializeField] private Vector3 minAngles;
     [SerializeField] private Vector3 maxAngles;
@@ -34,6 +35,8 @@ public class Turret : MonoBehaviour
     [SerializeField, Tooltip("0 for no tracer. Otherwise 1 tracer every tracerInterval shots.")] protected int tracerInterval = 3;
     protected int tracerCounter = 0;
 
+    [SerializeField] private Transform casingPoint;
+    [SerializeField] private float casingRandomness = 0.1f;
     [SerializeField] private GameObject casingPrefab;
     [SerializeField] private float casingSpeed = 5;
 
@@ -49,7 +52,7 @@ public class Turret : MonoBehaviour
     public float explosionRadius = 20f;
 
     [HideInInspector] public Vector3 aimDirection;
-    [HideInInspector] public bool shoot = false;
+    public bool shoot {get; private set;} = false;
     [SerializeField] protected bool showLines;
     private bool obstructed = false;
 
@@ -66,16 +69,30 @@ public class Turret : MonoBehaviour
     [SerializeField] private bool test;
     private Queue<KeyValuePair<float, Vector3d>> predictions = new Queue<KeyValuePair<float, Vector3d>>();
 
-    protected virtual void Start()
+    private void Start()
     {
         statSystem = GetComponent<StatSystem>();
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
         turretSystem.StartTargetSearch += ResetTargetSearch;
         turretSystem.CheckTarget += CheckTarget;
     }
 
-    protected virtual void Update()
+    public override void OnStopClient()
+    {
+        base.OnStopClient();
+        turretSystem.StartTargetSearch -= ResetTargetSearch;
+        turretSystem.CheckTarget -= CheckTarget;
+    }
+
+    private void Update()
     {
         if (!active)
+            return;
+        if (!IsOffline && !IsOwner)
             return;
         
         if (test && currentTarget != null && predictions.Count > 0)
@@ -83,7 +100,7 @@ public class Turret : MonoBehaviour
             KeyValuePair<float, Vector3d> prediction = predictions.Peek();
             if (Time.time >= prediction.Key)
             {
-                Vector3d realTargetPos = currentTarget.doubleRigidbody.scaledTransform.realPosition;
+                Vector3d realTargetPos = currentTarget.scaledRigidbody.scaledTransform.realPosition;
                 Vector3d error = realTargetPos - prediction.Value;
                 Debug.Log($"{Time.time - prediction.Key} Turret prediction: {prediction.Value}, actual: {realTargetPos}, error: {error}, error distance: {error.magnitude}");
                 predictions.Dequeue();
@@ -95,68 +112,88 @@ public class Turret : MonoBehaviour
         }
     }
 
-    protected virtual void FixedUpdate()
+    private void FixedUpdate()
     {
         if (!active)
             return;
-        if (!turretSystem.manualControl)
-            shoot = false;
-        if (currentTarget != null)
+        
+        if (IsOffline || IsOwner)
         {
-            // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
-            Vector3d realFirePoint = GetRealFirePoint();
-            Vector3d realTargetPos = currentTarget.doubleRigidbody.scaledTransform.realPosition;
-            Vector3d relativePosition = realTargetPos - realFirePoint;
-
-            if (relativePosition.sqrMagnitude > turretSystem.detectRadius * turretSystem.detectRadius)
+            if (currentTarget != null)
             {
-                currentTarget = null;
-                return;
+                // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
+                Vector3d realFirePoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+                Vector3d realTargetPos = currentTarget.scaledRigidbody.scaledTransform.realPosition;
+                Vector3d relativePosition = realTargetPos - realFirePoint;
+
+                if (relativePosition.sqrMagnitude > turretSystem.detectRadius * turretSystem.detectRadius)
+                {
+                    currentTarget = null;
+                    return;
+                }
+
+                Vector3d targetVelocity = currentTarget.scaledRigidbody.velocity;
+                Vector3d relativeVelocity = targetVelocity - turretSystem.ship.scaledRigidbody.velocity;
+                
+                // Assume the bullet's acceleration after getting fired is only from gravity
+                Vector3d projectileAcceleration = turretSystem.ship.scaledRigidbody.GetGravity();
+                Vector3d relativeAcceleration = currentTarget.acceleration - projectileAcceleration;
+
+                // Maybe add noise or something to bulletTime
+                double bulletTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration, projectileSpeed);
+                Vector3d predictedRelativePos = relativePosition
+                        + (relativeVelocity * bulletTime)
+                        + (0.5 * bulletTime * bulletTime * relativeAcceleration);
+                Vector3d direction = predictedRelativePos.normalized;
+                Vector3d simulatedVelocity = turretSystem.ship.scaledRigidbody.velocity + direction * projectileSpeed;
+                Vector3d simulatedPos = realFirePoint + simulatedVelocity * bulletTime + 0.5 * bulletTime * bulletTime * projectileAcceleration;
+                aimDirection = direction.ToVector3();
+
+                var prediction = new KeyValuePair<float, Vector3d>(Time.time + (float)bulletTime, simulatedPos);
+                predictions.Enqueue(prediction);
+
+                if (!shoot && !turretSystem.manualControl && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
+                    shoot = true;
             }
 
-            Vector3d targetVelocity = currentTarget.doubleRigidbody.velocity;
-            Vector3d relativeVelocity = targetVelocity - turretSystem.ship.doubleRigidbody.velocity;
-            
-            // Assume the bullet's acceleration after getting fired is only from gravity
-            Vector3d projectileAcceleration = turretSystem.ship.doubleRigidbody.GetGravity();
-            Vector3d relativeAcceleration = currentTarget.acceleration - projectileAcceleration;
+            if (aimDirection.sqrMagnitude > 0.00001f)
+            {
+                Vector3 localDir = platform.parent.InverseTransformDirection(aimDirection);
+                float targetYaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
+                targetYaw = Mathf.Clamp(SpaceMath.NormalizeAngle(targetYaw), minAngles.y, maxAngles.y);
 
-            // Maybe add noise or something to bulletTime
-            double bulletTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration, projectileSpeed);
-            Vector3d predictedRelativePos = relativePosition
-                    + (relativeVelocity * bulletTime)
-                    + (0.5 * bulletTime * bulletTime * relativeAcceleration);
-            Vector3d direction = predictedRelativePos.normalized;
-            Vector3d simulatedVelocity = turretSystem.ship.doubleRigidbody.velocity + direction * projectileSpeed;
-            Vector3d simulatedPos = realFirePoint + simulatedVelocity * bulletTime + 0.5 * bulletTime * bulletTime * projectileAcceleration;
-            aimDirection = direction.ToVector3();
+                Quaternion yawRotation = Quaternion.Euler(0f, targetYaw, 0f);
+                Vector3 yawSpaceDir = Quaternion.Inverse(yawRotation) * localDir;
+                float targetPitch = -Mathf.Atan2(yawSpaceDir.y, yawSpaceDir.z) * Mathf.Rad2Deg;
+                targetPitch = Mathf.Clamp(SpaceMath.NormalizeAngle(targetPitch), minAngles.x, maxAngles.x);
 
-            var prediction = new KeyValuePair<float, Vector3d>(Time.time + (float)bulletTime, simulatedPos);
-            predictions.Enqueue(prediction);
+                currentYaw = Mathf.MoveTowardsAngle(currentYaw, targetYaw, rotateSpeed * Time.fixedDeltaTime);
+                currentPitch = Mathf.MoveTowardsAngle(currentPitch, targetPitch, rotateSpeed * Time.fixedDeltaTime);
 
-            if (!turretSystem.manualControl && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
-                shoot = true;
-        }
+                platform.localRotation = Quaternion.Euler(0f, currentYaw, 0f);
+                barrel.localRotation = Quaternion.Euler(currentPitch, 0f, 0f);
 
-        if (aimDirection.sqrMagnitude > 0.00001f)
-        {
-            Vector3 localDir = platform.parent.InverseTransformDirection(aimDirection);
-            float targetYaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
-            targetYaw = Mathf.Clamp(SpaceMath.NormalizeAngle(targetYaw), minAngles.y, maxAngles.y);
+                Debug.DrawRay(origin.position, aimDirection * 1000f, Color.red, Time.fixedDeltaTime);
+                Debug.DrawRay(origin.position, origin.forward * 1000f, Color.yellow, Time.fixedDeltaTime);
 
-            Quaternion yawRotation = Quaternion.Euler(0f, targetYaw, 0f);
-            Vector3 yawSpaceDir = Quaternion.Inverse(yawRotation) * localDir;
-            float targetPitch = -Mathf.Atan2(yawSpaceDir.y, yawSpaceDir.z) * Mathf.Rad2Deg;
-            targetPitch = Mathf.Clamp(SpaceMath.NormalizeAngle(targetPitch), minAngles.x, maxAngles.x);
-
-            currentYaw = Mathf.MoveTowardsAngle(currentYaw, targetYaw, rotateSpeed * Time.fixedDeltaTime);
-            currentPitch = Mathf.MoveTowardsAngle(currentPitch, targetPitch, rotateSpeed * Time.fixedDeltaTime);
-
-            platform.localRotation = Quaternion.Euler(0f, currentYaw, 0f);
-            barrel.localRotation = Quaternion.Euler(currentPitch, 0f, 0f);
-
-            Debug.DrawRay(origin.position, aimDirection * 1000f, Color.red, Time.fixedDeltaTime);
-            Debug.DrawRay(origin.position, origin.forward * 1000f, Color.yellow, Time.fixedDeltaTime);
+                if (!turretSystem.manualControl && currentTarget != null)
+                {
+                    if ((aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
+                    {
+                        if (!shoot)
+                        {
+                            SetShoot(true);
+                        }
+                    }
+                    else
+                    {
+                        if (shoot)
+                        {
+                            SetShoot(false);
+                        }
+                    }
+                }
+            }
         }
 
         if (!obstructed && shoot && turretSystem.currentAmmo > 0)
@@ -164,17 +201,22 @@ public class Turret : MonoBehaviour
             fireTime += Time.deltaTime;
             if (fireTime >= fireRate)
             {
-                Fire();
+                if (IsOffline)
+                {
+                    FireRealBullet();
+                }
+                else if (IsServerInitialized)
+                {
+                    NonOwnerFire();
+                    FireRealBullet();
+                }
+                else if (IsOwner)
+                {
+                    // Fire visual bullet immediately to avoid perceived lag for owner client
+                    FireVisualBullet();
+                }
             }
         }
-    }
-
-    private Vector3d GetRealFirePoint()
-    {
-        Vector3d originOffset = (turretSystem.ship.transform.position - firePoint.position).ToVector3d();
-        if (turretSystem.ship.doubleRigidbody.scaledTransform.inScaledSpace)
-            originOffset *= turretSystem.ship.doubleRigidbody.scaledTransform.scaleFactor;
-        return turretSystem.ship.doubleRigidbody.scaledTransform.realPosition - originOffset;
     }
 
     private void ResetTargetSearch()
@@ -187,8 +229,10 @@ public class Turret : MonoBehaviour
 
     private void CheckTarget(RadarTarget target, bool inKillRadius)
     {
-        Vector3d realFirePoint = GetRealFirePoint();
-        Vector3d relativePosition = target.doubleRigidbody.scaledTransform.realPosition - realFirePoint;
+        if (!IsOffline && !IsOwner)
+            return;
+        Vector3d realFirePoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        Vector3d relativePosition = target.scaledRigidbody.scaledTransform.realPosition - realFirePoint;
         if (turretSystem.IsOffensive(target))
         {
             // Use offensive strategy against target
@@ -211,7 +255,7 @@ public class Turret : MonoBehaviour
             }
 
             // Dont want to use closingVelocity and closingAcceleration since we only want to consider the intention of the target, not if the ship is moving towards it
-            double incomingVelocity = -Vector3d.Dot(target.doubleRigidbody.velocity, direction);
+            double incomingVelocity = -Vector3d.Dot(target.scaledRigidbody.velocity, direction);
             double incomingAcceleration = -Vector3d.Dot(target.acceleration, direction);
 
             double estimatedClosingTime = distance / (incomingVelocity + accelerationHeuristic * incomingAcceleration * distance);
@@ -248,53 +292,131 @@ public class Turret : MonoBehaviour
             if (prevTarget != null)
             {
                 prevTarget.turretsTargeting--;
-                turretSystem.UpdateHudForTarget(prevTarget);
+                if (IsOffline)
+                    HUDSystem.Instance.SetTurretsTargetingOffline(prevTarget.GetID(), prevTarget.turretsTargeting);
+                else
+                    HUDSystem.Instance.SetTurretsTargetingTargetRpc(Owner, prevTarget.GetID(), prevTarget.turretsTargeting);
             }
             if (currentTarget != null)
             {
                 currentTarget.turretsTargeting++;
-                turretSystem.UpdateHudForTarget(currentTarget);
+                if (IsOffline)
+                    HUDSystem.Instance.SetTurretsTargetingOffline(prevTarget.GetID(), prevTarget.turretsTargeting);
+                else
+                    HUDSystem.Instance.SetTurretsTargetingTargetRpc(Owner, currentTarget.GetID(), currentTarget.turretsTargeting);
             }
         }
     }
 
-    protected virtual void Fire()
+    [ServerRpc]
+    private void SetShootServerRpc(bool shoot)
     {
-        tracerCounter++;
-        fireTime = 0;
-        turretSystem.OnTurretFire();
-        DoubleRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation).GetComponent<DoubleRigidbody>();
+        this.shoot = shoot;
+        if (shoot)
+        {
+            // Need to update obstructed bool on server
+            GetRaycastHit(out _);
+        }
+        // Periodically synchronize ammo count with owner
+        SetOwnerAmmoCountTargetRpc(Owner, turretSystem.currentAmmo);
+    }
+
+    [TargetRpc]
+    private void SetOwnerAmmoCountTargetRpc(NetworkConnection conn, int ammo)
+    {
+        turretSystem.SetAmmo(ammo);
+    }
+
+    public void SetShoot(bool shoot)
+    {
+        if (this.shoot == shoot)
+            return;
+        this.shoot = shoot;
+        if (shoot)
+            GetRaycastHit(out _); // Update obstructed
+        if (!IsOffline)
+            SetShootServerRpc(shoot);
+    }
+
+    /// <summary>
+    /// Shoot a bullet purely for visual effect. This is for non-server clients to maintain server authority for physics.
+    /// </summary>
+    private void FireVisualBullet()
+    {
+        ScaledRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation).GetComponent<ScaledRigidbody>();
+        projectileRB.velocity = turretSystem.ship.scaledRigidbody.velocity + firePoint.forward.ToVector3d() * projectileSpeed;
+        projectileRB.scaledTransform.realPosition = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        projectileRB.DestroyScaledColliders(); // Server takes authority over simulating physics
+
         Collider projectileCollider = projectileRB.GetComponent<Collider>();
-        projectileRB.IgnoreDoubleRigidbody(turretSystem.ship.doubleRigidbody, true);
         foreach(Collider collider in ignoreColliders)
         {
             Physics.IgnoreCollision(projectileCollider, collider, true);
         }
-        projectileRB.velocity = turretSystem.ship.doubleRigidbody.velocity + firePoint.forward.ToVector3d() * projectileSpeed;
-
-        if (tracerCounter >= tracerInterval)
+        
+        if (projectileRB.TryGetComponent<TrailRenderer>(out var trailRenderer))
         {
-            if(projectileRB.TryGetComponent<TrailRenderer>(out var projectileTrail))
+            if (tracerCounter >= tracerInterval)
             {
-                projectileTrail.enabled = true;
+                trailRenderer.enabled = true;
+                tracerCounter = 0;
             }
-            tracerCounter = 0;
-        }
-
-        projectileRB.scaledTransform.realPosition = turretSystem.ship.doubleRigidbody.scaledTransform.GetChildRealPosition(firePoint.position);
-
-        if (!turretSystem.ship.doubleRigidbody.scaledTransform.inScaledSpace)
-        {
-            if (shootParticles != null)
-                Instantiate(shootParticles, firePoint.position, firePoint.rotation, transform);
-
-            if (casingPoint != null && casingPrefab != null)
+            else
             {
-                Rigidbody casingRigidbody = Instantiate(casingPrefab, casingPoint.position, casingPoint.rotation).GetComponent<Rigidbody>();
-                casingRigidbody.angularVelocity = Random.insideUnitSphere * casingRandomness;
-                casingRigidbody.linearVelocity = turretSystem.ship.doubleRigidbody.velocity.ToVector3() + (casingPoint.up + Random.insideUnitSphere * casingRandomness) * casingSpeed;
+                trailRenderer.enabled = false;
+                tracerCounter++;
             }
         }
+    }
+
+    private void FireRealBullet()
+    {
+        fireTime = 0;
+        turretSystem.OnTurretFire();
+        ScaledRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation).GetComponent<ScaledRigidbody>();
+        projectileRB.velocity = turretSystem.ship.scaledRigidbody.velocity + firePoint.forward.ToVector3d() * projectileSpeed;
+        projectileRB.scaledTransform.realPosition = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        projectileRB.IgnoreScaledRigidbody(turretSystem.ship.scaledRigidbody, true);
+
+        Collider projectileCollider = projectileRB.GetComponent<Collider>();
+        foreach(Collider collider in ignoreColliders)
+        {
+            Physics.IgnoreCollision(projectileCollider, collider, true);
+        }
+
+        if (projectileRB.TryGetComponent<TrailRenderer>(out var trailRenderer))
+        {
+            if (tracerCounter >= tracerInterval)
+            {
+                trailRenderer.enabled = true;
+                tracerCounter = 0;
+            }
+            else
+            {
+                trailRenderer.enabled = false;
+                tracerCounter++;
+            }
+        }
+
+        if (turretSystem.ship.scaledRigidbody.scaledTransform.visible && shootParticles != null)
+        {
+            Instantiate(shootParticles, firePoint.position, firePoint.rotation, transform).GetComponent<ScaledRigidbody>();
+        }
+
+        if (casingPoint != null && casingPrefab != null)
+        {
+            Vector3d realCasingPoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(casingPoint.position);
+            ScaledRigidbody casingRigidbody = Instantiate(casingPrefab, casingPoint.position, casingPoint.rotation).GetComponent<ScaledRigidbody>();
+            casingRigidbody.scaledTransform.realPosition = realCasingPoint;
+            casingRigidbody.angularVelocity = (Random.insideUnitSphere * casingRandomness).ToVector3d();
+            casingRigidbody.velocity = turretSystem.ship.scaledRigidbody.velocity + ((casingPoint.up + Random.insideUnitSphere * casingRandomness) * casingSpeed).ToVector3d();
+        }
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void NonOwnerFire()
+    {
+        FireVisualBullet();
     }
 
     public bool GetRaycastHit(out RaycastHit hit)
@@ -336,11 +458,5 @@ public class Turret : MonoBehaviour
     public void SetFireTime(float percentMax)
     {
         fireTime = percentMax * fireRate;
-    }
-
-    private void OnDestroy()
-    {
-        turretSystem.StartTargetSearch -= ResetTargetSearch;
-        turretSystem.CheckTarget -= CheckTarget;
     }
 }

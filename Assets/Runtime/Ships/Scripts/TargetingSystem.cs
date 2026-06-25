@@ -8,7 +8,6 @@ public class TargetingSystem : MonoBehaviour
 {
     [SerializeField] private Transform centralCrosshair;
     [SerializeField] private LayerMask ignoreLayers;
-    [SerializeField] private HUDSystem _HUDSystem;
     [SerializeField] private Material modelMaterial;
     [SerializeField] private Transform targetModelParent;
     [SerializeField] private TextMeshProUGUI targetName;
@@ -35,7 +34,7 @@ public class TargetingSystem : MonoBehaviour
             if (crosshairHit.transform.TryGetComponent<ScaledTransform>(out var scaledTransform))
             {
                 // Convert hit point to real position and back to transform position (position relative to world origin)
-                aimPoint = (scaledTransform.GetChildRealPosition(crosshairHit.point) - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3();
+                aimPoint = (scaledTransform.TransformRenderPoint(crosshairHit.point) - FloatingWorldOrigin.Instance.scaledTransform.realPosition).ToVector3();
             }
             else
             {
@@ -53,10 +52,10 @@ public class TargetingSystem : MonoBehaviour
         {
             targetName.text = lockedTarget.name;
             targetModel.rotation = lockedTarget.transform.rotation;
-            if (lockedTarget.doubleRigidbody.velocity != Vector3d.zero)
-                targetDirectionPivot.rotation = Quaternion.LookRotation(lockedTarget.doubleRigidbody.velocity.ToVector3(), transform.up);
+            if (lockedTarget.scaledRigidbody.velocity != Vector3d.zero)
+                targetDirectionPivot.rotation = Quaternion.LookRotation(lockedTarget.scaledRigidbody.velocity.ToVector3(), transform.up);
 
-            _HUDSystem.UpdateTargetDirectionMarker(lockedTarget.doubleRigidbody.scaledTransform.realPosition);
+            HUDSystem.Instance.UpdateTargetDirectionMarker(lockedTarget.scaledRigidbody.scaledTransform.realPosition);
 
         }
         else if (targetModel != null)
@@ -70,9 +69,9 @@ public class TargetingSystem : MonoBehaviour
         if (lockedTarget != null)
         {
             if (lockedTarget.alertSystem != null)
-                lockedTarget.alertSystem.RemoveRadarLock();
+                lockedTarget.alertSystem.IncrementRadarLock(-1);
             lockedTarget = null;
-            _HUDSystem.SetTargetDirectionMarkerActive(false);
+            HUDSystem.Instance.SetTargetDirectionMarkerActive(false);
         }
         if (targetModel != null)
         {
@@ -85,10 +84,10 @@ public class TargetingSystem : MonoBehaviour
 
     private void LockTarget(InputAction.CallbackContext context)
     {
-        if (!_HUDSystem.radarHudActive)
+        if (!HUDSystem.Instance.radarHudActive)
             return;
 
-        RadarTarget newTarget = _HUDSystem.GetClosestTarget();
+        RadarTarget newTarget = HUDSystem.Instance.GetClosestTarget();
         if (newTarget == null || newTarget == lockedTarget)
         {
             RemoveTarget();
@@ -98,7 +97,7 @@ public class TargetingSystem : MonoBehaviour
         RemoveTarget();
         lockedTarget = newTarget;
         if (lockedTarget.alertSystem != null)
-            lockedTarget.alertSystem.AddRadarLock();
+            lockedTarget.alertSystem.IncrementRadarLock(1);
         targetModelParent.gameObject.SetActive(lockedTarget != null);
 
         GameObject newTargetModel;

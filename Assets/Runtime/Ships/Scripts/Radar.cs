@@ -98,7 +98,7 @@ public class Radar : MonoBehaviour
                     targetsInTrigger.RemoveAt(i);
                     continue;
                 }
-                Vector3d relativePosition = radarTarget.doubleRigidbody.scaledTransform.realPosition - ship.doubleRigidbody.scaledTransform.realPosition;
+                Vector3d relativePosition = radarTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition;
                 double sqrDistance = relativePosition.sqrMagnitude;
 
                 if (sqrDistance > (radarRanges[rangeIndex] * radarRanges[rangeIndex])
@@ -128,7 +128,7 @@ public class Radar : MonoBehaviour
                             radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, "F2"));
                         if (radarTarget.CompareTag("CelestialBody"))
                         {
-                            Vector3d realScale = radarTarget.doubleRigidbody.scaledTransform.realScale;
+                            Vector3d realScale = radarTarget.scaledRigidbody.scaledTransform.realScale;
                             iconScale = new Vector3(
                                 (float)(realScale.x / radarRanges[rangeIndex] * hologramScale.x),
                                 (float)(realScale.y / radarRanges[rangeIndex] * hologramScale.y),
@@ -198,7 +198,7 @@ public class Radar : MonoBehaviour
                                 newIcon = Instantiate(realScaleIcon, iconParent.transform).GetComponent<RadarIcon>();
                                 iconColor = celestialBodyColor;
                                 iconEmission = celestialBodyEmission;
-                                Vector3d realScale = radarTarget.doubleRigidbody.scaledTransform.realScale;
+                                Vector3d realScale = radarTarget.scaledRigidbody.scaledTransform.realScale;
                                 iconScale = new Vector3(
                                     (float)(realScale.x / radarRanges[rangeIndex] * hologramScale.x),
                                     (float)(realScale.y / radarRanges[rangeIndex] * hologramScale.y),
@@ -232,7 +232,7 @@ public class Radar : MonoBehaviour
                 if (_HUDSystem.radarHudActive)
                 {
                     Vector3d relativeAcceleration = radarTarget.acceleration - ship.radarTarget.acceleration;
-                    Vector3d relativeVelocity = radarTarget.doubleRigidbody.velocity - ship.doubleRigidbody.velocity;
+                    Vector3d relativeVelocity = radarTarget.scaledRigidbody.velocity - ship.scaledRigidbody.velocity;
                     // Negative closing => moving away, Positive closing => coming closer
                     double closingVelocity = -Vector3d.Dot(relativeVelocity, direction);
                     double closingAcceleration = -Vector3d.Dot(relativeAcceleration, direction);
@@ -242,12 +242,12 @@ public class Radar : MonoBehaviour
                     string ETA = arrivalTime < 0.0 ? "Never" : SpaceMath.SecondsToFormattedString(arrivalTime, "F2");
                     string details = "<b>" + radarTarget.name + "</b>" +
                         "\nDST " + SpaceMath.DistanceToFormattedString(distance, "F2") +
-                        "\nSPD " + SpaceMath.SpeedToFormattedString((float)radarTarget.doubleRigidbody.velocity.magnitude, "F2") +
+                        "\nSPD " + SpaceMath.SpeedToFormattedString((float)radarTarget.scaledRigidbody.velocity.magnitude, "F2") +
                         "\nCLS " + SpaceMath.SpeedToFormattedString(closingVelocity, "F2") +
                         "\nETA " + ETA;
 
                     double predictTime = arrivalTime < 0.0 ? distance / 25.0 : arrivalTime;
-                    Vector3d predictedPosition = radarTarget.doubleRigidbody.scaledTransform.realPosition + radarTarget.doubleRigidbody.velocity * predictTime + 0.5 * predictTime * predictTime * radarTarget.acceleration;
+                    Vector3d predictedPosition = radarTarget.scaledRigidbody.scaledTransform.realPosition + radarTarget.scaledRigidbody.velocity * predictTime + 0.5 * predictTime * predictTime * radarTarget.acceleration;
 
                     if (!_HUDSystem.UpdateObject(radarTarget, details, predictedPosition))
                     {
@@ -321,6 +321,8 @@ public class Radar : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
+        if (other.attachedRigidbody == null)
+            return;
         if (other.attachedRigidbody.TryGetComponent(out RadarTarget otherRadarTarget) && !targetsInTrigger.Contains(otherRadarTarget.GetID()))
         {
             targetsInTrigger.Add(otherRadarTarget.GetID());
@@ -329,6 +331,8 @@ public class Radar : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
+        if (other.attachedRigidbody == null)
+            return;
         if (other.attachedRigidbody.TryGetComponent(out RadarTarget otherRadarTarget))
         {
             targetsInTrigger.Remove(otherRadarTarget.GetID());

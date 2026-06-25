@@ -22,7 +22,8 @@ GameObject:
   - component: {fileID: 2848928438514413154}
   - component: {fileID: 6577287821693102537}
   - component: {fileID: 8942289586678289918}
-  - component: {fileID: 4776741766681722286}
+  - component: {fileID: 1209257913728134229}
+  - component: {fileID: 8624868431337818510}
   m_Layer: 0
   m_Name: Torpedo
   m_TagString: Torpedo
@@ -188,7 +189,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 660b2028be04cb445a20efd3df3e65c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScaledTransform
-  transformChange: {fileID: 4776741766681722286}
   _realPosition:
     x: 0
     y: 0.6000000238418579
@@ -202,6 +202,7 @@ MonoBehaviour:
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 10
+  dynamicScaleFactor: 0
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
 --- !u!114 &2821699641902407001
@@ -226,8 +227,11 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  finishedStep: 0
   prevPos:
+    x: 0
+    y: 0
+    z: 0
+  inverseInertiaTensor:
     x: 0
     y: 0
     z: 0
@@ -249,7 +253,9 @@ MonoBehaviour:
     z: -0.9
   radius: 0.12
   isTrigger: 0
+  restitution: 0
   hGridLevel: -1
+  overrideUnity: 0
 --- !u!114 &5523896917430819422
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -268,7 +274,9 @@ MonoBehaviour:
     z: 0.9
   radius: 0.12
   isTrigger: 0
+  restitution: 0
   hGridLevel: -1
+  overrideUnity: 0
 --- !u!114 &1404306499154668698
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -287,7 +295,9 @@ MonoBehaviour:
     z: 0
   radius: 0.12
   isTrigger: 0
+  restitution: 0
   hGridLevel: -1
+  overrideUnity: 0
 --- !u!114 &2848928438514413154
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -306,7 +316,9 @@ MonoBehaviour:
     z: 0
   radius: 10
   isTrigger: 1
+  restitution: 0
   hGridLevel: -1
+  overrideUnity: 0
 --- !u!114 &6577287821693102537
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -319,10 +331,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdcd49df3d6f1744d928678c582bb52a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ignoreLayers:
-    serializedVersion: 2
-    m_Bits: 52
-  destroyDelay: -1
+  _componentIndexCache: 0
+  _addedNetworkObject: {fileID: 8624868431337818510}
+  _networkObjectCache: {fileID: 8624868431337818510}
   active: 0
   _collider: {fileID: 2688048666450355157}
   engineForce: 50000
@@ -337,6 +348,9 @@ MonoBehaviour:
   explosionForce: 10000
   minDamage: 300
   maxDamage: 1000
+  ignoreLayers:
+    serializedVersion: 2
+    m_Bits: 52
   target: {fileID: 0}
   navigationConstant: 4
 --- !u!114 &8942289586678289918
@@ -360,7 +374,7 @@ MonoBehaviour:
   useScaleForBounds: 0
   boundsRenderers:
   - {fileID: 2153530488087983894}
---- !u!114 &4776741766681722286
+--- !u!114 &1209257913728134229
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -369,11 +383,72 @@ MonoBehaviour:
   m_GameObject: {fileID: 6316366540338611349}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 76ec2b68975954c45b1d10e424648641, type: 3}
+  m_Script: {fileID: 11500000, guid: 87f21fb26d74cb446adea6577efd64e9, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TransformChange
-  trackPosition: 1
-  trackRotation: 0
+  m_EditorClassIdentifier: Assembly-CSharp::DoubleRigidbodySync
+  _componentIndexCache: 1
+  _addedNetworkObject: {fileID: 8624868431337818510}
+  _networkObjectCache: {fileID: 8624868431337818510}
+  snapshotRate: 10
+--- !u!114 &8624868431337818510
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6316366540338611349}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FishNet.Runtime::FishNet.Object.NetworkObject
+  _localLevelOfDetailCalculationType: 0
+  _useLevelOfDetail: 0
+  _useRootLevelOfDetail: 1
+  NetworkObserver: {fileID: 0}
+  _enablePrediction: 0
+  _predictionType: 0
+  _localReconcileCorrectionType: 2
+  _graphicalObject: {fileID: 0}
+  _detachGraphicalObject: 0
+  _enableStateForwarding: 1
+  _networkTransform: {fileID: 0}
+  _ownerInterpolation: 1
+  _ownerSmoothedProperties: 255
+  _adaptiveInterpolation: 3
+  _spectatorSmoothedProperties: 255
+  _spectatorInterpolation: 2
+  _enableTeleport: 0
+  _teleportThreshold: 1
+  <PrefabId>k__BackingField: 12
+  <SpawnableCollectionId>k__BackingField: 0
+  <AssetPathHash>k__BackingField: 17792068308959698063
+  SceneId: 0
+  SerializedTransformProperties:
+    Position: {x: 0, y: -0.39999998, z: 16.6}
+    Rotation: {x: 6.123234e-17, y: -3.7493994e-33, z: 6.123234e-17, w: -1}
+    Scale: {x: 1, y: 1, z: 1}
+    IsValid: 1
+  <IsNested>k__BackingField: 0
+  WasActiveDuringEdit: 0
+  WasActiveDuringEdit_Set1: 1
+  <ComponentIndex>k__BackingField: 0
+  <PredictedSpawn>k__BackingField: {fileID: 0}
+  <PredictedOwner>k__BackingField: {fileID: 0}
+  NetworkBehaviours:
+  - {fileID: 6577287821693102537}
+  - {fileID: 1209257913728134229}
+  InitializedParentNetworkBehaviour: {fileID: 0}
+  InitializedNestedNetworkObjects: []
+  RuntimeParentNetworkBehaviour: {fileID: 0}
+  RuntimeChildNetworkBehaviours: []
+  _isNetworked: 0
+  _isSpawnable: 1
+  _isGlobal: 0
+  _initializeOrder: 0
+  _preventDespawnOnDisconnect: 0
+  _defaultDespawnType: 0
+  _initializedTimestamp: -8584192617891388083
 --- !u!1001 &4109854028599492452
 PrefabInstance:
   m_ObjectHideFlags: 0

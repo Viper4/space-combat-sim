@@ -1,28 +1,33 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using SpaceStuff;
 using UnityEngine;
 
 public class TerrainChunk
 {
-    TerrainChunk[] children;
-    ShapeGenerator shapeGenerator;
-    Vector3 localPosition;
-    float width;
-    int maxLOD;
-    int detailLevel;
-    int filterResolution;
-    int colliderResolution;
-    Vector3 localUp;
-    Vector3 localRight;
-    Vector3 localForward;
-    TerrainChunkObject chunkObject;
+    private TerrainChunk[] children;
+    private ShapeGenerator shapeGenerator;
+    private Vector3 localPosition;
+    private float width;
+    // This terrain chunk will be visible below max screen size, anything above will generate higher LOD
+    private float sqrMaxScreenSize;
+    private int maxLOD;
+    private int detailLevel;
+    private int filterResolution;
+    private int colliderResolution;
+    private Vector3 localUp;
+    private Vector3 localRight;
+    private Vector3 localForward;
+    private TerrainChunkObject chunkObject;
 
-    public TerrainChunk(ShapeGenerator shapeGenerator, ShapeSettings settings, Vector3 localUp, int row, int col, int rootLOD)
+    public TerrainChunk(ShapeGenerator shapeGenerator, ShapeSettings settings, float maxScreenSize, Vector3 localUp, int row, int col, int rootLOD)
     {
         this.shapeGenerator = shapeGenerator;
         filterResolution = settings.meshFilterResolution;
-        colliderResolution = settings.complexMeshCollider ? settings.meshColliderResolution : ShapeSettings.simpleMeshColliderSize;
-        width = 1 / rootLOD;
+        colliderResolution = settings.meshColliderResolution;
+        width = 1f / rootLOD;
+        sqrMaxScreenSize = maxScreenSize * maxScreenSize;
         maxLOD = settings.levelOfDetail;
         detailLevel = 0;
         this.localUp = localUp;
@@ -33,11 +38,12 @@ public class TerrainChunk
         localForward /= rootLOD;
     }
 
-    public TerrainChunk(ShapeGenerator shapeGenerator, Vector3 localPosition, float width, int filterResolution, int colliderResolution, int maxLOD, int detailLevel, Vector3 localUp, Vector3 localRight, Vector3 localForward)
+    public TerrainChunk(ShapeGenerator shapeGenerator, Vector3 localPosition, float width, float sqrMaxScreenSize, int filterResolution, int colliderResolution, int maxLOD, int detailLevel, Vector3 localUp, Vector3 localRight, Vector3 localForward)
     {
         this.shapeGenerator = shapeGenerator;
         this.localPosition = localPosition;
         this.width = width;
+        this.sqrMaxScreenSize = sqrMaxScreenSize;
         this.filterResolution = filterResolution;
         this.colliderResolution = colliderResolution;
         this.maxLOD = maxLOD;
@@ -63,9 +69,11 @@ public class TerrainChunk
         return pointOnUnitCube.normalized;
     }
 
-    public void ConstructMesh(Camera camera = null, bool forceMeshCollider = false)
+    public void ConstructMesh()
     {
-        Mesh filterMesh = chunkObject.meshFilter.sharedMesh;
+        if (chunkObject == null)
+            return;
+        Mesh filterMesh = chunkObject.meshFilter.sharedMesh; // Cant get shared mesh outside main thread
         Vector3[] vertices = new Vector3[filterResolution * filterResolution]; // resolution vertices on each side of the mesh
         int[] triangles = new int[(filterResolution - 1) * (filterResolution - 1) * 6]; // 2 triangles per square so (resolution - 1)^2 faces * 2 tris * 3 vertices per tri
         int triangleIndex = 0;
@@ -93,18 +101,15 @@ public class TerrainChunk
             }
         }
 
+        if (filterMesh == null)
+            return;
+
         filterMesh.Clear();
         filterMesh.vertices = vertices;
         filterMesh.triangles = triangles;
         filterMesh.RecalculateNormals();
         if (filterMesh.uv.Length == uv.Length)
             filterMesh.uv = uv;
-
-        bool generateCollider = forceMeshCollider || (camera != null && chunkObject.meshRenderer.bounds.SqrDistance(camera.transform.position) < 100);
-        if (generateCollider)
-            ConstructMeshCollider();
-        else
-            chunkObject.UpdateBoxCollider();            
     }
 
     public void ConstructMeshCollider()
@@ -150,6 +155,8 @@ public class TerrainChunk
 
     public void UpdateUVs(ColorGenerator colorGenerator)
     {
+        if (chunkObject == null || chunkObject.meshFilter == null)
+            return;
         Vector2[] uv = new Vector2[filterResolution * filterResolution];
         int i = 0;
         for (int y = 0; y < filterResolution; y++)
@@ -166,28 +173,65 @@ public class TerrainChunk
         chunkObject.meshFilter.sharedMesh.uv = uv;
     }
 
-    public void GenerateTree(Camera camera, Transform parent, ColorGenerator colorGenerator)
+    public void GenerateEmptyTree(Transform parent, ColorGenerator colorGenerator)
     {
-        float sqrDistance = 0;
-        if(camera != null)
-            sqrDistance = chunkObject == null ? (parent.TransformPoint(shapeGenerator.CalculatePointOnSphere(GetPointOnCubeSphere(new Vector2(0.5f, 0.5f)))) - camera.transform.position).sqrMagnitude : chunkObject.meshRenderer.bounds.SqrDistance(camera.transform.position);
-        if (camera != null && detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < width * width)
+        if (chunkObject == null)
+        {
+            GameObject meshGO = new GameObject("Mesh (" + detailLevel + " LOD)");
+            meshGO.transform.SetParent(parent, false);
+            chunkObject = meshGO.AddComponent<TerrainChunkObject>();
+            chunkObject.Init(this);
+            chunkObject.gameObject.layer = parent.gameObject.layer;
+        }
+
+        if (!chunkObject.gameObject.activeSelf)
+            chunkObject.gameObject.SetActive(true);
+        chunkObject.meshRenderer.sharedMaterial = colorGenerator.materialInstance;
+        chunkObject.meshFilter.sharedMesh = new Mesh();
+    }
+
+    public void GenerateTree(Vector3d realCamPos, ScaledTransform parent, ColorGenerator colorGenerator)
+    {
+        Vector3 worldRenderPos = parent.transform.TransformPoint(localPosition);
+        double sqrDistance = (realCamPos - parent.TransformRenderPoint(worldRenderPos)).sqrMagnitude;
+        if (detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < 4.0f * width * width * parent.scaleFactor * parent.scaleFactor)
         {
             // Camera is close enough to this chunk that we need to increase the LOD so generate children with higher LOD in this chunk
             if (chunkObject != null && chunkObject.gameObject.activeSelf)
                 chunkObject.gameObject.SetActive(false);
             children = new TerrainChunk[4];
             float nextWidth = width * 0.5f;
+            float nextSqrMaxScreenSize = sqrMaxScreenSize * 4f;
             Vector3 nextLocalRight = localRight * 0.5f;
             Vector3 nextLocalForward = localForward * 0.5f;
-            children[0] = new TerrainChunk(shapeGenerator, localPosition + nextLocalRight - nextLocalForward, nextWidth, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Top left
-            children[1] = new TerrainChunk(shapeGenerator, localPosition + nextLocalRight + nextLocalForward, nextWidth, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Top right
-            children[2] = new TerrainChunk(shapeGenerator, localPosition - nextLocalRight + nextLocalForward, nextWidth, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Bottom right
-            children[3] = new TerrainChunk(shapeGenerator, localPosition - nextLocalRight - nextLocalForward, nextWidth, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Bottom left
+            children[0] = new TerrainChunk(
+                shapeGenerator, 
+                localPosition + nextLocalRight - nextLocalForward, 
+                nextWidth, nextSqrMaxScreenSize, 
+                filterResolution, colliderResolution, maxLOD, detailLevel + 1, 
+                localUp, nextLocalRight, nextLocalForward); // Top left
+            children[1] = new TerrainChunk(
+                shapeGenerator, 
+                localPosition + nextLocalRight + nextLocalForward, 
+                nextWidth, nextSqrMaxScreenSize, 
+                filterResolution, colliderResolution, maxLOD, detailLevel + 1, 
+                localUp, nextLocalRight, nextLocalForward); // Top right
+            children[2] = new TerrainChunk(
+                shapeGenerator, 
+                localPosition - nextLocalRight + nextLocalForward, 
+                nextWidth, nextSqrMaxScreenSize, 
+                filterResolution, colliderResolution, maxLOD, detailLevel + 1, 
+                localUp, nextLocalRight, nextLocalForward); // Bottom right
+            children[3] = new TerrainChunk(
+                shapeGenerator, 
+                localPosition - nextLocalRight - nextLocalForward, 
+                nextWidth, nextSqrMaxScreenSize, 
+                filterResolution, colliderResolution, maxLOD, detailLevel + 1, 
+                localUp, nextLocalRight, nextLocalForward); // Bottom left
 
             foreach (TerrainChunk chunk in children)
             {
-                chunk.GenerateTree(camera, parent, colorGenerator);
+                chunk.GenerateTree(realCamPos, parent, colorGenerator);
             }
         }
         else
@@ -196,7 +240,7 @@ public class TerrainChunk
             if (chunkObject == null)
             {
                 GameObject meshGO = new GameObject("Mesh (" + detailLevel + " LOD)");
-                meshGO.transform.SetParent(parent, false);
+                meshGO.transform.SetParent(parent.transform, false);
                 chunkObject = meshGO.AddComponent<TerrainChunkObject>();
                 chunkObject.Init(this);
                 chunkObject.gameObject.layer = parent.gameObject.layer;
@@ -206,27 +250,25 @@ public class TerrainChunk
                 chunkObject.gameObject.SetActive(true);
             chunkObject.meshRenderer.sharedMaterial = colorGenerator.materialInstance;
             chunkObject.meshFilter.sharedMesh = new Mesh();
-            if (camera != null)
-            {
-                ConstructMesh(camera);
-                UpdateUVs(colorGenerator);
-            }
+            ConstructMesh();
+            if (colliderResolution > 0)
+                ConstructMeshCollider();
+            UpdateUVs(colorGenerator);
         }
     }
 
     /// <summary>
-    /// Generates/activates higher LOD child chunks if the camera is close enough, otherwise it just generates/activates this chunk
+    /// Generates/activates higher LOD child chunks depending on screen size of this body relative to camera, otherwise it just generates/activates this chunk
     /// </summary>
-    /// <param name="camera"></param>
+    /// <param name="sqrScreenSize"></param>
     /// <param name="parent"></param>
     /// <param name="colorGenerator"></param>
     /// <returns>Whether the chunk generated new chunks</returns>
-    public bool UpdateTree(Camera camera, Transform parent, ColorGenerator colorGenerator)
+    public bool UpdateTree(Vector3d realCamPos, ScaledTransform parent, ColorGenerator colorGenerator)
     {
-        float sqrDistance = 0;
-        if (camera != null)
-            sqrDistance = chunkObject == null ? (parent.TransformPoint(shapeGenerator.CalculatePointOnSphere(GetPointOnCubeSphere(new Vector2(0.5f, 0.5f)))) - camera.transform.position).sqrMagnitude : chunkObject.meshRenderer.bounds.SqrDistance(camera.transform.position);
-        if (camera != null && detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < width * width)
+        Vector3 worldRenderPos = parent.transform.TransformPoint(localPosition);
+        double sqrDistance = (realCamPos - parent.TransformRenderPoint(worldRenderPos)).sqrMagnitude;
+        if (detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < 4.0f * width * width * parent.scaleFactor * parent.scaleFactor)
         {
             // Camera is close enough to this chunk that we need to increase the LOD so generate children with higher LOD in this chunk
             if(chunkObject != null && chunkObject.gameObject.activeSelf)
@@ -235,18 +277,19 @@ public class TerrainChunk
             {
                 children = new TerrainChunk[4];
                 float nextWidth = width * 0.5f;
+                float nextSqrMaxScreenSize = sqrMaxScreenSize * 4f;
                 Vector3 nextLocalRight = localRight * 0.5f;
                 Vector3 nextLocalForward = localForward * 0.5f;
-                children[0] = new TerrainChunk(shapeGenerator, localPosition + nextLocalRight - nextLocalForward, nextWidth, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Top left
-                children[1] = new TerrainChunk(shapeGenerator, localPosition + nextLocalRight + nextLocalForward, nextWidth, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Top right
-                children[2] = new TerrainChunk(shapeGenerator, localPosition - nextLocalRight + nextLocalForward, nextWidth, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Bottom right
-                children[3] = new TerrainChunk(shapeGenerator, localPosition - nextLocalRight - nextLocalForward, nextWidth, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Bottom left
+                children[0] = new TerrainChunk(shapeGenerator, localPosition + nextLocalRight - nextLocalForward, nextWidth, nextSqrMaxScreenSize, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Top left
+                children[1] = new TerrainChunk(shapeGenerator, localPosition + nextLocalRight + nextLocalForward, nextWidth, nextSqrMaxScreenSize, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Top right
+                children[2] = new TerrainChunk(shapeGenerator, localPosition - nextLocalRight + nextLocalForward, nextWidth, nextSqrMaxScreenSize, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Bottom right
+                children[3] = new TerrainChunk(shapeGenerator, localPosition - nextLocalRight - nextLocalForward, nextWidth, nextSqrMaxScreenSize, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Bottom left
             }
 
             bool generated = false;
             foreach (TerrainChunk chunk in children)
             {
-                generated |= chunk.UpdateTree(camera, parent, colorGenerator);
+                generated |= chunk.UpdateTree(realCamPos, parent, colorGenerator);
             }
             return generated;
         }
@@ -256,13 +299,15 @@ public class TerrainChunk
             if (chunkObject == null)
             {
                 GameObject meshGO = new GameObject("Mesh (" + detailLevel + " LOD)");
-                meshGO.transform.SetParent(parent, false);
+                meshGO.transform.SetParent(parent.transform, false);
                 chunkObject = meshGO.AddComponent<TerrainChunkObject>();
                 chunkObject.Init(this);
                 chunkObject.gameObject.layer = parent.gameObject.layer;
                 chunkObject.meshFilter.sharedMesh = new Mesh();
                 chunkObject.meshRenderer.sharedMaterial = colorGenerator.materialInstance;
-                ConstructMesh(camera);
+                ConstructMesh();
+                if (colliderResolution > 0)
+                    ConstructMeshCollider();
                 UpdateUVs(colorGenerator);
                 return true;
             }

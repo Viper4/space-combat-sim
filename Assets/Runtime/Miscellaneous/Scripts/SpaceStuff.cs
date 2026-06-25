@@ -882,6 +882,7 @@ namespace SpaceStuff
 
     public static class SpaceMath
     {
+        public const double stefanBoltzmann = 5.67e-8; // For luminosity
         public const double kilo = 1e3;
         public const double mega = 1e6;
         public const double giga = 1e9;
@@ -1045,18 +1046,6 @@ namespace SpaceStuff
                 returnVector.z = min;
             }
             return returnVector;
-        }
-
-        /// <summary>
-        /// Normalizes a value to the range [0, 1] based on the provided minimum and maximum values.
-        /// </summary>
-        /// <param name="value">The value to normalize</param>
-        /// <param name="min">The minimum value</param>
-        /// <param name="max">The maximum value</param>
-        /// <returns>The normalized value</returns>
-        public static float Normalize(float value, float min, float max)
-        {
-            return (value - min) / (max - min);
         }
 
         /// <summary>
@@ -1438,6 +1427,24 @@ namespace SpaceStuff
             // Newton-Raphson method or Jenkins-Traub algorithm
             // x_n+1 = x_n - f(x_n)/f'(x_n)
             return -1.0;
+        }
+
+        /// <summary>
+        /// Returns the square of the pixel size (diameter) of the object assumed to be a sphere with given radius on screen in pixels based on its given square distance from the camera's realPosition.
+        /// </summary>
+        /// <param name="sqrCameraDistance">Square distance from the camera in the actual world (using realPosition)</param>
+        /// <returns>Pixel size (diameter) squared</returns>
+        public static double CalculateSquarePixelSize(double sqrCameraDistance, double radius)
+        {
+            // screenSize = diameter * verticalScreenHeight / (2 * distance * tan(FOV/2))
+            // = radius * verticalScreenHeight / (distance * tan(FOV/2))
+            if (sqrCameraDistance < 0)
+                return -1.0;
+            if (sqrCameraDistance < double.Epsilon)
+                return Screen.height * Screen.height;
+            double tan = Math.Tan(Camera.main.fieldOfView * Mathf.Deg2Rad * 0.5);
+            double sqrScreenSize = radius * radius * Screen.height * Screen.height / (sqrCameraDistance * tan * tan);
+            return sqrScreenSize;
         }
     }
 

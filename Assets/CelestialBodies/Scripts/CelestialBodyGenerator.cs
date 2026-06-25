@@ -1,7 +1,10 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using SpaceStuff;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 [RequireComponent(typeof(ScaledTransform))]
 public class CelestialBodyGenerator : MonoBehaviour
@@ -28,6 +31,8 @@ public class CelestialBodyGenerator : MonoBehaviour
     [HideInInspector] public bool shapeSettingsFoldout;
     [HideInInspector] public bool colorSettingsFoldout;
 
+    [SerializeField, Tooltip("Base LOD will be displayed at screen sizes below this.")] private float baseMaxScreenSize;
+
     private ShapeGenerator shapeGenerator;
     private ColorGenerator colorGenerator;
 
@@ -35,8 +40,6 @@ public class CelestialBodyGenerator : MonoBehaviour
     private TerrainChunk[] rootChunks;
 
     [SerializeField] private Vector2 seedRange = new Vector2(-999, 999);
-
-    [SerializeField] private bool forceGenerateMeshColliders;
 
     public bool initialized {get; private set;} = false;
     public bool generated {get; private set;} = false;
@@ -106,9 +109,9 @@ public class CelestialBodyGenerator : MonoBehaviour
             {
                 for (int c = 0; c < rootLOD; c++)
                 {
-                    rootChunks[arrayIndex] = new TerrainChunk(shapeGenerator, shapeSettings, directions[i], r, c, rootLOD);
+                    rootChunks[arrayIndex] = new TerrainChunk(shapeGenerator, shapeSettings, baseMaxScreenSize, directions[i], r, c, rootLOD);
                     if (renderMask == FaceRenderMask.All || (int)renderMask - 1 == i)
-                        rootChunks[arrayIndex].GenerateTree(null, transform, colorGenerator);
+                        rootChunks[arrayIndex].GenerateEmptyTree(transform, colorGenerator);
                     arrayIndex++;
                 }
             }
@@ -119,12 +122,14 @@ public class CelestialBodyGenerator : MonoBehaviour
 
     public bool UpdateQuadTrees(Camera camera)
     {
-        bool generated = false;
+        bool updateGenerated = false;
+        Vector3d realCamPos = FloatingWorldOrigin.Instance.scaledTransform.realPosition + camera.transform.position.ToVector3d();
+
         foreach (TerrainChunk rootChunk in rootChunks)
         {
-            generated |= rootChunk.UpdateTree(camera, transform, colorGenerator);
+            updateGenerated |= rootChunk.UpdateTree(realCamPos, scaledTransform, colorGenerator);
         }
-        return generated;
+        return updateGenerated;
     }
 
     public void GenerateCelestialBody()
@@ -198,13 +203,15 @@ public class CelestialBodyGenerator : MonoBehaviour
         }
     }
 
-    void GenerateMeshes()
+    private void GenerateMeshes()
     {
         for (int i = 0; i < 6 * rootLOD * rootLOD; i++)
         {
             int faceIndex = i / (rootLOD * rootLOD);
             if (renderMask == FaceRenderMask.All || (int)renderMask - 1 == faceIndex)
-                rootChunks[i].ConstructMesh(null, forceGenerateMeshColliders);
+                rootChunks[i].ConstructMesh();
+            if (shapeSettings.meshColliderResolution > 0)
+                rootChunks[i].ConstructMeshCollider();
         }
         colorGenerator.UpdateElevation(shapeGenerator.elevationMinMax);
     }

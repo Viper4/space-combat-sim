@@ -33,7 +33,7 @@ Transform:
   m_GameObject: {fileID: 4028611689432565048}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0.6, z: 6.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -51,7 +51,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 660b2028be04cb445a20efd3df3e65c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  transformChange: {fileID: 4194929419073694645}
   _realPosition:
     x: 0
     y: 0.6000000238418579
@@ -65,6 +64,7 @@ MonoBehaviour:
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 100
+  dynamicScaleFactor: 0
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
 --- !u!114 &654691890924152879
@@ -85,10 +85,10 @@ MonoBehaviour:
   originalColorSettings: {fileID: 11400000, guid: 46444cfcd02076f4d916d52c7119d0c2, type: 2}
   cloneSettings: 1
   shapeSettingsFoldout: 1
-  colorSettingsFoldout: 1
+  colorSettingsFoldout: 0
+  baseMaxScreenSize: 32
   rootLOD: 1
   seedRange: {x: -10000, y: 10000}
-  forceGenerateMeshColliders: 1
 --- !u!114 &1673852074928851070
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -103,11 +103,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   scaledTransform: {fileID: 0}
   originalLayer: 0
-  generationSettingsFoldout: 1
   generationSettings: {fileID: 11400000, guid: 0be72f32df323dc4fb7839601af70aec, type: 2}
-  gravity: 0
-  gravitySettingsFoldout: 1
+  generationSettingsFoldout: 1
   gravitySettings: {fileID: 0}
+  gravitySettingsFoldout: 1
   orbitTarget: {fileID: 0}
   pauseUpdates: 0
 --- !u!54 &6356004437463594846
@@ -159,7 +158,6 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  finishedStep: 0
   prevPos:
     x: 0
     y: 0
@@ -216,4 +214,5 @@ MonoBehaviour:
     z: 0
   radius: -1
   isTrigger: 0
+  restitution: 0
   hGridLevel: -1

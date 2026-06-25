@@ -1,17 +1,15 @@
-using SpaceStuff;
+using FishNet.Object;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-[RequireComponent(typeof(Ship)), RequireComponent(typeof(TargetingSystem))]
-public class TurretSystem : MonoBehaviour
+[RequireComponent(typeof(Ship))]
+public class TurretSystem : NetworkBehaviour
 {
     [HideInInspector] public Ship ship;
-    [SerializeField] private HUDSystem _HUDSystem;
     private TargetingSystem targetingSystem;
     
     [SerializeField] private int maxAmmo = 10000;
@@ -51,10 +49,14 @@ public class TurretSystem : MonoBehaviour
 
     private bool triggerHeld;
 
+    private bool IsOwnerOrOffline => IsOwner || IsOffline;
+
+    private bool initialized = false;
+
     private void Start()
     {
         ship = GetComponent<Ship>();
-        targetingSystem = GetComponent<TargetingSystem>();
+        TryGetComponent(out targetingSystem);
         currentAmmo = maxAmmo;
         ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
         for (int i = 0; i < offensiveTags.Length; i++)
@@ -65,7 +67,7 @@ public class TurretSystem : MonoBehaviour
         {
             defensiveTagsSet.Add(defensiveTags[i]);
         }
-        Collider[] shipColliders = ship.doubleRigidbody.scaledTransform.GetTrackedColliders();
+        Collider[] shipColliders = ship.scaledRigidbody.scaledTransform.GetTrackedColliders();
 
         turrets = new Turret[turretPoints.Length];
         turretCrosshairs = new Transform[turretPoints.Length];
@@ -78,27 +80,58 @@ public class TurretSystem : MonoBehaviour
             {
                 turrets[i].AddIgnoredCollider(shipColliders[j]);
             }
-            GameObject newCrosshair = Instantiate(turretCrosshairPrefab, _HUDSystem.combatPanel);
+            GameObject newCrosshair = Instantiate(turretCrosshairPrefab, HUDSystem.Instance.combatPanel);
             turretCrosshairs[i] = newCrosshair.transform;
             turretCrosshairImages[i] = newCrosshair.GetComponent<Image>();
         }
-        
+
+        if (IsOffline)
+            Init();
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+        if (!IsOwner)
+            return;
         targetingSystem.SetCrosshairActive(!manualControl);
         manualControlCrosshair.gameObject.SetActive(manualControl);
-        ship.doubleRigidbody.OnScaledTriggerEnter += CheckTargetOnEnter;
+        ship.scaledRigidbody.OnScaledTriggerEnter += CheckTargetOnEnter;
         GameManager.Instance.inputActions.Player.Primary.performed += StartTrigger;
         GameManager.Instance.inputActions.Player.Primary.canceled += StopTrigger;
     }
 
+    /// <summary>
+    /// Should only be called for Owner or in Offline mode.
+    /// </summary>
+    private void Init()
+    {
+        if (initialized)
+            return;
+        
+        targetingSystem.SetCrosshairActive(!manualControl);
+        manualControlCrosshair.gameObject.SetActive(manualControl);
+        ship.scaledRigidbody.OnScaledTriggerEnter += CheckTargetOnEnter;
+        GameManager.Instance.inputActions.Player.Primary.performed += StartTrigger;
+        GameManager.Instance.inputActions.Player.Primary.canceled += StopTrigger;
+        initialized = true;
+    }
+
+    private void OnDestroy()
+    {
+        if (!IsOwnerOrOffline)
+            return;
+        ship.scaledRigidbody.OnScaledTriggerEnter -= CheckTargetOnEnter;
+        GameManager.Instance.inputActions.Player.Primary.performed -= StartTrigger;
+        GameManager.Instance.inputActions.Player.Primary.canceled -= StopTrigger;
+    }
+
     private void FixedUpdate()
     {
+        if (!IsOwnerOrOffline)
+            return;
         if (manualControl)
         {
-            if (!_HUDSystem.combatHudActive)
-            {
-                return;
-            }
-
             if (triggerHeld)
             {
                 manualControlCrosshair.color = crosshairTriggerColor;
@@ -132,7 +165,7 @@ public class TurretSystem : MonoBehaviour
                     continue;
                 }
 
-                double sqrDistance = (radarTarget.doubleRigidbody.scaledTransform.realPosition - ship.doubleRigidbody.scaledTransform.realPosition).sqrMagnitude;
+                double sqrDistance = (radarTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition).sqrMagnitude;
 
                 if (sqrDistance > detectRadius * detectRadius)
                     continue;
@@ -144,18 +177,11 @@ public class TurretSystem : MonoBehaviour
                 CheckTarget?.Invoke(radarTarget, inKillRadius);
             }
 
-            if (_HUDSystem.combatHudActive)
+            if (HUDSystem.Instance.combatHudActive)
             {
                 for (int i = 0; i < turrets.Length; i++)
                 {
                     UpdateTurretOnHUD(i);
-                }
-            }
-            else
-            {
-                for (int i = 0; i < turrets.Length; i++)
-                {
-                    turrets[i].GetRaycastHit(out RaycastHit _); // Need to update turret's obstructed bool
                 }
             }
         }
@@ -163,28 +189,34 @@ public class TurretSystem : MonoBehaviour
 
     private void StartTrigger(InputAction.CallbackContext context)
     {
-        if (!manualControl)
+        if (!IsOwnerOrOffline || GameManager.Instance.IsPaused)
             return;
         triggerHeld = true;
+        if (!manualControl)
+            return;
         for (int i = 0; i < turrets.Length; i++)
         {
-            turrets[i].shoot = triggerHeld;
+            turrets[i].SetShoot(triggerHeld);
         }
     }
 
     private void StopTrigger(InputAction.CallbackContext context)
     {
-        if (!manualControl)
+        if (!IsOwnerOrOffline || GameManager.Instance.IsPaused)
             return;
         triggerHeld = false;
+        if (!manualControl)
+            return;
         for (int i = 0; i < turrets.Length; i++)
         {
-            turrets[i].shoot = triggerHeld;
+            turrets[i].SetShoot(triggerHeld);
         }
     }
 
     private void UpdateTurretOnHUD(int i)
     {
+        if (!IsOwnerOrOffline)
+            return;
         Turret turret = turrets[i];
         Vector3 screenHit;
         bool gotHit = turret.GetRaycastHit(out RaycastHit turretHit);
@@ -220,7 +252,7 @@ public class TurretSystem : MonoBehaviour
                 turretCrosshairImages[i].color = crosshairTriggerColor;
         }
         
-        if (RectTransformUtility.ScreenPointToWorldPointInRectangle(_HUDSystem.combatPanel, screenHit, Camera.main, out Vector3 turretCrosshairPos))
+        if (RectTransformUtility.ScreenPointToWorldPointInRectangle(HUDSystem.Instance.combatPanel, screenHit, Camera.main, out Vector3 turretCrosshairPos))
         {
             turretCrosshairs[i].position = turretCrosshairPos;
         }
@@ -228,9 +260,10 @@ public class TurretSystem : MonoBehaviour
 
     private void CheckTargetOnEnter(Component other)
     {
+        if (!IsOwnerOrOffline)
+            return;
         if (!other.TryGetComponent<RadarTarget>(out var target))
             return;
-
         if (target.team == ship.radarTarget.team)
             return;
 
@@ -240,13 +273,6 @@ public class TurretSystem : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         CheckTargetOnEnter(other);
-    }
-
-    private void OnDestroy()
-    {
-        ship.doubleRigidbody.OnScaledTriggerEnter -= CheckTargetOnEnter;
-        GameManager.Instance.inputActions.Player.Primary.performed -= StartTrigger;
-        GameManager.Instance.inputActions.Player.Primary.canceled -= StopTrigger;
     }
 
     public bool IsOffensive(RadarTarget target)
@@ -261,6 +287,8 @@ public class TurretSystem : MonoBehaviour
 
     public void ToggleManualControl(int state)
     {
+        if (!IsOwnerOrOffline || GameManager.Instance.IsPaused)
+            return;
         manualControl = state == 1;
         
         targetingSystem.SetCrosshairActive(!manualControl);
@@ -270,38 +298,32 @@ public class TurretSystem : MonoBehaviour
             for(int i = 0; i < turrets.Length; i++)
             {
                 turrets[i].currentTarget = null;
-                turrets[i].shoot = false;
+                turrets[i].SetShoot(false);
             }
         }
         else
         {
             for(int i = 0; i < turrets.Length; i++)
             {
-                turrets[i].shoot = false;
+                turrets[i].SetShoot(triggerHeld);
             }
-        }
-    }
-
-    public void UpdateHudForTarget(RadarTarget target)
-    {
-        if (!_HUDSystem.radarHudActive)
-            return;
-        if (_HUDSystem.TryGetValue(target.GetID(), out HUDObject hudObject))
-        {
-            hudObject.SetTargetText(target.turretsTargeting);
         }
     }
 
     public void OnTurretFire()
     {
+        if (!IsOwnerOrOffline)
+            return;
         if (currentAmmo <= 0)
             return;
         currentAmmo--;
         ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
     }
 
-    public void RefillAmmo(int amount)
+    public void SetAmmo(int amount)
     {
+        if (!IsOwnerOrOffline)
+            return;
         currentAmmo = Mathf.Min(maxAmmo, amount);
         ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
     }

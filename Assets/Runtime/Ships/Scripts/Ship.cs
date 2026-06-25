@@ -4,17 +4,21 @@ using SpaceStuff;
 using TMPro;
 using UnityEngine;
 
-[RequireComponent(typeof(DoubleRigidbody), typeof(RadarTarget))]
+[RequireComponent(typeof(ScaledRigidbody), typeof(RadarTarget))]
 public class Ship : NetworkBehaviour
 {
     [Header("Ship")]
-    public DoubleRigidbody doubleRigidbody;
+    public ScaledRigidbody scaledRigidbody;
     public RadarTarget radarTarget;
     public StatSystem statSystem;
     public Shields shields;
-    [SerializeField, Tooltip("Minimum collision speed for ship to take damage")] private float minCollideSpeed = 5f;
-    [SerializeField] private float collideDamageScale = 0.01f;
+    [SerializeField, Tooltip("Minimum collision impulse for ship to take damage")] private float minImpulse = 5f;
+    // Need separate scales since unity's impulse calculation is different from our custom scaled space one
+    [SerializeField] private double unityCollideImpulseScale = 0.01;
+    [SerializeField] private double scaledCollideImpulseScale = 0.01;
     [SerializeField, Tooltip("Local Z position at the front tip of the ship")] private float maxLocalZ;
+    [SerializeField, Tooltip("Collisions at the front of the ship multiply damage by this.")] private float minRamAttenuation = 0.5f;
+    [SerializeField, Tooltip("Collisions at the back of the ship multiply damage by this.")] private float maxRamAttenuation = 1.0f;
 
     [Header("HUD stuff")]
     public GameObject hologramPrefab;
@@ -75,14 +79,50 @@ public class Ship : NetworkBehaviour
 
     private bool ShouldSimulateShip => IsOffline || IsServerInitialized || IsOwner;
 
+    private void Awake()
+    {
+        scaledRigidbody = GetComponent<ScaledRigidbody>();
+        radarTarget = GetComponent<RadarTarget>();
+
+        thrusterTorque = new Vector3(thrusterForce * thrusterRadiusX, thrusterForce * thrusterRadiusY, thrusterForce * thrusterRadiusZ);
+
+        xRotatePID = new PIDController(P, I, D);
+        yRotatePID = new PIDController(P, I, D);
+        zRotatePID = new PIDController(P, I, D);
+
+        xMovePID = new PIDController(P, I, D);
+        yMovePID = new PIDController(P, I, D);
+        zMovePID = new PIDController(P, I, D);
+        if (IsOffline)
+        {
+            scaledRigidbody.OnScaledCollisionEnter += OnScaledCollide;
+        }
+    }
+
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+
+        scaledRigidbody.OnScaledCollisionEnter += OnScaledCollide;
+    }
+
+    private void OnDestroy()
+    {
+        scaledRigidbody.OnScaledCollisionEnter -= OnScaledCollide;
+    }
+
     private void ReadLocalInput()
     {
-        currentInput.move = GameManager.Instance.inputActions.Player.Move.ReadValue<Vector3>();
+        currentInput.move = Vector3.zero;
         currentInput.look = Vector2.zero;
+        if (GameManager.Instance.IsPaused)
+            return;
+
+        currentInput.move = GameManager.Instance.inputActions.Player.Move.ReadValue<Vector3>();
         if (Cursor.lockState == CursorLockMode.Locked)
         {
             currentInput.look = GameManager.Instance.inputActions.Player.Look.ReadValue<Vector2>();
-            currentInput.look = GameManager.Instance.gameSettings.sensitivity * GameManager.Instance.sensitivityScale * currentInput.look;
+            currentInput.look *= GameManager.Instance.GetRangedSettingValue("Sensitivity") * GameManager.Instance.sensitivityScale;
         }
     }
 
@@ -100,28 +140,6 @@ public class Ship : NetworkBehaviour
     private void SetInputServerRpc(ShipInputData input)
     {
         currentInput = input;
-    }
-
-    public override void OnStartServer()
-    {
-        base.OnStartServer();
-        doubleRigidbody.OnScaledCollisionEnter += OnScaledCollide;
-    }
-
-    private void Start()
-    {
-        doubleRigidbody = GetComponent<DoubleRigidbody>();
-        radarTarget = GetComponent<RadarTarget>();
-
-        thrusterTorque = new Vector3(thrusterForce * thrusterRadiusX, thrusterForce * thrusterRadiusY, thrusterForce * thrusterRadiusZ);
-
-        xRotatePID = new PIDController(P, I, D);
-        yRotatePID = new PIDController(P, I, D);
-        zRotatePID = new PIDController(P, I, D);
-
-        xMovePID = new PIDController(P, I, D);
-        yMovePID = new PIDController(P, I, D);
-        zMovePID = new PIDController(P, I, D);
     }
 
     private void FixedUpdate()
@@ -161,7 +179,7 @@ public class Ship : NetworkBehaviour
         if (autoStabilizePos)
         {
             // Add local desired move velocity for PID to move to
-            Vector3 stableFinalLocalVel = desiredMove * (float)(doubleRigidbody.velocity.sqrMagnitude + 1.0);
+            Vector3 stableFinalLocalVel = desiredMove * (float)(scaledRigidbody.velocity.sqrMagnitude + 1.0);
             if (useRelativeVelocity)
             {
                 stableFinalLocalVel += stableLocalVelocity;
@@ -172,7 +190,7 @@ public class Ship : NetworkBehaviour
                 stableFinalLocalVel += transform.InverseTransformDirection(stableVelocity);
             }
 
-            Vector3 localVelocity = transform.InverseTransformDirection(doubleRigidbody.velocity.ToVector3());
+            Vector3 localVelocity = transform.InverseTransformDirection(scaledRigidbody.velocity.ToVector3());
             Vector3 error = stableFinalLocalVel - localVelocity;
 
             float fx = xMovePID.GetOutput(error.x, Time.fixedDeltaTime);
@@ -198,7 +216,7 @@ public class Ship : NetworkBehaviour
         }
 
         if (finalForce.sqrMagnitude > 0.0001)
-            doubleRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
+            scaledRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
 
         // Calculate local torque to apply
         Vector3d desiredRotate;
@@ -214,7 +232,7 @@ public class Ship : NetworkBehaviour
 
         if (autoStabilizeRot && !rotating)
         {
-            Vector3 localAngularVelocity = transform.InverseTransformDirection(doubleRigidbody.angularVelocity.ToVector3());
+            Vector3 localAngularVelocity = transform.InverseTransformDirection(scaledRigidbody.angularVelocity.ToVector3());
             Vector3 error = stableLocalAngularVelocity - localAngularVelocity;
 
             float tx = xRotatePID.GetOutput(error.x, Time.fixedDeltaTime);
@@ -231,9 +249,9 @@ public class Ship : NetworkBehaviour
         );
 
         if (finalTorque.sqrMagnitude > 0.0001)
-            doubleRigidbody.AddRelativeTorque(finalTorque, ForceMode.Force);
+            scaledRigidbody.AddRelativeTorque(finalTorque, ForceMode.Force);
 
-        if (IsOwner)
+        if (IsOwner || IsOffline)
         {
             UpdateOwnerEffects(finalForce, desiredRotate, finalTorque);
         }
@@ -268,14 +286,12 @@ public class Ship : NetworkBehaviour
     {
         // Visual effects for force
         bool hasForce = finalForce.sqrMagnitude > 0.0001;
-
-        if (hasForce)
-        {
-            bool usingThrusters =
+        bool usingThrusters =
                 Math.Abs(finalForce.x) > 0.001 ||
                 Math.Abs(finalForce.y) > 0.001 ||
                 finalForce.z < 0.0;
-
+        if (hasForce)
+        {
             bool usingMainEngine = finalForce.z > 0.0;
 
             // Thruster audio
@@ -331,20 +347,20 @@ public class Ship : NetworkBehaviour
                 thrusterAudioSource.volume = Mathf.Max(thrusterAudioSource.volume, (float)desiredRotate.magnitude * thrusterVolumeScale);
             }
         }
-        else if (!hasForce)
+        else if (!usingThrusters)
         {
             thrusterAudioSource.volume = 0f;
         }
 
         // Update speed HUD UI
-        speedText.text = "SPD " + SpaceMath.SpeedToFormattedString(doubleRigidbody.velocity.magnitude, "F2");
-        if (doubleRigidbody.velocity != Vector3d.zero)
-            velocityDirectionPivot.rotation = Quaternion.LookRotation(doubleRigidbody.velocity.ToVector3(), transform.up);
+        speedText.text = "SPD " + SpaceMath.SpeedToFormattedString(scaledRigidbody.velocity.magnitude, "F2");
+        if (scaledRigidbody.velocity != Vector3d.zero)
+            velocityDirectionPivot.rotation = Quaternion.LookRotation(scaledRigidbody.velocity.ToVector3(), transform.up);
 
         // Update camera movement
         if (cameraControl != null)
         {
-            Rigidbody rb = doubleRigidbody.attachedRigidbody;
+            Rigidbody rb = scaledRigidbody.attachedRigidbody;
 
             // Local-space linear acceleration: a = F/m (stays local, not TransformVector'd)
             Vector3 localLinAcc = hasForce ? finalForce.ToVector3() / rb.mass : Vector3.zero;
@@ -367,8 +383,7 @@ public class Ship : NetworkBehaviour
         }
     }
 
-    [ObserversRpc]
-    private void ApplyCollideDamageToObservers(float damage, Vector3 contactPoint)
+    private void ApplyDamageLocally(float damage, Vector3 contactPoint)
     {
         if (shields != null)
             shields.Damage(damage, contactPoint);
@@ -376,36 +391,39 @@ public class Ship : NetworkBehaviour
             statSystem.Damage(damage);
     }
 
+    [ObserversRpc]
+    private void ApplyCollideDamageToObservers(float damage, Vector3 contactPoint)
+    {
+        ApplyDamageLocally(damage, contactPoint);
+    }
+
     private void OnScaledCollide(ScaledSpacePhysics.CollisionInfo collisionInfo)
     {
         if (!IsServerInitialized && !IsOffline)
             return;
 
-        if (collisionInfo.transformB.CompareTag("Projectile") || collisionInfo.transformB.CompareTag("Torpedo"))
-            return;
-            
-        float massB = collisionInfo.colliderB.doubleRigidbody.attachedRigidbody.mass;
-        if (massB < 0.5f)
-            return;
+        // if (collisionInfo.transformB.CompareTag("Projectile") || collisionInfo.transformB.CompareTag("Torpedo"))
+        //     return;
 
-        Vector3d relativeVelocity = collisionInfo.colliderA.doubleRigidbody.velocity - collisionInfo.colliderB.doubleRigidbody.velocity;
-        double sqrRelativeSpeed = relativeVelocity.sqrMagnitude;
-        if (sqrRelativeSpeed < minCollideSpeed * minCollideSpeed)
+        double sqrImpulse = scaledCollideImpulseScale * collisionInfo.impulse.sqrMagnitude / (scaledRigidbody.attachedRigidbody.mass * scaledRigidbody.attachedRigidbody.mass);
+        if (sqrImpulse < minImpulse * minImpulse)
             return;
 
-        float impulse = (float)Math.Sqrt(sqrRelativeSpeed) * massB;
+        // Ram attenuation
+        Vector3d relativeCollisionPoint = collisionInfo.contactPoint - scaledRigidbody.scaledTransform.realPosition;
+        float t = Mathf.Clamp01((-(float)relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
+        float attenuation = Mathf.Lerp(minRamAttenuation, maxRamAttenuation, t);
+        Debug.Log($"Attenuation: {attenuation}");
+        float damage = (float)(attenuation * sqrImpulse);
 
-        // Front attenuation
-        Vector3d relativeCollisionPoint = collisionInfo.contactPoint - doubleRigidbody.scaledTransform.realPosition;
-        float attenuation = Mathf.Clamp01((-(float)relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
-
-        float damage = attenuation * impulse * collideDamageScale;
-
+        Vector3 renderContactPoint = (collisionInfo.contactPoint - FloatingWorldOrigin.Instance.scaledTransform.realPosition).ToVector3();
         if (!IsOffline)
-            ApplyCollideDamageToObservers(damage, (collisionInfo.contactPoint - FloatingWorldOrigin.Instance.worldOriginPosition).ToVector3());
-
+            ApplyCollideDamageToObservers(damage, renderContactPoint);
+        else
+            ApplyDamageLocally(damage, renderContactPoint);
         Debug.Log(
-            $"Impulse: {impulse:F1}, " +
+            $"Impulse: {collisionInfo.impulse:F1}, " +
+            $"Normalized impulse: {sqrImpulse:F1}, " + 
             $"damage: {damage:F1}");
     }
 
@@ -414,32 +432,37 @@ public class Ship : NetworkBehaviour
         if (!IsServerInitialized && !IsOffline)
             return;
 
-        if (collision.transform.CompareTag("Projectile") || collision.transform.CompareTag("Torpedo"))
+        // if (collision.transform.CompareTag("Projectile") || collision.transform.CompareTag("Torpedo"))
+        //     return;
+
+        Vector3 impulse = collision.impulse;
+        double sqrImpulse = unityCollideImpulseScale * impulse.sqrMagnitude / (scaledRigidbody.attachedRigidbody.mass * scaledRigidbody.attachedRigidbody.mass);
+        if (sqrImpulse < minImpulse * minImpulse)
             return;
 
-        Rigidbody otherRb = collision.rigidbody;
-
-        if (otherRb == null || otherRb.mass < 0.5f)
-            return;
-
-        float sqrRelativeSpeed = collision.relativeVelocity.sqrMagnitude;
-        if (sqrRelativeSpeed < minCollideSpeed * minCollideSpeed)
-            return;
-
-        float impulse = Mathf.Sqrt(sqrRelativeSpeed) * otherRb.mass;
-
-        // Front attenuation
         ContactPoint contact = collision.GetContact(0);
-        Vector3 relativeCollisionPoint = contact.point - transform.position;
-        float attenuation = Mathf.Clamp01((-relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
+        if (contact.separation < 0f)
+        {
+            Vector3 direction = collision.transform.position - transform.position;
+            scaledRigidbody.scaledTransform.realPosition += (direction.normalized * contact.separation).ToVector3d();
+        }
 
-        float damage = attenuation * impulse * collideDamageScale;
+        // Ram attenuation
+        Vector3 relativeCollisionPoint = contact.point - transform.position;
+        float t = Mathf.Clamp01((-relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
+        float attenuation = Mathf.Lerp(minRamAttenuation, maxRamAttenuation, t);
+        Debug.Log($"Attenuation: {attenuation}");
+        float damage = (float)(attenuation * sqrImpulse);
         if (!IsOffline)
             ApplyCollideDamageToObservers(damage, contact.point);
+        else
+            ApplyDamageLocally(damage, contact.point);
 
         Debug.Log(
             $"Impulse: {impulse:F1}, " +
-            $"damage: {damage:F1}");
+            $"Normalized impulse: {sqrImpulse:F1}, " + 
+            $"damage: {damage:F1}, " +
+            $"Seperation: {contact.separation}");
     }
 
     [ServerRpc]
@@ -493,13 +516,13 @@ public class Ship : NetworkBehaviour
         {
             if (useRelativeVelocity)
             {
-                stableLocalVelocity = transform.InverseTransformDirection(doubleRigidbody.velocity.ToVector3());
+                stableLocalVelocity = transform.InverseTransformDirection(scaledRigidbody.velocity.ToVector3());
             }
             else
             {
-                stableVelocity = doubleRigidbody.velocity.ToVector3();
+                stableVelocity = scaledRigidbody.velocity.ToVector3();
             }
-            stableLocalAngularVelocity = transform.InverseTransformDirection(doubleRigidbody.angularVelocity.ToVector3());
+            stableLocalAngularVelocity = transform.InverseTransformDirection(scaledRigidbody.angularVelocity.ToVector3());
         }
     }
 
@@ -527,10 +550,5 @@ public class Ship : NetworkBehaviour
         launchMode = state == 1;
         if (IsOwner)
             SendLaunchModeToServer(launchMode);
-    }
-
-    private void OnDestroy()
-    {
-        doubleRigidbody.OnScaledCollisionEnter -= OnScaledCollide;
     }
 }

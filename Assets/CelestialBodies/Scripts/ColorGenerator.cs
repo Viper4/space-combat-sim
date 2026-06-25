@@ -23,7 +23,7 @@ public class ColorGenerator
 
     public void UpdateElevation(MinMax elevationMinMax)
     {
-        if(materialInstance != null)
+        if (materialInstance != null)
             materialInstance.SetVector("_ElevationMinMax", new Vector4(elevationMinMax.Min, elevationMinMax.Max));
     }
 

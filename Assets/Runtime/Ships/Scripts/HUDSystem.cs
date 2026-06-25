@@ -1,11 +1,13 @@
-using System.Collections;
 using System.Collections.Generic;
+using FishNet.Connection;
+using FishNet.Object;
 using SpaceStuff;
 using UnityEngine;
-using UnityEngine.UI;
 
-public class HUDSystem : MonoBehaviour
+public class HUDSystem : NetworkBehaviour
 {
+    public static HUDSystem Instance {get; private set;}
+
     public bool radarHudActive {get; private set;}
     public bool combatHudActive {get; private set;}
     [SerializeField] private TargetingSystem targetingSystem;
@@ -23,13 +25,19 @@ public class HUDSystem : MonoBehaviour
 
     private void Start()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
         radarHudParent.SetActive(radarHudActive);
         combatPanel.gameObject.SetActive(combatHudActive);
     }
 
     private Vector3 CalculateHUDPosition(Vector3d realPosition, string tag)
     {
-        Vector3d camRealPos = FloatingWorldOrigin.Instance.worldOriginPosition + Camera.main.transform.position.ToVector3d();
+        Vector3d camRealPos = FloatingWorldOrigin.Instance.GetRealCameraPosition();
         Vector3 direction = (realPosition - camRealPos).normalized.ToVector3();
         var distanceOffset = tag switch
         {
@@ -43,7 +51,7 @@ public class HUDSystem : MonoBehaviour
 
     public HUDObject CreateObject(RadarTarget target, string details, Vector3d predictedPosition)
     {
-        Vector3 position = CalculateHUDPosition(target.doubleRigidbody.scaledTransform.realPosition, target.tag);
+        Vector3 position = CalculateHUDPosition(target.scaledRigidbody.scaledTransform.realPosition, target.tag);
         Vector3 prediction = CalculateHUDPosition(predictedPosition, target.tag);
         float sqrDistanceToCenter = (Camera.main.transform.position + Camera.main.transform.forward * radarHUDDistance - position).sqrMagnitude;
         bool detailsActive = sqrDistanceToCenter < detailsDistance * detailsDistance;
@@ -58,12 +66,12 @@ public class HUDSystem : MonoBehaviour
         if (!radarIDHUDPair.TryGetValue(target.GetID(), out HUDObject HUDObject))
             return false;
 
-        Vector3 position = CalculateHUDPosition(target.doubleRigidbody.scaledTransform.realPosition, target.tag);
+        Vector3 position = CalculateHUDPosition(target.scaledRigidbody.scaledTransform.realPosition, target.tag);
         Vector3 predicted = CalculateHUDPosition(predictedPosition, target.tag);
         float sqrDistanceToCenter = (Camera.main.transform.position + Camera.main.transform.forward * radarHUDDistance - position).sqrMagnitude;
         HUDObject.sqrDistanceToCenter = sqrDistanceToCenter;
 
-        if (targetingSystem.lockedTarget != target || !target.doubleRigidbody.scaledTransform.visible)
+        if (targetingSystem.lockedTarget != target || !target.scaledRigidbody.scaledTransform.visible)
         {
             // No quad bounds
             HUDObject.UpdateObject(position, details, sqrDistanceToCenter < detailsDistance * detailsDistance, predicted);
@@ -96,7 +104,7 @@ public class HUDSystem : MonoBehaviour
     {
         Camera cam = Camera.main;
 
-        Vector3d camRealPos = FloatingWorldOrigin.Instance.worldOriginPosition + cam.transform.position.ToVector3d();
+        Vector3d camRealPos = FloatingWorldOrigin.Instance.GetRealCameraPosition();
 
         Vector3 worldDirection = (targetPosition - camRealPos).normalized.ToVector3();
         Vector3 localDirection = cam.transform.InverseTransformDirection(worldDirection);
@@ -156,5 +164,26 @@ public class HUDSystem : MonoBehaviour
             }
         }
         return best;
+    }
+
+    [TargetRpc]
+    public void SetTurretsTargetingTargetRpc(NetworkConnection conn, uint targetId, int num)
+    {
+        if (!radarHudActive)
+            return;
+        if (TryGetValue(targetId, out HUDObject hudObject))
+        {
+            hudObject.SetTargetText(num);
+        }
+    }
+
+    public void SetTurretsTargetingOffline(uint targetId, int num)
+    {
+        if (!radarHudActive)
+            return;
+        if (TryGetValue(targetId, out HUDObject hudObject))
+        {
+            hudObject.SetTargetText(num);
+        }
     }
 }

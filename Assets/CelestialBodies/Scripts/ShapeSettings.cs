@@ -6,17 +6,14 @@ using UnityEngine;
 public class ShapeSettings : ScriptableObject
 {
     public const int numSupportedLODS = 24;
-    public static int simpleMeshColliderSize = 6;
 
     public float radius = 1;
     [Range(2, 256)]
     public int meshFilterResolution = 8;
     [Range(1, numSupportedLODS)]
     public int levelOfDetail = 1;
-    public bool complexMeshCollider = true;
-    [ConditionalHide("complexMeshCollider"), Range(2, 256)]
-    public int meshColliderResolution = 8;
-    //public float radius = 1;
+    [Range(0, 256)]
+    public int meshColliderResolution = 0; // 0 => No MeshCollider
     public FilterLayer[] filterLayers;
 
     [System.Serializable]

@@ -4908,7 +4908,7 @@ GameObject:
   - component: {fileID: 865497951010755169}
   - component: {fileID: -6574273678887412413}
   - component: {fileID: 2277226422833099611}
-  - component: {fileID: 479926527093910578}
+  - component: {fileID: -5550161619794951917}
   m_Layer: 2
   m_Name: Explosion 1
   m_TagString: IgnoreBullets
@@ -4925,7 +4925,7 @@ Transform:
   m_GameObject: {fileID: 3507901705876011743}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.6, z: -6.6}
+  m_LocalPosition: {x: 0, y: -1, z: 10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -9945,13 +9945,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c20a83660c30ff40ac92e47da28f061, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AudioManipulation
+  setPitchOnAwake: 1
+  setVolumeOnAwake: 1
   pitchRange:
   - 1.2
   - 1.3
   volumeRange:
   - 0.8
   - 0.9
---- !u!114 &479926527093910578
+--- !u!114 &-5550161619794951917
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -9960,10 +9962,25 @@ MonoBehaviour:
   m_GameObject: {fileID: 3507901705876011743}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6cdcd62bb100d2a46bff54daf24e9afd, type: 3}
+  m_Script: {fileID: 11500000, guid: 660b2028be04cb445a20efd3df3e65c9, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::WorldSpaceOnly
-  destroyThreshold: 2000
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledTransform
+  _realPosition:
+    x: 0
+    y: 0
+    z: 0
+  _realScale:
+    x: 1
+    y: 1
+    z: 1
+  minScreenPixelSize: 3
+  visible: 1
+  scaledSpaceLayer: 3
+  inScaledSpace: 0
+  scaleFactor: 1000
+  dynamicScaleFactor: 0
+  worldSpaceThreshold: 3900
+  scaledSpaceThreshold: 4100
 --- !u!1 &3507901706414328757
 GameObject:
   m_ObjectHideFlags: 0

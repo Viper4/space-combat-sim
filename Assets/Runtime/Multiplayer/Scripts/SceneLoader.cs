@@ -1,10 +1,47 @@
+using System.Collections;
 using FishNet.Managing.Scened;
 using UnityEngine;
+using UnitySceneManager = UnityEngine.SceneManagement.SceneManager;
 
 public class SceneLoader : DefaultSceneProcessor
 {
+    public static SceneLoader Instance;
+
     [SerializeField] private GameObject loadingPanel;
     [SerializeField] private SliderIndicator progressIndicator;
+
+    private AsyncOperation manualOperation;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
+    public void BeginOfflineLoad(string sceneName)
+    {
+        StartCoroutine(LoadOfflineSceneAsync(sceneName));
+    }
+
+    private IEnumerator LoadOfflineSceneAsync(string sceneName)
+    {
+        AsyncOperation op = UnitySceneManager.LoadSceneAsync(sceneName);
+
+        manualOperation = op;
+        loadingPanel.SetActive(true);
+
+        while (!IsPercentComplete())
+        {
+            yield return null;
+        }
+
+        manualOperation = null;
+        loadingPanel.SetActive(false);
+    }
 
     public override void LoadStart(LoadQueueData queueData)
     {

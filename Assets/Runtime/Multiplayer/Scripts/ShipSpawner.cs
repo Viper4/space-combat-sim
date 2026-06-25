@@ -4,7 +4,7 @@ using FishNet.Object;
 using FishNet;
 using UnityEngine;
 
-public class ShipSpawner : NetworkBehaviour
+public class ShipSpawner : MonoBehaviour
 {
     public static ShipSpawner Instance { get; private set; }
 
@@ -23,25 +23,24 @@ public class ShipSpawner : NetworkBehaviour
             Destroy(gameObject);
             return;
         }
+        if (InstanceFinder.IsOffline)
+        {
+            SpawnOfflinePlayerShip();
+        }
+        else if (InstanceFinder.IsServerStarted)
+        {
+            InstanceFinder.ServerManager.OnRemoteConnectionState += OnRemoteConnectionState;
+
+            SpawnConnectedPlayers();
+        }
 
         Instance = this;
     }
 
-    public override void OnStartServer()
+    private void OnDestroy()
     {
-        base.OnStartServer();
-
-        InstanceFinder.ServerManager.OnRemoteConnectionState += OnRemoteConnectionState;
-
-        // The scene this object is in (MainScene) isn't loaded until after the clients have connected, so must manually create their ships on startup
-        SpawnConnectedPlayers();
-    }
-
-    public override void OnStopServer()
-    {
-        base.OnStopServer();
-
-        InstanceFinder.ServerManager.OnRemoteConnectionState -= OnRemoteConnectionState;
+        if (InstanceFinder.ServerManager != null)
+            InstanceFinder.ServerManager.OnRemoteConnectionState -= OnRemoteConnectionState;
 
         playerShips.Clear();
     }
@@ -65,14 +64,41 @@ public class ShipSpawner : NetworkBehaviour
                 SpawnPlayerShip(conn);
                 break;
             case FishNet.Transporting.RemoteConnectionState.Stopped:
-                RemovePlayer(conn);
+                RemovePlayerShip(conn);
                 break;
         }
     }
 
+    private void SpawnOfflinePlayerShip()
+    {
+        if (!InstanceFinder.IsOffline)
+            return;
+
+        if (playerShips.ContainsKey(0))
+            return;
+
+        Vector3 spawnPosition;
+        Quaternion spawnRotation;
+
+        GetSpawnPoint(out spawnPosition, out spawnRotation);
+
+        NetworkObject shipObject = Instantiate(shipPrefab, spawnPosition, spawnRotation);
+        shipObject.name = "Player";
+
+        if (!shipObject.TryGetComponent<Ship>(out var ship))
+        {
+            Debug.LogError("[ShipSpawner] Ship prefab is missing Ship component.");
+            return;
+        }
+
+        playerShips.Add(0, ship);
+
+        Debug.Log($"[ShipSpawner] Spawned offline ship.");
+    }
+
     private void SpawnPlayerShip(NetworkConnection conn)
     {
-        if (!IsServerInitialized)
+        if (!InstanceFinder.IsServerStarted)
             return;
 
         if (playerShips.ContainsKey(conn.ClientId))
@@ -84,6 +110,8 @@ public class ShipSpawner : NetworkBehaviour
         GetSpawnPoint(out spawnPosition, out spawnRotation);
 
         NetworkObject shipObject = Instantiate(shipPrefab, spawnPosition, spawnRotation);
+        PlayerRegistry.TryGetPlayer(conn.ClientId, out var playerInfo);
+        shipObject.name = playerInfo.Username;
 
         InstanceFinder.ServerManager.Spawn(shipObject, conn);
 
@@ -98,7 +126,7 @@ public class ShipSpawner : NetworkBehaviour
         Debug.Log($"Spawned ship for client {conn.ClientId}");
     }
 
-    private void RemovePlayer(NetworkConnection conn)
+    private void RemovePlayerShip(NetworkConnection conn)
     {
         if (!playerShips.TryGetValue(conn.ClientId, out Ship ship))
             return;
@@ -148,7 +176,7 @@ public class ShipSpawner : NetworkBehaviour
 
     public void RespawnPlayer(NetworkConnection conn)
     {
-        RemovePlayer(conn);
+        RemovePlayerShip(conn);
         SpawnPlayerShip(conn);
     }
 }

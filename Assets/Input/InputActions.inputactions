@@ -43,7 +43,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "CursorLock",
+                    "name": "GUIToggle",
                     "type": "Button",
                     "id": "18b29772-a5aa-47db-a5ca-801b4d8d0170",
                     "expectedControlType": "",
@@ -167,15 +167,6 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
-                },
-                {
-                    "name": "LaunchTorpedo",
-                    "type": "Button",
-                    "id": "459cc93c-539b-48f3-8792-9b12cfa58428",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -285,7 +276,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "CursorLock",
+                    "action": "GUIToggle",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -519,17 +510,6 @@
                     "action": "LockTarget",
                     "isComposite": false,
                     "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "d8b83d4c-b57b-4995-8d9c-92cb51bc1ba1",
-                    "path": "<Mouse>/rightButton",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "LaunchTorpedo",
-                    "isComposite": false,
-                    "isPartOfComposite": false
                 }
             ]
         },
@@ -550,7 +530,7 @@
                     "name": "Submit",
                     "type": "Button",
                     "id": "7607c7b6-cd76-4816-beef-bd0341cfe950",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -559,7 +539,7 @@
                     "name": "Cancel",
                     "type": "Button",
                     "id": "15cef263-9014-4fd5-94d9-4e4a6234a6ef",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false

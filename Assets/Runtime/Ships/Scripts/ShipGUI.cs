@@ -24,7 +24,7 @@ public class ShipGUI : MonoBehaviour
 
     private void Update()
     {
-        if (GameManager.Instance.inputActions.Player.CursorLock.WasPressedThisFrame())
+        if (!GameManager.Instance.IsPaused && GameManager.Instance.inputActions.Player.GUIToggle.WasPressedThisFrame())
         {
             if (animationRoutine != null)
                 StopCoroutine(animationRoutine);

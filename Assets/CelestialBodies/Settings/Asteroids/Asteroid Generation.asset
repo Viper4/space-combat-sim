@@ -14,13 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   simple: 1
   autoGenerate: 1
+  randomShapeGeneration: 0
   sphere: 0
-  random: 1
-  scaleRange:
-  - {x: 2.5, y: 2.5, z: 2.5}
-  - {x: 150, y: 150, z: 150}
-  calculateMass: 1
-  density: 1000
   initialAngularVelocityRange:
   - {x: -0.1, y: -0.1, z: -0.1}
   - {x: 0.1, y: 0.1, z: 0.1}
+  bodyType: 0
+  scaleRange:
+  - {x: 2.5, y: 2.5, z: 2.5}
+  - {x: 150, y: 150, z: 150}
+  densityRange: {x: 2000, y: 2500}
+  starDistributions: []

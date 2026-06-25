@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 88d83bfe8739ab34693c1294184b42e9, type: 3}
   m_Name: Star Gravity
   m_EditorClassIdentifier: 
-  surfaceGravityRange: {x: 200, y: 300}
+  applyGravity: 1
   affectedLayers:
     serializedVersion: 2
     m_Bits: 157
