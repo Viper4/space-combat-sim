@@ -19,8 +19,8 @@ public class ScaledCollider : MonoBehaviour
 
     [Range(0, 1), Tooltip("0 => perfectly inelastic (no bounce), 1 => perfectly elastic (full bounce)")] public float restitution = 0f;
 
-    public int hGridLevel = -1;
     public HGrid.GridCell hGridCell;
+    [HideInInspector] public int listIndex = -1;
 
     [Tooltip("If true, will always use ScaledSpacePhysics for collisions.")] public bool overrideUnity = false;
 
@@ -31,35 +31,6 @@ public class ScaledCollider : MonoBehaviour
         id = nextId++;
         scaledRigidbody = GetComponent<ScaledRigidbody>();
         scaledRigidbody.AddCollider(this);
-    }
-
-    private IEnumerator Start()
-    {
-        if (TryGetComponent<CelestialBody>(out var celestialBody))
-        {
-            yield return new WaitUntil(celestialBody.Initialized);
-        }
-        yield return new WaitForFixedUpdate();
-        if (radius < 0.0)
-        {
-            MeshRenderer[] meshRenderers = GetComponentsInChildren<MeshRenderer>();
-            if (meshRenderers.Length > 0)
-            {
-                Bounds combinedBounds = meshRenderers[0].bounds;
-                for (int i = 1; i < meshRenderers.Length; i++)
-                {
-                    combinedBounds.Encapsulate(meshRenderers[i].bounds);
-                }
-                radius = Mathf.Max(combinedBounds.extents.x, combinedBounds.extents.y, combinedBounds.extents.z);
-                if (scaledRigidbody.scaledTransform.inScaledSpace)
-                    radius *= scaledRigidbody.scaledTransform.scaleFactor;
-            }
-            else
-            {
-                Vector3d scale = scaledRigidbody.scaledTransform.realScale;
-                radius = Math.Max(Math.Max(scale.x, scale.y), scale.z);
-            }
-        }
     }
 
     private void OnEnable()
@@ -101,6 +72,13 @@ public class ScaledCollider : MonoBehaviour
 
     public double GetRadius()
     {
+        if (radius < 0.0)
+        {
+            ScaledTransform scaledTransform = scaledRigidbody.scaledTransform;
+            if (scaledTransform == null)
+                scaledTransform = scaledRigidbody.GetComponent<ScaledTransform>();
+            return scaledTransform.realRadius;
+        }
         return radius;
     }
 
@@ -111,7 +89,7 @@ public class ScaledCollider : MonoBehaviour
         if (scaledTransform == null)
             scaledTransform = scaledRigidbody.GetComponent<ScaledTransform>();
 
-        if (scaledTransform.inScaledSpace)
+        if (scaledTransform.inScaledSpace && scaledTransform.scaleFactor > 0.0)
         {
             return (float)(realRadius / scaledTransform.scaleFactor);
         }

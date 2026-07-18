@@ -6,6 +6,8 @@ using System;
 
 public class TargetingSystem : MonoBehaviour
 {
+    [SerializeField] private Radar radar;
+    [SerializeField] private Ship ship;
     [SerializeField] private Transform centralCrosshair;
     [SerializeField] private LayerMask ignoreLayers;
     [SerializeField] private Material modelMaterial;
@@ -50,13 +52,18 @@ public class TargetingSystem : MonoBehaviour
 
         if (lockedTarget != null)
         {
+            float radarRange = radar.GetCurrentRange();
+            if ((lockedTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition).sqrMagnitude > radarRange * radarRange)
+            {
+                RemoveTarget();
+                return;
+            }
             targetName.text = lockedTarget.name;
             targetModel.rotation = lockedTarget.transform.rotation;
             if (lockedTarget.scaledRigidbody.velocity != Vector3d.zero)
                 targetDirectionPivot.rotation = Quaternion.LookRotation(lockedTarget.scaledRigidbody.velocity.ToVector3(), transform.up);
 
             HUDSystem.Instance.UpdateTargetDirectionMarker(lockedTarget.scaledRigidbody.scaledTransform.realPosition);
-
         }
         else if (targetModel != null)
         {
@@ -66,12 +73,12 @@ public class TargetingSystem : MonoBehaviour
 
     private void RemoveTarget()
     {
+        HUDSystem.Instance.SetTargetDirectionMarkerActive(false);
         if (lockedTarget != null)
         {
             if (lockedTarget.alertSystem != null)
                 lockedTarget.alertSystem.IncrementRadarLock(-1);
             lockedTarget = null;
-            HUDSystem.Instance.SetTargetDirectionMarkerActive(false);
         }
         if (targetModel != null)
         {

@@ -5,9 +5,10 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using System.Collections;
 
-[RequireComponent(typeof(Ship))]
-public class TurretSystem : NetworkBehaviour
+[RequireComponent(typeof(Ship), typeof(TargetingSystem))]
+public class TurretSystem : MonoBehaviour
 {
     [HideInInspector] public Ship ship;
     private TargetingSystem targetingSystem;
@@ -49,14 +50,29 @@ public class TurretSystem : NetworkBehaviour
 
     private bool triggerHeld;
 
-    private bool IsOwnerOrOffline => IsOwner || IsOffline;
-
-    private bool initialized = false;
+    public bool initialized {get; private set;}
 
     private void Start()
     {
+        StartCoroutine(WaitToInit());
+    }
+
+    private IEnumerator WaitToInit()
+    {
+        yield return new WaitWhile(() => HUDSystem.Instance == null);
+        Init();
+    }
+
+    /// <summary>
+    /// Should only be called for Owner or in Offline mode.
+    /// </summary>
+    private void Init()
+    {
+        if (initialized)
+            return;
+
         ship = GetComponent<Ship>();
-        TryGetComponent(out targetingSystem);
+        targetingSystem = GetComponent<TargetingSystem>();
         currentAmmo = maxAmmo;
         ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
         for (int i = 0; i < offensiveTags.Length; i++)
@@ -75,7 +91,7 @@ public class TurretSystem : NetworkBehaviour
         for (int i = 0; i < turretPoints.Length; i++)
         {
             turrets[i] = turretPoints[i].GetChild(0).GetComponent<Turret>();
-            turrets[i].SetFireTime((float)(i+1) / turretPoints.Length);
+            turrets[i].SetFireOffset(i, turrets.Length);
             for(int j = 0; j < shipColliders.Length; j++)
             {
                 turrets[i].AddIgnoredCollider(shipColliders[j]);
@@ -84,42 +100,19 @@ public class TurretSystem : NetworkBehaviour
             turretCrosshairs[i] = newCrosshair.transform;
             turretCrosshairImages[i] = newCrosshair.GetComponent<Image>();
         }
-
-        if (IsOffline)
-            Init();
-    }
-
-    public override void OnStartClient()
-    {
-        base.OnStartClient();
-        if (!IsOwner)
-            return;
-        targetingSystem.SetCrosshairActive(!manualControl);
-        manualControlCrosshair.gameObject.SetActive(manualControl);
-        ship.scaledRigidbody.OnScaledTriggerEnter += CheckTargetOnEnter;
-        GameManager.Instance.inputActions.Player.Primary.performed += StartTrigger;
-        GameManager.Instance.inputActions.Player.Primary.canceled += StopTrigger;
-    }
-
-    /// <summary>
-    /// Should only be called for Owner or in Offline mode.
-    /// </summary>
-    private void Init()
-    {
-        if (initialized)
-            return;
         
         targetingSystem.SetCrosshairActive(!manualControl);
         manualControlCrosshair.gameObject.SetActive(manualControl);
         ship.scaledRigidbody.OnScaledTriggerEnter += CheckTargetOnEnter;
         GameManager.Instance.inputActions.Player.Primary.performed += StartTrigger;
         GameManager.Instance.inputActions.Player.Primary.canceled += StopTrigger;
+
         initialized = true;
     }
 
     private void OnDestroy()
     {
-        if (!IsOwnerOrOffline)
+        if (!initialized)
             return;
         ship.scaledRigidbody.OnScaledTriggerEnter -= CheckTargetOnEnter;
         GameManager.Instance.inputActions.Player.Primary.performed -= StartTrigger;
@@ -128,7 +121,7 @@ public class TurretSystem : NetworkBehaviour
 
     private void FixedUpdate()
     {
-        if (!IsOwnerOrOffline)
+        if (!initialized)
             return;
         if (manualControl)
         {
@@ -189,7 +182,7 @@ public class TurretSystem : NetworkBehaviour
 
     private void StartTrigger(InputAction.CallbackContext context)
     {
-        if (!IsOwnerOrOffline || GameManager.Instance.IsPaused)
+        if (GameManager.Instance.IsPaused)
             return;
         triggerHeld = true;
         if (!manualControl)
@@ -202,7 +195,7 @@ public class TurretSystem : NetworkBehaviour
 
     private void StopTrigger(InputAction.CallbackContext context)
     {
-        if (!IsOwnerOrOffline || GameManager.Instance.IsPaused)
+        if (GameManager.Instance.IsPaused)
             return;
         triggerHeld = false;
         if (!manualControl)
@@ -215,8 +208,6 @@ public class TurretSystem : NetworkBehaviour
 
     private void UpdateTurretOnHUD(int i)
     {
-        if (!IsOwnerOrOffline)
-            return;
         Turret turret = turrets[i];
         Vector3 screenHit;
         bool gotHit = turret.GetRaycastHit(out RaycastHit turretHit);
@@ -260,7 +251,7 @@ public class TurretSystem : NetworkBehaviour
 
     private void CheckTargetOnEnter(Component other)
     {
-        if (!IsOwnerOrOffline)
+        if (!initialized)
             return;
         if (!other.TryGetComponent<RadarTarget>(out var target))
             return;
@@ -287,7 +278,7 @@ public class TurretSystem : NetworkBehaviour
 
     public void ToggleManualControl(int state)
     {
-        if (!IsOwnerOrOffline || GameManager.Instance.IsPaused)
+        if (GameManager.Instance.IsPaused)
             return;
         manualControl = state == 1;
         
@@ -312,8 +303,6 @@ public class TurretSystem : NetworkBehaviour
 
     public void OnTurretFire()
     {
-        if (!IsOwnerOrOffline)
-            return;
         if (currentAmmo <= 0)
             return;
         currentAmmo--;
@@ -322,8 +311,6 @@ public class TurretSystem : NetworkBehaviour
 
     public void SetAmmo(int amount)
     {
-        if (!IsOwnerOrOffline)
-            return;
         currentAmmo = Mathf.Min(maxAmmo, amount);
         ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
     }

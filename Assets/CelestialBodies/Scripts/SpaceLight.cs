@@ -25,6 +25,7 @@ public class SpaceLight : MonoBehaviour
     private bool initialized = false;
 
     public float intensity;
+    public float temperature;
 
     private void Awake()
     {
@@ -43,6 +44,7 @@ public class SpaceLight : MonoBehaviour
     public void SetTemperature(float temperature, Color tint)
     {
         Init();
+        this.temperature = temperature;
         float clampedTemp = Mathf.Clamp(temperature, gradientMinTemperature, gradientMaxTemperature);
         float t = Mathf.InverseLerp(gradientMinTemperature, gradientMaxTemperature, clampedTemp);
         mainColor = temperatureGradient.Evaluate(t) * tint;
@@ -77,13 +79,17 @@ public class SpaceLight : MonoBehaviour
     {
         if (Camera.main == null || FloatingWorldOrigin.Instance == null)
             return;
-            
-        Vector3 direction = Camera.main.transform.position - transform.position;
-        worldLight.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+        
+        Vector3d realCamPosition = FloatingWorldOrigin.Instance.GetRealCameraPosition();
+        Vector3d delta = realCamPosition - scaledTransform.realPosition;
+        Vector3 direction = delta.normalized.ToVector3();
+        if (direction.sqrMagnitude > 0.0001)
+        {
+            worldLight.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+        }
 
         // Inverse square law of light: f = L / (4piD^2)
-        Vector3d realCameraPos = FloatingWorldOrigin.Instance.GetRealCameraPosition();
-        double sqrDistance = (realCameraPos - scaledTransform.realPosition).sqrMagnitude;
+        double sqrDistance = delta.sqrMagnitude;
         double irradiance = luminosity / (4 * Math.PI * sqrDistance);
         intensity = (float)Math.Log10(irradiance + 1);
         if (intensity < float.Epsilon)

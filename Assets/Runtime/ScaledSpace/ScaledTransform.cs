@@ -8,8 +8,8 @@ public class ScaledTransform : MonoBehaviour
     private ScaledRigidbody scaledRigidbody;
 
     [SerializeField] private Vector3d _realPosition; // Actual world position
-    public Vector3d realPosition 
-    { 
+    public Vector3d realPosition
+    {
         get
         {
             return _realPosition;
@@ -47,11 +47,17 @@ public class ScaledTransform : MonoBehaviour
     public int scaledSpaceLayer = 3;
 
     public bool inScaledSpace = false;
-    public double scaleFactor = 1000;
-    [SerializeField] private bool dynamicScaleFactor;
-    
+    public double scaleFactor = -1.0;
+
     public float worldSpaceThreshold = 3900;
     public float scaledSpaceThreshold = 4100;
+
+    public double realRadius = -1.0;
+    [SerializeField] private bool useRealScaleForRadius = false;
+
+    [HideInInspector] public int index = -1;
+
+    [SerializeField] private Renderer[] worldSpaceOnlyRenderers;
 
     private void Awake()
     {
@@ -59,6 +65,7 @@ public class ScaledTransform : MonoBehaviour
 
         ResetVisualComponents();
         
+        // Make sure everything is setup properly for whichever space
         if (inScaledSpace)
         {
             inScaledSpace = false;
@@ -71,6 +78,17 @@ public class ScaledTransform : MonoBehaviour
         }
 
         SetTrackedComponentsActive(visible);
+        UpdateRealRadius();
+    }
+
+    private void OnEnable()
+    {
+        ScaledSpaceVisuals.Instance.RegisterScaledTransform(this);
+    }
+
+    private void OnDisable()
+    {
+        ScaledSpaceVisuals.Instance.UnregisterScaledTransform(this);
     }
 
     private void OnValidate()
@@ -104,6 +122,7 @@ public class ScaledTransform : MonoBehaviour
                 tempRenderers.AddRange(renderers);
             }
         }
+
         trackedColliders = tempColliders.ToArray();
         trackedRenderers = tempRenderers.ToArray();
     }
@@ -143,19 +162,24 @@ public class ScaledTransform : MonoBehaviour
         // Disable/enable colliders
         for (int i = 0; i < trackedColliders.Length; i++)
         {
+            if (trackedColliders[i] == null)
+                continue;
             trackedColliders[i].enabled = value;
         }
+
         // Disable/enable renderers
-        for (int i = 0; i < trackedRenderers.Length; i++)
+        for(int i = 0; i < trackedRenderers.Length; i++)
         {
+            if (trackedRenderers[i] == null)
+                continue;
             trackedRenderers[i].enabled = value;
         }
+        
         visible = value;
     }
 
-    private void LateUpdate()
+    private void FixedUpdate()
     {
-        // LateUpdate to wait for everything else to finish applying changes to realPosition and camera is done applying transform position changes
         UpdateTransform();
     }
 
@@ -174,6 +198,7 @@ public class ScaledTransform : MonoBehaviour
         {
             UpdateInWorldSpace(originPosition, true);
         }
+        UpdateRealRadius();
     }
 
     private void UpdateTransform()
@@ -198,18 +223,16 @@ public class ScaledTransform : MonoBehaviour
             else
                 UpdateInWorldSpace(originPosition, scaledRigidbody != null && scaledRigidbody.active);
         }
+
+        if (useRealScaleForRadius)
+        {
+            realRadius = Math.Max(Math.Max(_realScale.x, _realScale.y), _realScale.z) * 0.5; // Good enough estimate
+        }
     }
 
-    private void UpdateInScaledSpace(Vector3d originPosition)
+    private void CheckVisibility(double sqrDistance)
     {
-        // visualPosition = renderCamPos + scaledOffset
-        // scaledOffset = (realPosition - realCamPos) / scale
-        Vector3d renderCamPos = Camera.main.transform.position.ToVector3d();
-        Vector3d realCamPos = originPosition + renderCamPos;
-        Vector3d offset = _realPosition - realCamPos; // Unscaled offset from camera to object
-
-        double radius = Math.Max(Math.Max(_realScale.x, _realScale.y), _realScale.z); // Good enough estimate, CelestialBodies use this for size anyway
-        double sqrPixelSize = SpaceMath.CalculateSquarePixelSize(offset.sqrMagnitude, radius);
+        double sqrPixelSize = SpaceMath.CalculateSquarePixelSize(sqrDistance, realRadius);
         if (sqrPixelSize < minScreenPixelSize * minScreenPixelSize)
         {
             if (visible)
@@ -217,14 +240,31 @@ public class ScaledTransform : MonoBehaviour
             transform.position = Vector3.zero; // Reduce risk of floating point errors
             return;
         }
-        else
-        {
-            if (!visible)
-                SetTrackedComponentsActive(true);
-        }
 
-        transform.position = (renderCamPos + offset / scaleFactor).ToVector3();
-        transform.localScale = (_realScale / scaleFactor).ToVector3();
+        if (!visible)
+        {
+            if (ScaledSpaceVisuals.Instance != null)
+                ScaledSpaceVisuals.Instance.UpdateScaleFactors();
+            SetTrackedComponentsActive(true);
+        }
+    }
+
+    private void UpdateInScaledSpace(Vector3d originPosition)
+    {
+        if (Camera.main == null)
+            return;
+        // visualPosition = renderCamPos + scaledOffset
+        // scaledOffset = (realPosition - realCamPos) / scale
+        Vector3d renderCamPos = Camera.main.transform.position.ToVector3d();
+        Vector3d realCamPos = originPosition + renderCamPos;
+        Vector3d offset = _realPosition - realCamPos; // Unscaled offset from camera to object
+
+        CheckVisibility(offset.sqrMagnitude);
+        if (visible)
+        {
+            transform.position = (renderCamPos + offset / scaleFactor).ToVector3();
+            transform.localScale = (_realScale / scaleFactor).ToVector3();
+        }
     }
 
     private void UpdateInWorldSpace(Vector3d originPosition, bool updateRenderPosition)
@@ -232,7 +272,7 @@ public class ScaledTransform : MonoBehaviour
         transform.localScale = _realScale.ToVector3();
         if (updateRenderPosition)
         {
-            // Assume Editor changes realPosition (scaledRigidbody == null) and ScaledRigidbody changes realPosition with velocity
+            // Should run if Editor changes realPosition (scaledRigidbody == null) or ScaledRigidbody changes realPosition with velocity
             transform.position = (_realPosition - originPosition).ToVector3();
         }
         else
@@ -245,13 +285,20 @@ public class ScaledTransform : MonoBehaviour
     private void SwitchToScaledSpace()
     {
         // Floating origin should never be in scaled space since we assume the origin has the camera
-        if (FloatingWorldOrigin.Instance == null || FloatingWorldOrigin.Instance.scaledTransform == this || !gameObject.activeSelf || inScaledSpace)
+        if (FloatingWorldOrigin.Instance == null || Camera.main == null || FloatingWorldOrigin.Instance.scaledTransform == this || !gameObject.activeSelf || inScaledSpace)
             return;
         inScaledSpace = true;
         if (scaledRigidbody != null)
             scaledRigidbody.active = true;
+
+        Vector3d renderCamPos = Camera.main.transform.position.ToVector3d();
+        Vector3d realCamPos = FloatingWorldOrigin.Instance.scaledTransform.realPosition + renderCamPos;
+        Vector3d offset = _realPosition - realCamPos; // Unscaled offset from camera to object
+        CheckVisibility(offset.sqrMagnitude);
+        if (visible)
+            ScaledSpaceVisuals.Instance.UpdateScaleFactors();
         UpdateVisualComponents();
-        UpdateInScaledSpace(FloatingWorldOrigin.Instance.scaledTransform.realPosition);
+        // UpdateInScaledSpace(FloatingWorldOrigin.Instance.scaledTransform.realPosition);
     }
 
     private void SwitchToWorldSpace()
@@ -274,23 +321,75 @@ public class ScaledTransform : MonoBehaviour
         {
             for (int i = 0; i < trackedColliders.Length; i++)
             {
+                if (trackedColliders[i] == null)
+                    continue;
                 trackedColliders[i].gameObject.layer = scaledSpaceLayer;
             }
             for (int i = 0; i < trackedRenderers.Length; i++)
             {
+                if (trackedRenderers[i] == null)
+                    continue;
                 trackedRenderers[i].gameObject.layer = scaledSpaceLayer;
+            }
+            foreach(Renderer renderer in worldSpaceOnlyRenderers)
+            {
+                renderer.enabled = false;
             }
         }
         else
         {
             for (int i = 0; i < trackedColliders.Length; i++)
             {
+                if (trackedColliders[i] == null)
+                    continue;
                 trackedColliders[i].gameObject.layer = originalColliderLayers[i];
             }
             for (int i = 0; i < trackedRenderers.Length; i++)
             {
+                if (trackedRenderers[i] == null)
+                    continue;
                 trackedRenderers[i].gameObject.layer = originalRendererLayers[i];
             }
+            foreach(Renderer renderer in worldSpaceOnlyRenderers)
+            {
+                renderer.enabled = true;
+            }
+        }
+    }
+
+    public void UpdateRealRadius()
+    {
+        // Update realRadius
+        if (trackedRenderers.Length > 0 && !useRealScaleForRadius)
+        {
+            bool boundsSet = false;
+            Bounds combinedBounds = new Bounds();
+            for(int i = 0; i < trackedRenderers.Length; i++)
+            {
+                if (trackedRenderers[i] == null)
+                    continue;
+                
+                // Update realRadius
+                if (!boundsSet)
+                {
+                    combinedBounds = trackedRenderers[i].bounds;
+                    boundsSet = true;
+                }
+                else
+                {
+                    combinedBounds.Encapsulate(trackedRenderers[i].bounds);
+                }
+            }
+            if (boundsSet)
+            {
+                realRadius = Mathf.Max(combinedBounds.extents.x, combinedBounds.extents.y, combinedBounds.extents.z);
+                if (inScaledSpace && scaleFactor > 0.0)
+                    realRadius *= scaleFactor;
+            }
+        }
+        else
+        {
+            realRadius = Math.Max(Math.Max(_realScale.x, _realScale.y), _realScale.z) * 0.5; // Good enough estimate
         }
     }
 
@@ -312,8 +411,8 @@ public class ScaledTransform : MonoBehaviour
     public Vector3d TransformRenderPoint(Vector3 renderPoint)
     {
         Vector3d offset = (renderPoint - transform.position).ToVector3d();
-        if (scaledRigidbody.scaledTransform.inScaledSpace)
-            offset *= scaledRigidbody.scaledTransform.scaleFactor;
+        if (inScaledSpace)
+            offset *= scaleFactor;
         return _realPosition + offset;
     }
 
@@ -325,8 +424,8 @@ public class ScaledTransform : MonoBehaviour
     public Vector3 TransformRealPoint(Vector3d realPoint)
     {
         Vector3d offset = realPoint - _realPosition;
-        if (scaledRigidbody.scaledTransform.inScaledSpace)
-            offset /= scaledRigidbody.scaledTransform.scaleFactor;
+        if (inScaledSpace)
+            offset /= scaleFactor;
         return transform.position + offset.ToVector3();
     }
 }

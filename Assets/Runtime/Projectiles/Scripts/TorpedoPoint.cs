@@ -28,7 +28,7 @@ public class TorpedoPoint : MonoBehaviour
         staticMesh.enabled = true;
     }
 
-    public Torpedo LaunchTorpedo(Vector3d launchPosition, Vector3d initialVelocity, RadarTarget target, int index, string team)
+    public Torpedo LaunchTorpedo(ScaledTransform parent, Vector3d initialVelocity, RadarTarget target, int index, string team)
     {
         hasTorpedo = false;
         staticMesh.enabled = false;
@@ -42,12 +42,12 @@ public class TorpedoPoint : MonoBehaviour
         if (InstanceFinder.ServerManager != null && !InstanceFinder.IsOffline)
             InstanceFinder.ServerManager.Spawn(torpedoGO.GetComponent<NetworkObject>()); // ScaledRigidbodySync handles the ScaledRB for us
 
-        StartCoroutine(LaunchRoutine(torpedoTarget, launchPosition, initialVelocity));
+        StartCoroutine(LaunchRoutine(torpedoTarget, parent, initialVelocity));
         torpedo.Activate(target, activateDelay);
         return torpedo;
     }
 
-    private IEnumerator LaunchRoutine(RadarTarget torpedoTarget, Vector3d launchPosition, Vector3d initialVelocity)
+    private IEnumerator LaunchRoutine(RadarTarget torpedoTarget, ScaledTransform parent, Vector3d initialVelocity)
     {
         while(torpedoTarget.scaledRigidbody == null)
         {
@@ -59,6 +59,6 @@ public class TorpedoPoint : MonoBehaviour
         double globalZ = transform.right.z * launchVelocity.x + transform.up.z * launchVelocity.y + transform.forward.z * launchVelocity.z;
         torpedoTarget.scaledRigidbody.velocity = initialVelocity + new Vector3d(globalX, globalY, globalZ);
         // torpedoTarget.scaledRigidbody.AddForce(launchVelocity, ForceMode.VelocityChange);
-        torpedoTarget.scaledRigidbody.scaledTransform.realPosition = launchPosition;
+        torpedoTarget.scaledRigidbody.scaledTransform.realPosition = parent.TransformRenderPoint(transform.position);
     }
 }

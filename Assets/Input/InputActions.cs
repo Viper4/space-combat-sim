@@ -237,7 +237,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""LaunchModeToggle"",
+                    ""name"": ""CombatModeToggle"",
                     ""type"": ""Button"",
                     ""id"": ""26676464-9fd1-441a-8773-49ff3925f524"",
                     ""expectedControlType"": """",
@@ -249,6 +249,33 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""name"": ""LockTarget"",
                     ""type"": ""Button"",
                     ""id"": ""837bbe0f-c1f9-4451-b376-33d93a9ba317"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""MatchTargetLinearVelocity"",
+                    ""type"": ""Button"",
+                    ""id"": ""33aa17f0-4471-4853-8141-b070f95dfed4"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""MatchTargetAngularVelocity"",
+                    ""type"": ""Button"",
+                    ""id"": ""268a2c3c-0916-48b0-b7b8-bb45d2463b4b"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""MaintainTargetDistance"",
+                    ""type"": ""Button"",
+                    ""id"": ""74698e4f-7cbc-4ce0-8ff1-aee50b6e329a"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
@@ -383,7 +410,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""path"": ""<Keyboard>/space"",
                     ""interactions"": """",
                     ""processors"": """",
-                    ""groups"": """",
+                    ""groups"": "";Keyboard&Mouse"",
                     ""action"": ""Move"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
@@ -394,7 +421,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""path"": ""<Keyboard>/leftCtrl"",
                     ""interactions"": """",
                     ""processors"": """",
-                    ""groups"": """",
+                    ""groups"": "";Keyboard&Mouse"",
                     ""action"": ""Move"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
@@ -405,7 +432,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""path"": ""<Keyboard>/a"",
                     ""interactions"": """",
                     ""processors"": """",
-                    ""groups"": """",
+                    ""groups"": "";Keyboard&Mouse"",
                     ""action"": ""Move"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
@@ -416,7 +443,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""path"": ""<Keyboard>/d"",
                     ""interactions"": """",
                     ""processors"": """",
-                    ""groups"": """",
+                    ""groups"": "";Keyboard&Mouse"",
                     ""action"": ""Move"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
@@ -427,7 +454,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""path"": ""<Keyboard>/w"",
                     ""interactions"": """",
                     ""processors"": """",
-                    ""groups"": """",
+                    ""groups"": "";Keyboard&Mouse"",
                     ""action"": ""Move"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
@@ -438,7 +465,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""path"": ""<Keyboard>/s"",
                     ""interactions"": """",
                     ""processors"": """",
-                    ""groups"": """",
+                    ""groups"": "";Keyboard&Mouse"",
                     ""action"": ""Move"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
@@ -549,7 +576,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""LaunchModeToggle"",
+                    ""action"": ""CombatModeToggle"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -594,6 +621,39 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""LockTarget"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""0a326ec4-9e18-4b88-a88b-af6d6e4c3050"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""MatchTargetLinearVelocity"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a42263ad-f102-4cef-b787-32e6b157d7b9"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""MatchTargetAngularVelocity"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""ae204cc3-4e0e-4ae2-957f-020036532317"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""MaintainTargetDistance"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -1257,8 +1317,11 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         m_Player_TorpedoBayToggle = m_Player.FindAction("TorpedoBayToggle", throwIfNotFound: true);
         m_Player_ShieldToggle = m_Player.FindAction("ShieldToggle", throwIfNotFound: true);
         m_Player_RollYawToggle = m_Player.FindAction("RollYawToggle", throwIfNotFound: true);
-        m_Player_LaunchModeToggle = m_Player.FindAction("LaunchModeToggle", throwIfNotFound: true);
+        m_Player_CombatModeToggle = m_Player.FindAction("CombatModeToggle", throwIfNotFound: true);
         m_Player_LockTarget = m_Player.FindAction("LockTarget", throwIfNotFound: true);
+        m_Player_MatchTargetLinearVelocity = m_Player.FindAction("MatchTargetLinearVelocity", throwIfNotFound: true);
+        m_Player_MatchTargetAngularVelocity = m_Player.FindAction("MatchTargetAngularVelocity", throwIfNotFound: true);
+        m_Player_MaintainTargetDistance = m_Player.FindAction("MaintainTargetDistance", throwIfNotFound: true);
         // UI
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
@@ -1371,8 +1434,11 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_TorpedoBayToggle;
     private readonly InputAction m_Player_ShieldToggle;
     private readonly InputAction m_Player_RollYawToggle;
-    private readonly InputAction m_Player_LaunchModeToggle;
+    private readonly InputAction m_Player_CombatModeToggle;
     private readonly InputAction m_Player_LockTarget;
+    private readonly InputAction m_Player_MatchTargetLinearVelocity;
+    private readonly InputAction m_Player_MatchTargetAngularVelocity;
+    private readonly InputAction m_Player_MaintainTargetDistance;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -1449,13 +1515,25 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @RollYawToggle => m_Wrapper.m_Player_RollYawToggle;
         /// <summary>
-        /// Provides access to the underlying input action "Player/LaunchModeToggle".
+        /// Provides access to the underlying input action "Player/CombatModeToggle".
         /// </summary>
-        public InputAction @LaunchModeToggle => m_Wrapper.m_Player_LaunchModeToggle;
+        public InputAction @CombatModeToggle => m_Wrapper.m_Player_CombatModeToggle;
         /// <summary>
         /// Provides access to the underlying input action "Player/LockTarget".
         /// </summary>
         public InputAction @LockTarget => m_Wrapper.m_Player_LockTarget;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/MatchTargetLinearVelocity".
+        /// </summary>
+        public InputAction @MatchTargetLinearVelocity => m_Wrapper.m_Player_MatchTargetLinearVelocity;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/MatchTargetAngularVelocity".
+        /// </summary>
+        public InputAction @MatchTargetAngularVelocity => m_Wrapper.m_Player_MatchTargetAngularVelocity;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/MaintainTargetDistance".
+        /// </summary>
+        public InputAction @MaintainTargetDistance => m_Wrapper.m_Player_MaintainTargetDistance;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1530,12 +1608,21 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @RollYawToggle.started += instance.OnRollYawToggle;
             @RollYawToggle.performed += instance.OnRollYawToggle;
             @RollYawToggle.canceled += instance.OnRollYawToggle;
-            @LaunchModeToggle.started += instance.OnLaunchModeToggle;
-            @LaunchModeToggle.performed += instance.OnLaunchModeToggle;
-            @LaunchModeToggle.canceled += instance.OnLaunchModeToggle;
+            @CombatModeToggle.started += instance.OnCombatModeToggle;
+            @CombatModeToggle.performed += instance.OnCombatModeToggle;
+            @CombatModeToggle.canceled += instance.OnCombatModeToggle;
             @LockTarget.started += instance.OnLockTarget;
             @LockTarget.performed += instance.OnLockTarget;
             @LockTarget.canceled += instance.OnLockTarget;
+            @MatchTargetLinearVelocity.started += instance.OnMatchTargetLinearVelocity;
+            @MatchTargetLinearVelocity.performed += instance.OnMatchTargetLinearVelocity;
+            @MatchTargetLinearVelocity.canceled += instance.OnMatchTargetLinearVelocity;
+            @MatchTargetAngularVelocity.started += instance.OnMatchTargetAngularVelocity;
+            @MatchTargetAngularVelocity.performed += instance.OnMatchTargetAngularVelocity;
+            @MatchTargetAngularVelocity.canceled += instance.OnMatchTargetAngularVelocity;
+            @MaintainTargetDistance.started += instance.OnMaintainTargetDistance;
+            @MaintainTargetDistance.performed += instance.OnMaintainTargetDistance;
+            @MaintainTargetDistance.canceled += instance.OnMaintainTargetDistance;
         }
 
         /// <summary>
@@ -1595,12 +1682,21 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @RollYawToggle.started -= instance.OnRollYawToggle;
             @RollYawToggle.performed -= instance.OnRollYawToggle;
             @RollYawToggle.canceled -= instance.OnRollYawToggle;
-            @LaunchModeToggle.started -= instance.OnLaunchModeToggle;
-            @LaunchModeToggle.performed -= instance.OnLaunchModeToggle;
-            @LaunchModeToggle.canceled -= instance.OnLaunchModeToggle;
+            @CombatModeToggle.started -= instance.OnCombatModeToggle;
+            @CombatModeToggle.performed -= instance.OnCombatModeToggle;
+            @CombatModeToggle.canceled -= instance.OnCombatModeToggle;
             @LockTarget.started -= instance.OnLockTarget;
             @LockTarget.performed -= instance.OnLockTarget;
             @LockTarget.canceled -= instance.OnLockTarget;
+            @MatchTargetLinearVelocity.started -= instance.OnMatchTargetLinearVelocity;
+            @MatchTargetLinearVelocity.performed -= instance.OnMatchTargetLinearVelocity;
+            @MatchTargetLinearVelocity.canceled -= instance.OnMatchTargetLinearVelocity;
+            @MatchTargetAngularVelocity.started -= instance.OnMatchTargetAngularVelocity;
+            @MatchTargetAngularVelocity.performed -= instance.OnMatchTargetAngularVelocity;
+            @MatchTargetAngularVelocity.canceled -= instance.OnMatchTargetAngularVelocity;
+            @MaintainTargetDistance.started -= instance.OnMaintainTargetDistance;
+            @MaintainTargetDistance.performed -= instance.OnMaintainTargetDistance;
+            @MaintainTargetDistance.canceled -= instance.OnMaintainTargetDistance;
         }
 
         /// <summary>
@@ -2047,12 +2143,12 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnRollYawToggle(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "LaunchModeToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "CombatModeToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnLaunchModeToggle(InputAction.CallbackContext context);
+        void OnCombatModeToggle(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "LockTarget" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
@@ -2060,6 +2156,27 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnLockTarget(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "MatchTargetLinearVelocity" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnMatchTargetLinearVelocity(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "MatchTargetAngularVelocity" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnMatchTargetAngularVelocity(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "MaintainTargetDistance" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnMaintainTargetDistance(InputAction.CallbackContext context);
     }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "UI" which allows adding and removing callbacks.

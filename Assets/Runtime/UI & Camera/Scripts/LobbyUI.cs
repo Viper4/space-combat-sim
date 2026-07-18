@@ -1,11 +1,9 @@
 using System;
 using FishNet;
-using FishNet.Managing;
 using FishNet.Managing.Scened;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using UnitySceneManager = UnityEngine.SceneManagement.SceneManager; 
 
 /// <summary>
 /// Thin UI layer over LobbyManager.
@@ -27,6 +25,7 @@ public class LobbyUI : MonoBehaviour
 
     [Header("Panels")]
     [SerializeField] private GameObject mainMenuPanel;
+    [SerializeField] private GameObject hostPortPanel;
     [SerializeField] private GameObject hostPanel;
     [SerializeField] private GameObject joinPanel;
     [SerializeField] private GameObject connectingPanel;
@@ -39,6 +38,13 @@ public class LobbyUI : MonoBehaviour
     [SerializeField] private Button connectMainServerButton;
     [SerializeField] private Button hostPrivateLobbyButton;
     [SerializeField] private Button joinPrivateLobbyButton;
+
+    // -- Host Port Panel --------------------------------------------------------
+
+    [Header("Host Port Panel")]
+    [SerializeField] private TMP_InputField hostPortInput;
+    [SerializeField] private Button confirmHostButton;
+    [SerializeField] private Button cancelHostButton;
 
     // -- Host Panel -------------------------------------------------------------
 
@@ -100,6 +106,8 @@ public class LobbyUI : MonoBehaviour
         connectMainServerButton.onClick.AddListener(OnClickMainServer);
         hostPrivateLobbyButton .onClick.AddListener(OnClickHost);
         joinPrivateLobbyButton .onClick.AddListener(() => ShowPanel(joinPanel));
+        confirmHostButton      .onClick.AddListener(OnClickConfirmHost);
+        cancelHostButton       .onClick.AddListener(() => ShowPanel(mainMenuPanel));
         copyInviteCodeButton   .onClick.AddListener(OnClickCopyCode);
         stopHostingButton      .onClick.AddListener(OnClickStopHosting);
         startGameButton        .onClick.AddListener(OnClickStartGame);
@@ -109,13 +117,15 @@ public class LobbyUI : MonoBehaviour
         cancelConnectButton    .onClick.AddListener(Disconnect);
         disconnectButton       .onClick.AddListener(Disconnect);
 
-        maxPlayerCountInput.onEndEdit.AddListener(OnMaxPlayersEndEdit);
+        maxPlayerCountInput.onValueChanged.AddListener(OnMaxPlayersChanged);
         for(int i = 0; i < usernameInputs.Length; i++)
         {
-            usernameInputs[i].onEndEdit.AddListener(OnUsernameEndEdit);
+            usernameInputs[i].onValueChanged.AddListener(OnUsernameChanged);
         }
 
         ShowPanel(mainMenuPanel);
+
+        SceneLoader.Instance.OnEndSceneLoad += HidePanels;
     }
 
     private void OnDisable()
@@ -130,24 +140,32 @@ public class LobbyUI : MonoBehaviour
         singleplayerButton     .onClick.RemoveListener(OnClickSingleplayer);
         connectMainServerButton.onClick.RemoveListener(OnClickMainServer);
         hostPrivateLobbyButton .onClick.RemoveListener(OnClickHost);
+        joinPrivateLobbyButton .onClick.RemoveAllListeners();
+        confirmHostButton      .onClick.RemoveListener(OnClickConfirmHost);
+        cancelHostButton       .onClick.RemoveAllListeners();
         copyInviteCodeButton   .onClick.RemoveListener(OnClickCopyCode);
         stopHostingButton      .onClick.RemoveListener(OnClickStopHosting);
         startGameButton        .onClick.RemoveListener(OnClickStartGame);
         joinByCodeButton       .onClick.RemoveListener(OnClickJoinByCode);
         joinByIPButton         .onClick.RemoveListener(OnClickJoinByIP);
+        cancelJoinButton       .onClick.RemoveAllListeners();
         cancelConnectButton    .onClick.RemoveListener(Disconnect);
         disconnectButton       .onClick.RemoveListener(Disconnect);
 
-        maxPlayerCountInput.onEndEdit.RemoveListener(OnMaxPlayersEndEdit);
+        maxPlayerCountInput.onValueChanged.RemoveListener(OnMaxPlayersChanged);
+        for(int i = 0; i < usernameInputs.Length; i++)
+        {
+            usernameInputs[i].onValueChanged.RemoveListener(OnUsernameChanged);
+        }
+        SceneLoader.Instance.OnEndSceneLoad -= HidePanels;
     }
 
     // -- Button Handlers --------------------------------------------------------
 
     private void OnClickSingleplayer()
     {
-        SetStatus("Connecting to main server...");
-        ShowPanel(connectingPanel);
-        SceneLoader.Instance.BeginOfflineLoad("MainScene");
+        SetStatus("Loading singleplayer...");
+        LobbyManager.Instance.LoadSingleplayer();
     }
 
     private void OnClickMainServer()
@@ -159,12 +177,22 @@ public class LobbyUI : MonoBehaviour
 
     private void OnClickHost()
     {
+        ShowPanel(hostPortPanel);
+        hostPortInput.SetTextWithoutNotify(LobbyManager.Instance.GetPrivateLobbyPort().ToString());
+    }
+
+    private void OnClickConfirmHost()
+    {
+        ushort port = ushort.TryParse(hostPortInput.text.Trim(), out ushort p) ? p : (ushort)7771;
+
+        LobbyManager.Instance.SetPrivateLobbyPort(port);
+
         int maxPlayers = ParseMaxPlayers();
 
         inviteCodeLabel.text = "Fetching your public IP...";
         for (int i = 0; i < playerCountLabels.Length; i++)
         {
-            playerCountLabels[i].text = FormatPlayerCount(0, maxPlayers);
+            playerCountLabels[i].text = FormatPlayerCount(1, maxPlayers);
         }
         ShowPanel(hostPanel);
 
@@ -226,7 +254,7 @@ public class LobbyUI : MonoBehaviour
 
     // -- Input Validation ------------------------------------------------------
 
-    private void OnMaxPlayersEndEdit(string value)
+    private void OnMaxPlayersChanged(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -256,10 +284,10 @@ public class LobbyUI : MonoBehaviour
         {
             ShowStatus(false);
         }
-        LobbyManager.Instance.SetMaxPlayers(clamped);
+        LobbyManager.Instance.SetMaxPlayersAsHost(clamped);
     }
 
-    private void OnUsernameEndEdit(string value)
+    private void OnUsernameChanged(string value)
     {
         LobbyManager.Instance.SetPlayerUsername(value);
     }
@@ -279,6 +307,7 @@ public class LobbyUI : MonoBehaviour
                 break;
             case LobbyManager.LobbyState.Connected:
                 ShowPanel(connectedPanel);
+
                 break;
         }
     }
@@ -304,14 +333,24 @@ public class LobbyUI : MonoBehaviour
 
     // -- Helpers ----------------------------------------------------------------
 
+    private void UpdateUsernameFields()
+    {
+        for(int i = 0; i < usernameInputs.Length; i++)
+        {
+            usernameInputs[i].SetTextWithoutNotify(LobbyManager.Instance.GetLocalUsername());
+        }
+    }
+
     private void ShowPanel(GameObject target)
     {
         mainMenuPanel  .SetActive(target == mainMenuPanel);
+        hostPortPanel  .SetActive(target == hostPortPanel);
         hostPanel      .SetActive(target == hostPanel);
         joinPanel      .SetActive(target == joinPanel);
         connectingPanel.SetActive(target == connectingPanel);
         connectedPanel .SetActive(target == connectedPanel);
         ShowStatus(false);
+        UpdateUsernameFields();
     }
 
     private void SetStatus(string msg)
@@ -327,6 +366,16 @@ public class LobbyUI : MonoBehaviour
     {
         if (statusParent.activeSelf != active)
             statusParent.SetActive(active);
+    }
+    
+    private void HidePanels()
+    {
+        mainMenuPanel  .SetActive(false);
+        hostPanel      .SetActive(false);
+        joinPanel      .SetActive(false);
+        connectingPanel.SetActive(false);
+        connectedPanel .SetActive(false);
+        ShowStatus(false);
     }
 
     /// <summary>

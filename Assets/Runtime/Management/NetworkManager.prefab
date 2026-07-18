@@ -120,11 +120,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 478b2426d888e4d4b804aa04717eccb0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyManager
-  mainServerAddress: your-server.example.com
+  mainServerAddress: FUCK
   mainServerPort: 7770
   privateServerPort: 7777
   connectionTimeoutSeconds: 5
   kickWindowSeconds: 2
+  playerInfoRelayPrefab: {fileID: 2770388785015131211, guid: 4e3ca8337d01055439bea7c14dec7c76, type: 3}
 --- !u!1 &2489087825067674745
 GameObject:
   m_ObjectHideFlags: 0
@@ -187,6 +188,7 @@ GameObject:
   - component: {fileID: 2160952490160052663}
   - component: {fileID: 3748211234209740777}
   - component: {fileID: 5998810647739720852}
+  - component: {fileID: 7561189887119994116}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -327,7 +329,27 @@ MonoBehaviour:
   _levelOfDetailDistances: []
   _updateHostVisibility: 1
   _maximumTimedObserversDuration: 10
-  _defaultConditions: []
+  _defaultConditions:
+  - {fileID: 11400000, guid: 2033f54fd2794464bae08fa5a55c8996, type: 2}
+--- !u!114 &7561189887119994116
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7591276985565681240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d0962ead4b02a34aae248fccce671ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FishNet.Runtime::FishNet.Managing.Debugging.DebugManager
+  WriteSceneObjectDetails: 1
+  ValidateRpcLengths: 0
+  DisableObserversRpcLinks: 0
+  DisableTargetRpcLinks: 0
+  DisableServerRpcLinks: 0
+  DisableReplicateRpcLinks: 0
+  DisableReconcileRpcLinks: 0
 --- !u!1 &8331641642878961268
 GameObject:
   m_ObjectHideFlags: 0
@@ -389,7 +411,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 1
   m_TargetDisplay: 0
 --- !u!114 &5633702348473294537
 MonoBehaviour:

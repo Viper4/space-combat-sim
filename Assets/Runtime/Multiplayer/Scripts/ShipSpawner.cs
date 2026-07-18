@@ -3,6 +3,10 @@ using FishNet.Connection;
 using FishNet.Object;
 using FishNet;
 using UnityEngine;
+using SpaceStuff;
+using FishNet.Managing.Scened;
+using System.Collections;
+using UnityEngine.SceneManagement;
 
 public class ShipSpawner : MonoBehaviour
 {
@@ -29,9 +33,11 @@ public class ShipSpawner : MonoBehaviour
         }
         else if (InstanceFinder.IsServerStarted)
         {
+            // InstanceFinder.SceneManager.OnClientLoadedStartScenes += OnClientLoadedStartScenes;
+            InstanceFinder.SceneManager.OnClientPresenceChangeEnd += OnClientPresenceChangeEnd;
             InstanceFinder.ServerManager.OnRemoteConnectionState += OnRemoteConnectionState;
 
-            SpawnConnectedPlayers();
+            // SpawnPlayerShip(InstanceFinder.ClientManager.Connection);
         }
 
         Instance = this;
@@ -39,20 +45,40 @@ public class ShipSpawner : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (InstanceFinder.ServerManager != null)
+        if (InstanceFinder.IsServerStarted && InstanceFinder.ServerManager != null)
+        {
+            // InstanceFinder.SceneManager.OnClientLoadedStartScenes -= OnClientLoadedStartScenes;
+            InstanceFinder.SceneManager.OnClientPresenceChangeEnd -= OnClientPresenceChangeEnd;
             InstanceFinder.ServerManager.OnRemoteConnectionState -= OnRemoteConnectionState;
+        }
 
         playerShips.Clear();
     }
 
-    private void SpawnConnectedPlayers()
+    private void OnClientLoadedStartScenes(NetworkConnection connection, bool asServer)
     {
-        foreach (NetworkConnection conn in InstanceFinder.ServerManager.Clients.Values)
+        SpawnPlayerShip(connection);
+    }
+
+    private IEnumerator WaitToSpawnShip(NetworkConnection connection, Scene mainScene)
+    {
+        yield return new WaitUntil(() => mainScene.isLoaded);
+        SpawnPlayerShip(connection);
+    }
+
+    private void OnClientPresenceChangeEnd(ClientPresenceChangeEventArgs args)
+    {
+        if (args.Scene.name != "MainScene")
+            return;
+
+        if (args.Added)
         {
-            if (!playerShips.ContainsKey(conn.ClientId))
-            {
-                SpawnPlayerShip(conn);
-            }
+            // StartCoroutine(WaitToSpawnShip(args.Connection, args.Scene));
+            SpawnPlayerShip(args.Connection);
+        }
+        else
+        {
+            RemovePlayerShip(args.Connection);
         }
     }
 
@@ -61,7 +87,7 @@ public class ShipSpawner : MonoBehaviour
         switch (args.ConnectionState)
         {
             case FishNet.Transporting.RemoteConnectionState.Started:
-                SpawnPlayerShip(conn);
+                // SpawnPlayerShip(conn);
                 break;
             case FishNet.Transporting.RemoteConnectionState.Stopped:
                 RemovePlayerShip(conn);
@@ -110,20 +136,27 @@ public class ShipSpawner : MonoBehaviour
         GetSpawnPoint(out spawnPosition, out spawnRotation);
 
         NetworkObject shipObject = Instantiate(shipPrefab, spawnPosition, spawnRotation);
+        if (shipObject.TryGetComponent<ScaledTransform>(out var scaledTransform))
+        {
+            scaledTransform.realPosition = spawnPosition.ToVector3d();
+        }
         PlayerRegistry.TryGetPlayer(conn.ClientId, out var playerInfo);
         shipObject.name = playerInfo.Username;
 
         InstanceFinder.ServerManager.Spawn(shipObject, conn);
+        Debug.Log($"[ShipSpawner] Spawned ship for client {conn.ClientId}");
 
         if (!shipObject.TryGetComponent<Ship>(out var ship))
         {
-            Debug.LogError("Ship prefab is missing Ship component.");
+            Debug.LogError("[ShipSpawner] Ship prefab is missing Ship component.");
             return;
         }
 
         playerShips.Add(conn.ClientId, ship);
-
-        Debug.Log($"Spawned ship for client {conn.ClientId}");
+        if (shipObject.TryGetComponent<NetworkObjectDestroyer>(out var networkObjectDestroyer))
+        {
+            networkObjectDestroyer.HideCriticalObjects();
+        }
     }
 
     private void RemovePlayerShip(NetworkConnection conn)

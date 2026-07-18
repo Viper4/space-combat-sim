@@ -14,9 +14,10 @@ GameObject:
   - component: {fileID: 6741833927358446544}
   - component: {fileID: 7988712374659034346}
   - component: {fileID: -8207550002145788697}
-  - component: {fileID: 2609004871448456363}
   - component: {fileID: 325603571820138488}
   - component: {fileID: -8214975133850535882}
+  - component: {fileID: 423929763229353203}
+  - component: {fileID: 3529067775758097779}
   m_Layer: 0
   m_Name: Moon 1
   m_TagString: CelestialBody
@@ -33,7 +34,7 @@ Transform:
   m_GameObject: {fileID: 2201142413859200454}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.0000006, z: 0.0000066}
+  m_LocalPosition: {x: 0, y: 0.9999986, z: -9.999973}
   m_LocalScale: {x: 0.000001, y: 0.000001, z: 0.000001}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -51,7 +52,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 660b2028be04cb445a20efd3df3e65c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  transformChange: {fileID: 2609004871448456363}
   _realPosition:
     x: 0
     y: 0.6000000238418579
@@ -65,9 +65,12 @@ MonoBehaviour:
   scaledSpaceLayer: 3
   inScaledSpace: 1
   scaleFactor: 1000000
-  dynamicScaleFactor: 0
   worldSpaceThreshold: 4900
   scaledSpaceThreshold: 5100
+  realRadius: 0.5
+  useRealScaleForRadius: 0
+  index: -1
+  worldSpaceOnlyRenderers: []
 --- !u!114 &5761081526728979838
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -89,6 +92,7 @@ MonoBehaviour:
   colorSettingsFoldout: 1
   baseMaxScreenSize: 128
   rootLOD: 1
+  randomSeed: 1
   seedRange: {x: -10000, y: 10000}
 --- !u!114 &6741833927358446544
 MonoBehaviour:
@@ -102,13 +106,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ecefe1d978853f4f91e593a040236b7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 0
+  _addedNetworkObject: {fileID: 423929763229353203}
+  _networkObjectCache: {fileID: 423929763229353203}
   scaledTransform: {fileID: 0}
   originalLayer: 0
   generationSettings: {fileID: 11400000, guid: 9d8268b4c96e5cc42b857afaddf81fd4, type: 2}
   generationSettingsFoldout: 1
   gravitySettings: {fileID: 11400000, guid: 6d7804aa2b56200498e97388c7364617, type: 2}
-  gravitySettingsFoldout: 0
+  gravitySettingsFoldout: 1
   orbitTarget: {fileID: 0}
+  tidallyLocked: 1
+  overrideRotationAxis: 0
   pauseUpdates: 0
 --- !u!54 &7988712374659034346
 Rigidbody:
@@ -149,6 +158,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _mass: 0.0000001
   _isKinematic: 0
   speedThreshold: -1
   _velocity:
@@ -163,20 +173,6 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
---- !u!114 &2609004871448456363
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2201142413859200454}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 76ec2b68975954c45b1d10e424648641, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TransformChange
-  trackPosition: 1
-  trackRotation: 0
 --- !u!114 &325603571820138488
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -215,4 +211,84 @@ MonoBehaviour:
     z: 0
   radius: -1
   isTrigger: 0
-  hGridLevel: -1
+  restitution: 0
+  listIndex: -1
+  overrideUnity: 0
+--- !u!114 &423929763229353203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2201142413859200454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FishNet.Runtime::FishNet.Object.NetworkObject
+  _localLevelOfDetailCalculationType: 0
+  _useLevelOfDetail: 0
+  _useRootLevelOfDetail: 1
+  NetworkObserver: {fileID: 0}
+  _enablePrediction: 0
+  _predictionType: 0
+  _localReconcileCorrectionType: 2
+  _graphicalObject: {fileID: 0}
+  _detachGraphicalObject: 0
+  _enableStateForwarding: 1
+  _networkTransform: {fileID: 0}
+  _ownerInterpolation: 1
+  _ownerSmoothedProperties: 255
+  _adaptiveInterpolation: 3
+  _spectatorSmoothedProperties: 255
+  _spectatorInterpolation: 2
+  _enableTeleport: 0
+  _teleportThreshold: 1
+  <PrefabId>k__BackingField: 11
+  <SpawnableCollectionId>k__BackingField: 0
+  <AssetPathHash>k__BackingField: 11235234168432016391
+  SceneId: 0
+  SerializedTransformProperties:
+    Position: {x: 0, y: 0, z: 0}
+    Rotation: {x: 0, y: 0, z: 0, w: 1}
+    Scale: {x: 0.000001, y: 0.000001, z: 0.000001}
+    IsValid: 1
+  <IsNested>k__BackingField: 0
+  WasActiveDuringEdit: 0
+  WasActiveDuringEdit_Set1: 1
+  <ComponentIndex>k__BackingField: 0
+  <PredictedSpawn>k__BackingField: {fileID: 0}
+  <PredictedOwner>k__BackingField: {fileID: 0}
+  NetworkBehaviours:
+  - {fileID: 6741833927358446544}
+  - {fileID: 3529067775758097779}
+  InitializedParentNetworkBehaviour: {fileID: 0}
+  InitializedNestedNetworkObjects: []
+  RuntimeParentNetworkBehaviour: {fileID: 0}
+  RuntimeChildNetworkBehaviours: []
+  _isNetworked: 0
+  _isSpawnable: 1
+  _isGlobal: 0
+  _initializeOrder: 0
+  _preventDespawnOnDisconnect: 0
+  _defaultDespawnType: 0
+  _initializedTimestamp: -8584172423546112069
+--- !u!114 &3529067775758097779
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2201142413859200454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87f21fb26d74cb446adea6577efd64e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbodySync
+  _componentIndexCache: 1
+  _addedNetworkObject: {fileID: 423929763229353203}
+  _networkObjectCache: {fileID: 423929763229353203}
+  snapshotRate: 10
+  interpolate: 1
+  controlType: 1
+  activeWhenOffline: 1

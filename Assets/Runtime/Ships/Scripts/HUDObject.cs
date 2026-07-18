@@ -110,10 +110,16 @@ public class HUDObject : MonoBehaviour
         }
 
         killTimer = killTime;
-        transform.SetPositionAndRotation(position, Quaternion.LookRotation(transform.position - Camera.main.transform.position, Camera.main.transform.up));
+        Vector3 lookVector = transform.position - Camera.main.transform.position;
+        if (lookVector.sqrMagnitude < 0.0001)
+        {
+            lookVector = Camera.main.transform.forward;
+        }
+        transform.SetPositionAndRotation(position, Quaternion.LookRotation(lookVector, Camera.main.transform.up));
 
         centerOfMass.position = position;
-        predictedCenter.position = predictedPosition;
+        // predictedCenter.position = predictedPosition;
+        predictedCenter.SetPositionAndRotation(predictedPosition, Quaternion.LookRotation(predictedPosition - Camera.main.transform.position, Camera.main.transform.up));
     }
 
     public void UpdateObject(Vector3 position, Quadrilateral quad, string details, bool detailsActive, Vector3 predictedPosition)
@@ -175,7 +181,7 @@ public class HUDObject : MonoBehaviour
         topRightCorner.position = topRightPos;
         bottomRightCorner.position = bottomRightPos;
         centerOfMass.position = position;
-        predictedCenter.position = predictedPosition;
+        predictedCenter.SetPositionAndRotation(predictedPosition, Quaternion.LookRotation(predictedPosition - Camera.main.transform.position, Camera.main.transform.up));
 
         // If corners are too close together, scale them down
         float dx = Mathf.Abs(bottomLeftCorner.localPosition.x - bottomRightCorner.localPosition.x);

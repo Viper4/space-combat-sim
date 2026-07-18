@@ -7,7 +7,7 @@ public class DynamicLensFlare : MonoBehaviour
 {
     private LensFlareComponentSRP lensFlare;
 
-    [SerializeField] private Light _light;
+    [SerializeField] private SpaceLight spaceLight;
     [SerializeField] private ScaledTransform lightScaledTransform;
     [SerializeField] private LayerMask occlusionLayers;
     [SerializeField, Tooltip("Total number of linecasts to average over.")] private int numSamples = 4;
@@ -31,7 +31,7 @@ public class DynamicLensFlare : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (FloatingWorldOrigin.Instance == null)
+        if (FloatingWorldOrigin.Instance == null || Camera.main == null)
             return;
             
         Vector3d realCamPosition = FloatingWorldOrigin.Instance.GetRealCameraPosition();
@@ -102,7 +102,7 @@ public class DynamicLensFlare : MonoBehaviour
             lensFlare.enabled = true;
             // t is nonlinear but still smooth
             float t = (float)((sqrDistance - distanceRange.x * distanceRange.x) / (distanceRange.y * distanceRange.y - distanceRange.x * distanceRange.x));
-            lensFlare.intensity = Mathf.Lerp(brightnessRange.x, brightnessRange.y, t) * _light.colorTemperature * temperatureScale * fraction;
+            lensFlare.intensity = Mathf.Lerp(brightnessRange.x, brightnessRange.y, t) * spaceLight.temperature * temperatureScale * fraction;
             lensFlare.scale = Mathf.Lerp(scaleRange.x, scaleRange.y, t);
         }
     }

@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using UnityEngine.InputSystem;
 using TMPro;
 using FishNet;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Pause menu activated by the UI/Pause input action.
@@ -84,7 +85,6 @@ public class PauseUI : MonoBehaviour
         leaveButton      .onClick.AddListener(Leave);
         exitDesktopButton.onClick.AddListener(ExitDesktop);
         settingsBackButton.onClick.AddListener(CloseSettings);
-        DontDestroyOnLoad(gameObject);
     }
 
     private void OnDestroy()
@@ -135,8 +135,16 @@ public class PauseUI : MonoBehaviour
         if (!GameManager.Instance.IsPaused)
             return;
         GameManager.Instance.IsPaused = false;
-        Cursor.lockState = originalLockState;
-        Cursor.visible = originalCursorVisibility;
+        if (SceneManager.GetActiveScene().buildIndex == 0)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        else
+        {
+            Cursor.lockState = originalLockState;
+            Cursor.visible = originalCursorVisibility;
+        }
 
         // Cancel any in-progress rebind so we don't leave listeners dangling.
         CancelCurrentRebind();
@@ -164,7 +172,14 @@ public class PauseUI : MonoBehaviour
     private void Leave()
     {
         Resume();
-        LobbyManager.Instance.Disconnect();
+        if (LobbyManager.Instance.State == LobbyManager.LobbyState.Disconnected)
+        {
+            SceneLoader.Instance.BeginOfflineLoad("StartScene");
+        }
+        else
+        {
+            LobbyManager.Instance.Disconnect();
+        }
     }
 
     private void ExitDesktop()
@@ -180,15 +195,7 @@ public class PauseUI : MonoBehaviour
 
     private void RefreshLeaveButtonVisibility()
     {
-        if (LobbyManager.Instance == null)
-        {
-            leaveButton.gameObject.SetActive(false);
-            return;
-        }
-        var s = LobbyManager.Instance.State;
-        leaveButton.gameObject.SetActive(
-            s == LobbyManager.LobbyState.Connected ||
-            s == LobbyManager.LobbyState.Hosting);
+        leaveButton.gameObject.SetActive(SceneManager.GetActiveScene().buildIndex != 0);
     }
 
     // ── Panel Helpers ──────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ using SpaceStuff;
 using UnityEngine;
 
 [Serializable]
-public struct ScaledRigidbodyState
+public struct ScaledObjectState
 {
     public double posX;
     public double posY;
@@ -27,9 +27,9 @@ public struct ScaledRigidbodyState
     public Vector3d Velocity => new Vector3d(velX, velY, velZ);
     public Vector3d AngularVelocity => new Vector3d(angVelX, angVelY, angVelZ);
 
-    public static ScaledRigidbodyState From(ScaledRigidbody scaledRigidbody)
+    public static ScaledObjectState From(ScaledRigidbody scaledRigidbody)
     {
-        return new ScaledRigidbodyState
+        return new ScaledObjectState
         {
             posX = scaledRigidbody.scaledTransform.realPosition.x,
             posY = scaledRigidbody.scaledTransform.realPosition.y,

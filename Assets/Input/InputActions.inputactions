@@ -151,7 +151,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "LaunchModeToggle",
+                    "name": "CombatModeToggle",
                     "type": "Button",
                     "id": "26676464-9fd1-441a-8773-49ff3925f524",
                     "expectedControlType": "",
@@ -163,6 +163,33 @@
                     "name": "LockTarget",
                     "type": "Button",
                     "id": "837bbe0f-c1f9-4451-b376-33d93a9ba317",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "MatchTargetLinearVelocity",
+                    "type": "Button",
+                    "id": "33aa17f0-4471-4853-8141-b070f95dfed4",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "MatchTargetAngularVelocity",
+                    "type": "Button",
+                    "id": "268a2c3c-0916-48b0-b7b8-bb45d2463b4b",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "MaintainTargetDistance",
+                    "type": "Button",
+                    "id": "74698e4f-7cbc-4ce0-8ff1-aee50b6e329a",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -297,7 +324,7 @@
                     "path": "<Keyboard>/space",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Keyboard&Mouse",
                     "action": "Move",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -308,7 +335,7 @@
                     "path": "<Keyboard>/leftCtrl",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Keyboard&Mouse",
                     "action": "Move",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -319,7 +346,7 @@
                     "path": "<Keyboard>/a",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Keyboard&Mouse",
                     "action": "Move",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -330,7 +357,7 @@
                     "path": "<Keyboard>/d",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Keyboard&Mouse",
                     "action": "Move",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -341,7 +368,7 @@
                     "path": "<Keyboard>/w",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Keyboard&Mouse",
                     "action": "Move",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -352,7 +379,7 @@
                     "path": "<Keyboard>/s",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Keyboard&Mouse",
                     "action": "Move",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -463,7 +490,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "LaunchModeToggle",
+                    "action": "CombatModeToggle",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -508,6 +535,39 @@
                     "processors": "",
                     "groups": "",
                     "action": "LockTarget",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0a326ec4-9e18-4b88-a88b-af6d6e4c3050",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "MatchTargetLinearVelocity",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a42263ad-f102-4cef-b787-32e6b157d7b9",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "MatchTargetAngularVelocity",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ae204cc3-4e0e-4ae2-957f-020036532317",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "MaintainTargetDistance",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

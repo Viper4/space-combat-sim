@@ -1,42 +1,118 @@
 using System;
+using FishNet;
 using FishNet.Object;
 using UnityEngine;
 
-public class NetworkObjectDestroyer : MonoBehaviour
+public class NetworkObjectDestroyer : NetworkBehaviour
 {
-    [SerializeField] private NetworkObject networkObject;
-    [SerializeField] private UnityEngine.Object[] nonOwnerToDestroy;
-    [SerializeField] private Behaviour[] nonOwnerToDisable;
-    [SerializeField] private UnityEngine.Object[] nonServerToDestroy;
-    [SerializeField] private Behaviour[] nonServerToDisable;
+    [Header("Non-Owner")]
+    [SerializeField] private GameObject[] nonOwnerGOsToDestroy;
+    [SerializeField] private Behaviour[] nonOwnerBehaviorsToDestroy;
+
+    [Header("Non-Server")]
+    [SerializeField] private GameObject[] nonServerGOsToDestroy;
+    [SerializeField] private Behaviour[] nonServerBehaviorsToDestroy;
+
+    public override void OnStartNetwork()
+    {
+        base.OnStartNetwork();
+        HideCriticalObjects();
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+        DestroyAndDisable();
+    }
+
+    public void HideCriticalObjects()
+    {
+        Debug.Log($"[NetworkObjectDestroyer] Hid critical objects on {name}");
+        // Keep everything disabled for safety until client starts
+        for(int i = 0; i < nonOwnerGOsToDestroy.Length; i++)
+        {
+            nonOwnerGOsToDestroy[i].SetActive(false);
+        }
+        for(int i = 0; i < nonOwnerBehaviorsToDestroy.Length; i++)
+        {
+            nonOwnerBehaviorsToDestroy[i].enabled = false;
+        }
+
+        for(int i = 0; i < nonServerGOsToDestroy.Length; i++)
+        {
+            nonServerGOsToDestroy[i].SetActive(false);
+        }
+        for(int i = 0; i < nonServerBehaviorsToDestroy.Length; i++)
+        {
+            nonServerBehaviorsToDestroy[i].enabled = false;
+        }
+    }
+
+    private void ShowOwnerObjects()
+    {
+        for(int i = 0; i < nonOwnerGOsToDestroy.Length; i++)
+        {
+            nonOwnerGOsToDestroy[i].SetActive(true);
+        }
+        for(int i = 0; i < nonOwnerBehaviorsToDestroy.Length; i++)
+        {
+            nonOwnerBehaviorsToDestroy[i].enabled = true;
+        }
+    }
+
+    private void ShowServerObjects()
+    {
+        for(int i = 0; i < nonServerGOsToDestroy.Length; i++)
+        {
+            nonServerGOsToDestroy[i].SetActive(true);
+        }
+        for(int i = 0; i < nonServerBehaviorsToDestroy.Length; i++)
+        {
+            nonServerBehaviorsToDestroy[i].enabled = true;
+        }
+    }
 
     public void DestroyAndDisable()
     {
-        if (networkObject.IsOffline)
-            return;
-        Debug.Log($"[NetworkObjectDestroyer] Destroying and Disabling objects and behaviours for {name}.");
-        if (!networkObject.IsOwner)
+        if (IsOffline)
         {
-            for(int i = 0; i < nonOwnerToDestroy.Length; i++)
-            {
-                Destroy(nonOwnerToDestroy[i]);
-            }
-            for(int i = 0; i < nonOwnerToDisable.Length; i++)
-            {
-                nonOwnerToDisable[i].enabled = false;
-            }
+            ShowOwnerObjects();
+            ShowServerObjects();
+            return;
         }
 
-        if (!networkObject.IsServerInitialized)
+        if (!IsOwner)
         {
-            for(int i = 0; i < nonServerToDestroy.Length; i++)
+            Debug.Log($"[NetworkObjectDestroyer] Destroying non-owner objects for {name}.");
+            for(int i = 0; i < nonOwnerGOsToDestroy.Length; i++)
             {
-                Destroy(nonServerToDestroy[i]);
+                Destroy(nonOwnerGOsToDestroy[i]);
             }
-            for(int i = 0; i < nonServerToDisable.Length; i++)
+            for(int i = 0; i < nonOwnerBehaviorsToDestroy.Length; i++)
             {
-                nonServerToDisable[i].enabled = false;
+                Destroy(nonOwnerBehaviorsToDestroy[i]);
             }
+        }
+        else
+        {
+            ShowOwnerObjects();
+        }
+
+        if (!IsServerInitialized)
+        {
+            Debug.Log($"[NetworkObjectDestroyer] Destroying non-server objects for {name}.");
+            for(int i = 0; i < nonServerGOsToDestroy.Length; i++)
+            {
+                Destroy(nonServerGOsToDestroy[i]);
+            }
+            for(int i = 0; i < nonServerBehaviorsToDestroy.Length; i++)
+            {
+                Destroy(nonServerBehaviorsToDestroy[i]);
+            }
+        }
+        else
+        {
+            ShowServerObjects();
         }
     }
 }

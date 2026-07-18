@@ -160,9 +160,12 @@ MonoBehaviour:
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 1000
-  dynamicScaleFactor: 0
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
+  realRadius: 0.041661642491817474
+  useRealScaleForRadius: 0
+  index: -1
+  worldSpaceOnlyRenderers: []
 --- !u!114 &8675818534221068254
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -175,6 +178,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbody
+  _mass: 0.0000001
   _isKinematic: 0
   speedThreshold: -1
   _velocity:
@@ -186,10 +190,6 @@ MonoBehaviour:
     y: 0
     z: 0
   prevPos:
-    x: 0
-    y: 0
-    z: 0
-  inverseInertiaTensor:
     x: 0
     y: 0
     z: 0

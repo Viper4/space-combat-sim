@@ -2,6 +2,7 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 public class TurretsUI : MonoBehaviour
 {
@@ -34,8 +35,10 @@ public class TurretsUI : MonoBehaviour
         button.onClick.AddListener(() => SelectTurretPanel(index));
     }
 
-    private void Start()
+    private IEnumerator Start()
     {
+        yield return new WaitWhile(() => !turretSystem.initialized);
+        
         turretPanels = new TurretPanel[turretSystem.turrets.Length];
         for (int i = 0; i < turretSystem.turrets.Length; i++)
         {
@@ -61,9 +64,9 @@ public class TurretsUI : MonoBehaviour
             switch (turret.GetType().Name)
             {
                 case "Turret":
-                    turretButtonText.text = "TRT" + (i + 1);
+                    turretButtonText.text = "GUN" + (i + 1);
 
-                    turretPanels[i].title.text = "TRT" + (i + 1) + " INFO";
+                    turretPanels[i].title.text = "GUN" + (i + 1) + " INFO";
                     break;
                 case "LaserTurret":
                     turretButtonText.text = "LSR" + (i + 1);
@@ -71,9 +74,9 @@ public class TurretsUI : MonoBehaviour
                     turretPanels[i].title.text = "LSR" + (i + 1) + " INFO";
                     break;
                 case "RailGun":
-                    turretButtonText.text = "RAI" + (i + 1);
+                    turretButtonText.text = "RLG" + (i + 1);
 
-                    turretPanels[i].title.text = "RAI" + (i + 1) + " INFO";
+                    turretPanels[i].title.text = "RLG" + (i + 1) + " INFO";
                     break;
             }
 
@@ -105,13 +108,18 @@ public class TurretsUI : MonoBehaviour
                 }
             }
             
-            if (turretSystem.manualControl)
+            string targetColor = turret.shoot ? "red" : "yellow";
+            if (turret.currentTarget != null)
             {
-                panel.targetText.text = "<color=yellow>MANUAL CONTROL</color>";
+                panel.targetText.text = $"<color={targetColor}>" + turret.currentTarget.name + "</color>";
+            }
+            else if (turretSystem.manualControl)
+            {
+                panel.targetText.text = $"<color={targetColor}>MANUAL CONTROL</color>";
             }
             else
             {
-                panel.targetText.text = turret.currentTarget == null ? "<color=grey>None</color>" : turret.currentTarget.name;
+                panel.targetText.text = "<color=grey>None</color>";
             }
             
             panel.modelPlatform.rotation = turret.platform.rotation;

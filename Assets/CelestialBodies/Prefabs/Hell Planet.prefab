@@ -14,9 +14,10 @@ GameObject:
   - component: {fileID: 3915326071955594568}
   - component: {fileID: 7915033456189830094}
   - component: {fileID: 7695821888860447494}
-  - component: {fileID: 8320035156069566036}
   - component: {fileID: 1587936259041496733}
   - component: {fileID: -9009501470675722712}
+  - component: {fileID: 5936781585265924629}
+  - component: {fileID: 3616553670080556561}
   m_Layer: 0
   m_Name: Hell Planet
   m_TagString: CelestialBody
@@ -51,7 +52,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 660b2028be04cb445a20efd3df3e65c9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  transformChange: {fileID: 8320035156069566036}
   _realPosition:
     x: 0
     y: 0.6000000238418579
@@ -65,9 +65,12 @@ MonoBehaviour:
   scaledSpaceLayer: 3
   inScaledSpace: 1
   scaleFactor: 1000000
-  dynamicScaleFactor: 0
   worldSpaceThreshold: 4900
   scaledSpaceThreshold: 5100
+  realRadius: 0.5
+  useRealScaleForRadius: 0
+  index: -1
+  worldSpaceOnlyRenderers: []
 --- !u!114 &4552536840262969544
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -89,6 +92,7 @@ MonoBehaviour:
   colorSettingsFoldout: 1
   baseMaxScreenSize: 128
   rootLOD: 1
+  randomSeed: 1
   seedRange: {x: -10000, y: 10000}
 --- !u!114 &3915326071955594568
 MonoBehaviour:
@@ -102,6 +106,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ecefe1d978853f4f91e593a040236b7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 0
+  _addedNetworkObject: {fileID: 5936781585265924629}
+  _networkObjectCache: {fileID: 5936781585265924629}
   scaledTransform: {fileID: 0}
   originalLayer: 0
   generationSettings: {fileID: 11400000, guid: 2dc8b3b7e94058e43903e9ff6661198d, type: 2}
@@ -109,6 +116,8 @@ MonoBehaviour:
   gravitySettings: {fileID: 11400000, guid: 203e0aa71c53ce34da4cc44d8d7d8de7, type: 2}
   gravitySettingsFoldout: 1
   orbitTarget: {fileID: 0}
+  tidallyLocked: 0
+  overrideRotationAxis: 0
   pauseUpdates: 0
 --- !u!54 &7915033456189830094
 Rigidbody:
@@ -149,6 +158,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _mass: 0.0000001
   _isKinematic: 0
   speedThreshold: -1
   _velocity:
@@ -159,25 +169,10 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  finishedStep: 0
   prevPos:
     x: 0
     y: 0
     z: 0
---- !u!114 &8320035156069566036
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3884325996069740028}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 76ec2b68975954c45b1d10e424648641, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TransformChange
-  trackPosition: 1
-  trackRotation: 0
 --- !u!114 &1587936259041496733
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -216,4 +211,84 @@ MonoBehaviour:
     z: 0
   radius: -1
   isTrigger: 0
-  hGridLevel: -1
+  restitution: 0
+  listIndex: -1
+  overrideUnity: 0
+--- !u!114 &5936781585265924629
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3884325996069740028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FishNet.Runtime::FishNet.Object.NetworkObject
+  _localLevelOfDetailCalculationType: 0
+  _useLevelOfDetail: 0
+  _useRootLevelOfDetail: 1
+  NetworkObserver: {fileID: 0}
+  _enablePrediction: 0
+  _predictionType: 0
+  _localReconcileCorrectionType: 2
+  _graphicalObject: {fileID: 0}
+  _detachGraphicalObject: 0
+  _enableStateForwarding: 1
+  _networkTransform: {fileID: 0}
+  _ownerInterpolation: 1
+  _ownerSmoothedProperties: 255
+  _adaptiveInterpolation: 3
+  _spectatorSmoothedProperties: 255
+  _spectatorInterpolation: 2
+  _enableTeleport: 0
+  _teleportThreshold: 1
+  <PrefabId>k__BackingField: 4
+  <SpawnableCollectionId>k__BackingField: 0
+  <AssetPathHash>k__BackingField: 4398213486301737391
+  SceneId: 0
+  SerializedTransformProperties:
+    Position: {x: 0, y: 0, z: 0}
+    Rotation: {x: 0, y: 0, z: 0, w: 1}
+    Scale: {x: 0.000001, y: 0.000001, z: 0.000001}
+    IsValid: 1
+  <IsNested>k__BackingField: 0
+  WasActiveDuringEdit: 0
+  WasActiveDuringEdit_Set1: 1
+  <ComponentIndex>k__BackingField: 0
+  <PredictedSpawn>k__BackingField: {fileID: 0}
+  <PredictedOwner>k__BackingField: {fileID: 0}
+  NetworkBehaviours:
+  - {fileID: 3915326071955594568}
+  - {fileID: 3616553670080556561}
+  InitializedParentNetworkBehaviour: {fileID: 0}
+  InitializedNestedNetworkObjects: []
+  RuntimeParentNetworkBehaviour: {fileID: 0}
+  RuntimeChildNetworkBehaviours: []
+  _isNetworked: 0
+  _isSpawnable: 1
+  _isGlobal: 0
+  _initializeOrder: 0
+  _preventDespawnOnDisconnect: 0
+  _defaultDespawnType: 0
+  _initializedTimestamp: -8584172423546112069
+--- !u!114 &3616553670080556561
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3884325996069740028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87f21fb26d74cb446adea6577efd64e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbodySync
+  _componentIndexCache: 1
+  _addedNetworkObject: {fileID: 5936781585265924629}
+  _networkObjectCache: {fileID: 5936781585265924629}
+  snapshotRate: 10
+  interpolate: 1
+  controlType: 1
+  activeWhenOffline: 1

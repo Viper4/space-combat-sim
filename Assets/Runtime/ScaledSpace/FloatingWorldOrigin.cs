@@ -1,31 +1,52 @@
 using UnityEngine;
 using SpaceStuff;
-using System;
+using FishNet.Object;
+using FishNet;
 
-[RequireComponent(typeof(ScaledTransform))]
-public class FloatingWorldOrigin : MonoBehaviour
+[RequireComponent(typeof(ScaledRigidbody), typeof(ScaledTransform))]
+public class FloatingWorldOrigin : NetworkBehaviour
 {
     public static FloatingWorldOrigin Instance { get; private set; }
 
-    public ScaledRigidbody scaledRigidbody;
-    public ScaledTransform scaledTransform;
+    public ScaledRigidbody scaledRigidbody {get; private set; }
+    public ScaledTransform scaledTransform {get; private set; }
 
     private void Awake()
     {
-        if (Instance == null)
+        scaledRigidbody = GetComponent<ScaledRigidbody>();
+        scaledTransform = GetComponent<ScaledTransform>();
+
+        if (InstanceFinder.IsOffline)
         {
+            if (Instance == null)
+            {
+                Instance = this;
+            }
+            else
+            {
+                Debug.Log($"[FloatingWorldOrigin] Instance already exists in Offline mode, destroying the component on {name}.");
+                Destroy(this);
+            }
+        }
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+        if (IsOwner)
+        {
+            Debug.Log($"[FloatingWorldOrigin] Set Instance to {name}.");
             Instance = this;
-            scaledRigidbody = GetComponent<ScaledRigidbody>();
-            scaledTransform = GetComponent<ScaledTransform>();
+            ScaledSpaceVisuals.Instance.UpdateScaleFactors();
         }
         else
         {
-            Destroy(gameObject);
+            Destroy(this);
         }
     }
 
     public Vector3d GetRealCameraPosition()
     {
-        return Camera.main.transform.position.ToVector3d() + scaledTransform.realPosition;        
+        return scaledTransform.realPosition + Camera.main.transform.position.ToVector3d();        
     }
 }

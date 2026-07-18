@@ -6,7 +6,6 @@ public class GenerationSettings : ScriptableObject
 {
     public bool simple;
     public bool autoGenerate = true;
-    public bool randomShapeGeneration = false;
     public bool sphere = true;
     public Vector3[] initialAngularVelocityRange = new Vector3[2];
     public enum BodyType

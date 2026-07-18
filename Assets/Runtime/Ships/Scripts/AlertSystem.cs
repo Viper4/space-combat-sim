@@ -1,6 +1,7 @@
 using System;
 using FishNet.Connection;
 using FishNet.Object;
+using TMPro;
 using UnityEngine;
 
 public class AlertSystem : NetworkBehaviour
@@ -11,10 +12,17 @@ public class AlertSystem : NetworkBehaviour
     [SerializeField] private AudioClip contactClip;
     [SerializeField] private AudioClip specialContactClip;
 
+    [SerializeField] private GameObject overGPanel;
+    [SerializeField] private GameObject radarLockPanel;
+    [SerializeField] private GameObject torpedoLockPanel;
+    [SerializeField] private GameObject fuelPanel;
+
     private int radarLocks = 0;
     private int torpedoLocks = 0;
 
+    private bool IsOwnerOrOffline => IsOwner || IsOffline;
     private bool IsServerOrOffline => IsServerInitialized || IsOffline;
+
 
     [TargetRpc]
     private void NewContactTargetRpc(NetworkConnection conn)
@@ -22,18 +30,22 @@ public class AlertSystem : NetworkBehaviour
         alertAudioSource.PlayOneShot(contactClip);
     }
 
+    [ServerRpc(RequireOwnership = false)]
+    private void TrySendNewContactServerRpc(NetworkConnection target)
+    {
+        // TODO: Validate request
+        NewContactTargetRpc(target);
+    }
+
     public void NewContact()
     {
-        if (!IsServerOrOffline)
-            return;
-        
-        if (IsOwner || IsOffline)
+        if (IsOwnerOrOffline)
         {
             alertAudioSource.PlayOneShot(contactClip);
         }
         else
         {
-            NewContactTargetRpc(Owner);
+            TrySendNewContactServerRpc(Owner);
         }
     }
 
@@ -43,24 +55,28 @@ public class AlertSystem : NetworkBehaviour
         alertAudioSource.PlayOneShot(specialContactClip);
     }
 
+    [ServerRpc(RequireOwnership = false)]
+    private void TrySendNewSpecialContactServerRpc(NetworkConnection target)
+    {
+        // TODO: Validate request
+        NewSpecialContactTargetRpc(target);
+    }
+
     public void NewSpecialContact()
     {
-        if (!IsServerOrOffline)
-            return;
-        
-        if (IsOwner || IsOffline)
+        if (IsOwnerOrOffline)
         {
             alertAudioSource.PlayOneShot(specialContactClip);
         }
         else
         {
-            NewSpecialContactTargetRpc(Owner);
+            TrySendNewSpecialContactServerRpc(Owner);
         }
     }
 
     private void UpdateRadarLock()
     {
-        if (!IsOwner && !IsOffline)
+        if (!IsOwnerOrOffline)
             return;
         if (radarLocks > 0)
         {
@@ -68,40 +84,55 @@ public class AlertSystem : NetworkBehaviour
                 alertAudioSource.clip = radarLockClip;
             if (!alertAudioSource.isPlaying)
                 alertAudioSource.Play();
+            if (radarLockPanel != null)
+                radarLockPanel.SetActive(true);
         }
         else if (radarLocks <= 0)
         {
             radarLocks = 0;
             if (torpedoLocks <= 0)
+            {
                 alertAudioSource.Stop();
+            }
+            else
+            {
+                alertAudioSource.clip = torpedoLockClip;
+            }
+            if (radarLockPanel != null)
+                radarLockPanel.SetActive(false);
         }
     }
 
     [TargetRpc]
-    private void SetRadarLockTargetRpc(NetworkConnection conn, int radarLocks)
+    private void SetRadarLockTargetRpc(NetworkConnection conn, int amount)
     {
-        this.radarLocks = radarLocks;
+        this.radarLocks += amount;
         UpdateRadarLock();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void TrySendRadarLockServerRpc(NetworkConnection target, int amount)
+    {
+        // TODO: Validate request
+        SetRadarLockTargetRpc(target, amount);
     }
 
     public void IncrementRadarLock(int amount)
     {
-        if (!IsServerOrOffline)
-            return;
         radarLocks += amount;
-        if (IsOwner || IsOffline)
+        if (IsOwnerOrOffline)
         {
             UpdateRadarLock();
         }
         else
         {
-            SetRadarLockTargetRpc(Owner, radarLocks);
+            TrySendRadarLockServerRpc(Owner, amount);
         }
     }
 
     private void UpdateTorpedoLock()
     {
-        if (!IsOwner && !IsOffline)
+        if (!IsOwnerOrOffline)
             return;
         if (torpedoLocks > 0)
         {
@@ -109,34 +140,61 @@ public class AlertSystem : NetworkBehaviour
                 alertAudioSource.clip = torpedoLockClip;
             if (!alertAudioSource.isPlaying)
                 alertAudioSource.Play();
+            if (torpedoLockPanel != null)
+                torpedoLockPanel.SetActive(true);
         }
         else if (torpedoLocks <= 0)
         {
             torpedoLocks = 0;
             if (radarLocks <= 0)
+            {
                 alertAudioSource.Stop();
+            }
+            else
+            {
+                alertAudioSource.clip = radarLockClip;
+            }
+            if (torpedoLockPanel != null)
+                torpedoLockPanel.SetActive(false);
         }
     }
 
     [TargetRpc]
-    private void SetTorpedoLockTargetRpc(NetworkConnection conn, int torpedoLocks)
+    private void SetTorpedoLockTargetRpc(NetworkConnection conn, int amount)
     {
-        this.torpedoLocks = torpedoLocks;
+        this.torpedoLocks += amount;
         UpdateTorpedoLock();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void TrySendTorpedoLockServerRpc(NetworkConnection target, int amount)
+    {
+        // TODO: Validate request
+        SetRadarLockTargetRpc(target, amount);
     }
 
     public void IncrementTorpedoLock(int amount)
     {
-        if (!IsServerOrOffline)
-            return;
         torpedoLocks += amount;
-        if (IsOwner || IsOffline)
+        if (IsOwnerOrOffline)
         {
             UpdateTorpedoLock();
         }
         else
         {
-            SetTorpedoLockTargetRpc(Owner, torpedoLocks);
+            TrySendTorpedoLockServerRpc(Owner, amount);
         }
+    }
+
+    public void ToggleOverGAlert(bool value)
+    {
+        if (overGPanel != null && overGPanel.activeSelf != value)
+            overGPanel.SetActive(value);
+    }
+
+    public void ToggleLowFuelAlert(bool value)
+    {
+        if (fuelPanel != null && fuelPanel.activeSelf != value)
+            fuelPanel.SetActive(value);
     }
 }

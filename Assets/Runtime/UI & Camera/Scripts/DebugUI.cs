@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using FishNet;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -8,25 +9,26 @@ public class DebugUI : MonoBehaviour
 {
     [Header("UI")]
     [SerializeField] private GameObject panel;
-    [SerializeField] private TextMeshProUGUI displayText;
+    [SerializeField] private TextMeshProUGUI logText;
+    [SerializeField] private TextMeshProUGUI detailsText;
+    [SerializeField, Tooltip("How often to update the details text.")] private float pollingTime = 0.5f;
 
     [Header("Settings")]
     [SerializeField] private int maxUniqueLogs = 200;
 
     private readonly Dictionary<string, LogData> logs = new();
 
+    private static readonly Regex ColonRegex = new(@".*:", RegexOptions.Compiled);
     private static readonly Regex NumberRegex = new(@"\d+(\.\d+)?", RegexOptions.Compiled);
+
+    private float time;
+    private int frameCount;
 
     private class LogData
     {
         public string LatestMessage;
         public int Count;
         public LogType Type;
-    }
-
-    private void Awake()
-    {
-        DontDestroyOnLoad(gameObject);
     }
 
     private void OnEnable()
@@ -43,6 +45,36 @@ public class DebugUI : MonoBehaviour
 
         if (GameManager.Instance != null)
             GameManager.Instance.inputActions.UI.Debug.performed -= TogglePanel;
+    }
+
+    private void Update()
+    {
+        time += Time.unscaledDeltaTime;
+        frameCount++;
+
+        if (time >= pollingTime)
+        {
+            int frameRate = Mathf.RoundToInt(frameCount / time);
+            detailsText.text = $"{frameRate} FPS";
+            if (InstanceFinder.IsOffline)
+            {
+                detailsText.text += "\nOffline";
+            }
+            else
+            {
+                if (LobbyManager.Instance.IsHosting)
+                {
+                    detailsText.text += "\nHosting";
+                }
+                else
+                {
+                    detailsText.text += "\nConnected";
+                }
+            }
+
+            time -= pollingTime;
+            frameCount = 0;
+        }
     }
 
     private void TogglePanel(InputAction.CallbackContext context)
@@ -72,17 +104,24 @@ public class DebugUI : MonoBehaviour
             };
         }
 
-        RefreshDisplay();
+        RefreshLog();
     }
 
     private string GenerateTemplateKey(string message)
     {
-        return NumberRegex.Replace(message, "X");
+        if (message.Contains(":"))
+        {
+            return ColonRegex.Match(message).Value;
+        }
+        else
+        {
+            return NumberRegex.Match(message).Value;
+        }
     }
 
-    private void RefreshDisplay()
+    private void RefreshLog()
     {
-        displayText.text = string.Empty;
+        logText.text = string.Empty;
 
         foreach (var pair in logs)
         {
@@ -97,19 +136,19 @@ public class DebugUI : MonoBehaviour
                 _ => "#FFFFFF"
             };
 
-            displayText.text +=
+            logText.text +=
                 $"<color={color}>{log.LatestMessage}</color>";
 
             if (log.Count > 1)
-                displayText.text += $" <color=#88FF88>(x{log.Count})</color>";
+                logText.text += $" <color=#88FF88>(x{log.Count})</color>";
 
-            displayText.text += "\n";
+            logText.text += "\n";
         }
     }
 
     public void ClearLogs()
     {
         logs.Clear();
-        displayText.text = string.Empty;
+        logText.text = string.Empty;
     }
 }

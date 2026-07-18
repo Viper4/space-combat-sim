@@ -12,6 +12,7 @@ public class Ship : NetworkBehaviour
     public RadarTarget radarTarget;
     public StatSystem statSystem;
     public Shields shields;
+    [SerializeField] private AlertSystem alertSystem;
     [SerializeField, Tooltip("Minimum collision impulse for ship to take damage")] private float minImpulse = 5f;
     // Need separate scales since unity's impulse calculation is different from our custom scaled space one
     [SerializeField] private double unityCollideImpulseScale = 0.01;
@@ -19,6 +20,7 @@ public class Ship : NetworkBehaviour
     [SerializeField, Tooltip("Local Z position at the front tip of the ship")] private float maxLocalZ;
     [SerializeField, Tooltip("Collisions at the front of the ship multiply damage by this.")] private float minRamAttenuation = 0.5f;
     [SerializeField, Tooltip("Collisions at the back of the ship multiply damage by this.")] private float maxRamAttenuation = 1.0f;
+    private TargetingSystem targetingSystem;
 
     [Header("HUD stuff")]
     public GameObject hologramPrefab;
@@ -26,7 +28,7 @@ public class Ship : NetworkBehaviour
     [SerializeField] private TextMeshProUGUI speedText;
 
     [Header("Visual/Audio effects")]
-    [SerializeField] private CameraControl cameraControl;
+    [SerializeField] private InertialEffects inertialEffects;
     [SerializeField] private AudioSource thrusterAudioSource;
     [SerializeField] private float thrusterVolumeScale = 1.0f;
     [SerializeField] private AudioSource engineAudioSource;
@@ -37,17 +39,17 @@ public class Ship : NetworkBehaviour
     [SerializeField] private AudioClip launchEngineClip;
 
     [Header("Ship controls")]
-    [SerializeField] private float engineForce = 50f;
-    [SerializeField] private float engineLaunchForce = 50f;
-    [SerializeField] private float thrusterForce = 10f;
+    [SerializeField] private float engineCruiseForce = 50f;
+    [SerializeField] private float engineCombatForce = 50f;
+    [SerializeField] private float thrusterCruiseForce = 10f;
+    [SerializeField] private float thrusterCombatForce = 10f;
     [SerializeField, Tooltip("Thruster distance from ship's x axis (Pitch)")] private float thrusterRadiusX = 5f;
     [SerializeField, Tooltip("Thruster distance from ship's y axis (Yaw)")] private float thrusterRadiusY = 5f;
     [SerializeField, Tooltip("Thruster distance from ship's z axis (Roll)")] private float thrusterRadiusZ = 1f;
-    private Vector3 thrusterTorque;
+    private Vector3 thrusterCruiseTorque;
+    private Vector3 thrusterCombatTorque;
     private bool rollMode = true;
-    private bool launchMode = false;
-    private float fuel = 100f;
-    [SerializeField] private float maxFuel = 100f;
+    private bool combatMode = false;
 
     private bool autoStabilizeRot = false;
     private bool autoStabilizePos = false;
@@ -55,7 +57,12 @@ public class Ship : NetworkBehaviour
     private Vector3 stableVelocity;
     private Vector3 stableLocalVelocity;
     private Vector3 stableLocalAngularVelocity;
-    [SerializeField, Range(0, 1000)] private float P, I, D;
+
+    private bool matchTargetLinearVelocity = false;
+    private bool matchTargetAngularVelocity = false;
+    private float matchDistance = -1.0f;
+
+    [SerializeField, Range(0, 1000)] private float autoP, autoI, autoD;
     private PIDController xRotatePID;
     private PIDController yRotatePID;
     private PIDController zRotatePID;
@@ -64,8 +71,8 @@ public class Ship : NetworkBehaviour
     private PIDController yMovePID;
     private PIDController zMovePID;
 
-    private bool moving = false;
-    private bool rotating = false;
+    [SerializeField, Range(0, 1000)] private float matchDistanceP, matchDistanceI, matchDistanceD;
+    private PIDController matchDistancePID;
 
     public struct ShipInputData
     {
@@ -76,27 +83,50 @@ public class Ship : NetworkBehaviour
     private ShipInputData currentInput;
     [SerializeField] private float inputSendRate = 20f;
     private float inputSendTimer;
+    private bool moving = false;
+    private bool rotating = false;
 
-    private bool ShouldSimulateShip => IsOffline || IsServerInitialized || IsOwner;
+    [Header("Fuel")]
+    [SerializeField, Tooltip("Fuel consumption rate while idling in kg/s.")] private float idleFuelConsumption = 0.1f;
+    [SerializeField, Tooltip("Fuel consumption rate while at max thrust in kg/s.")] private float maxFuelConsumption = 10f;
+    [SerializeField, Tooltip("Exponential factor in fuel consumption formula.")] private float fuelConsumptionFactor = 1.6f;
+    private float fuel = 100000f;
+    [SerializeField, Tooltip("Max fuel capacity in kg.")] private float maxFuel = 100000f;
+    [SerializeField] private SliderIndicator fuelIndicator;
+
+    private bool IsOwnerOrOffline => IsOwner || IsOffline;
 
     private void Awake()
     {
         scaledRigidbody = GetComponent<ScaledRigidbody>();
         radarTarget = GetComponent<RadarTarget>();
 
-        thrusterTorque = new Vector3(thrusterForce * thrusterRadiusX, thrusterForce * thrusterRadiusY, thrusterForce * thrusterRadiusZ);
+        thrusterCruiseTorque = new Vector3(thrusterCruiseForce * thrusterRadiusX, thrusterCruiseForce * thrusterRadiusY, thrusterCruiseForce * thrusterRadiusZ);
+        thrusterCombatTorque = new Vector3(thrusterCombatForce * thrusterRadiusX, thrusterCombatForce * thrusterRadiusY, thrusterCombatForce * thrusterRadiusZ);
 
-        xRotatePID = new PIDController(P, I, D);
-        yRotatePID = new PIDController(P, I, D);
-        zRotatePID = new PIDController(P, I, D);
+        xRotatePID = new PIDController(autoP, autoI, autoD);
+        yRotatePID = new PIDController(autoP, autoI, autoD);
+        zRotatePID = new PIDController(autoP, autoI, autoD);
 
-        xMovePID = new PIDController(P, I, D);
-        yMovePID = new PIDController(P, I, D);
-        zMovePID = new PIDController(P, I, D);
+        xMovePID = new PIDController(autoP, autoI, autoD);
+        yMovePID = new PIDController(autoP, autoI, autoD);
+        zMovePID = new PIDController(autoP, autoI, autoD);
+
+        matchDistancePID = new PIDController(matchDistanceP, matchDistanceI, matchDistanceD);
         if (IsOffline)
         {
             scaledRigidbody.OnScaledCollisionEnter += OnScaledCollide;
         }
+        fuel = maxFuel;
+        fuelIndicator.UpdateUI(fuel, maxFuel);
+
+        if (TryGetComponent(out targetingSystem))
+        {
+            targetingSystem.OnTargetChange += SetTargetMatchDistance;
+        }
+
+        if (PlayerInfoRelay.Instance != null)
+            PlayerInfoRelay.Instance.OnPlayerInfoChanged += UpdateShipName;
     }
 
     public override void OnStartServer()
@@ -106,9 +136,31 @@ public class Ship : NetworkBehaviour
         scaledRigidbody.OnScaledCollisionEnter += OnScaledCollide;
     }
 
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+
+        UpdateShipName();
+    }
+
     private void OnDestroy()
     {
         scaledRigidbody.OnScaledCollisionEnter -= OnScaledCollide;
+        if (targetingSystem != null)
+        {
+            targetingSystem.OnTargetChange -= SetTargetMatchDistance;
+        }
+
+        if (PlayerInfoRelay.Instance != null)
+            PlayerInfoRelay.Instance.OnPlayerInfoChanged -= UpdateShipName;
+    }
+
+    private void UpdateShipName()
+    {
+        if (PlayerRegistry.TryGetPlayer(Owner.ClientId, out PlayerInfo playerInfo))
+        {
+            name = playerInfo.Username;
+        }
     }
 
     private void ReadLocalInput()
@@ -142,52 +194,73 @@ public class Ship : NetworkBehaviour
         currentInput = input;
     }
 
+    private float CalculateFuelBurn(double input, double maxInput)
+    {
+        float t = (float)Math.Pow(Math.Abs(input) / maxInput, fuelConsumptionFactor);
+        return Mathf.Lerp(0.0f, maxFuelConsumption, t);
+    }
+
     private void FixedUpdate()
     {
-        if (!IsServerInitialized && !IsOwner && !IsOffline)
-            return;
-
-        if (IsOwner || IsOffline)
+        if (IsOwnerOrOffline)
         {
             ReadLocalInput();
             if (!IsOffline)
                 SendInputToServer();
         }
 
-        if (!ShouldSimulateShip)
+        if (!IsOwnerOrOffline && !IsServerInitialized)
+            return;
+
+        if (fuel <= 0f)
             return;
 
         // Calculate local force to apply
-        Vector3d finalForce;
-
         Vector3 desiredMove = Vector3.ClampMagnitude(currentInput.move, 1f); // Prevent from moving faster than max force allows
         moving = desiredMove.x != 0 || desiredMove.y != 0 || desiredMove.z != 0;
-
-        double forceX = desiredMove.x * thrusterForce;
-        double forceY = desiredMove.y * thrusterForce;
-        double forceZ = desiredMove.z * thrusterForce;
-        // Engine can only move ship forward so use engine for +z and thrusters for -z
-        if (desiredMove.z > 0)
-        {
-            if (launchMode)
-                forceZ = desiredMove.z * engineLaunchForce;
-            else
-                forceZ = desiredMove.z * engineForce;
-        }
-        finalForce = new Vector3d(forceX, forceY, forceZ);
-
+        
         if (autoStabilizePos)
         {
-            // Add local desired move velocity for PID to move to
             Vector3 stableFinalLocalVel = desiredMove * (float)(scaledRigidbody.velocity.sqrMagnitude + 1.0);
-            if (useRelativeVelocity)
+            if (!moving && targetingSystem != null && targetingSystem.lockedTarget != null)
             {
-                stableFinalLocalVel += stableLocalVelocity;
+                bool shouldUpdateLocalVel = false;
+                Vector3 desiredWorldVel = Vector3.zero;
+                if (matchTargetLinearVelocity)
+                {
+                    desiredWorldVel += targetingSystem.lockedTarget.scaledRigidbody.velocity.ToVector3();
+                    shouldUpdateLocalVel = true;
+                }
+
+                if (matchDistance > 0)
+                {
+                    Vector3d toTarget = targetingSystem.lockedTarget.scaledRigidbody.scaledTransform.realPosition - scaledRigidbody.scaledTransform.realPosition;
+                    double distance = toTarget.magnitude;
+                    double distanceError = distance - matchDistance;
+                    if (distance > 0.001)
+                    {
+                        Vector3 targetDirection = (toTarget / distance).ToVector3();
+                        float closingSpeed = matchDistancePID.GetOutput((float)distanceError, Time.fixedDeltaTime);
+                        desiredWorldVel += targetDirection * closingSpeed;
+                        shouldUpdateLocalVel = true;
+                    }
+                }
+
+                if (shouldUpdateLocalVel)
+                    stableFinalLocalVel += transform.InverseTransformDirection(desiredWorldVel);
             }
             else
             {
-                // stableVelocity is in world coords, convert to local
-                stableFinalLocalVel += transform.InverseTransformDirection(stableVelocity);
+                // Add local desired move velocity for PID to move to
+                if (useRelativeVelocity)
+                {
+                    stableFinalLocalVel += stableLocalVelocity;
+                }
+                else
+                {
+                    // stableVelocity is in world coords, convert to local
+                    stableFinalLocalVel += transform.InverseTransformDirection(stableVelocity);
+                }
             }
 
             Vector3 localVelocity = transform.InverseTransformDirection(scaledRigidbody.velocity.ToVector3());
@@ -198,25 +271,32 @@ public class Ship : NetworkBehaviour
             float fz = zMovePID.GetOutput(error.z, Time.fixedDeltaTime);
             desiredMove = new Vector3(fx, fy, fz);
             desiredMove = Vector3.ClampMagnitude(desiredMove, 1f);
+        }
 
-            // Use engine to go forward (+z) and thrusters to go backward (-z)
+        // Engine can only move ship forward so use engine for +z and thrusters for -z
+        Vector3d finalForce;
+        if (combatMode)
+        {
             finalForce = new Vector3d(
-                desiredMove.x * thrusterForce,
-                desiredMove.y * thrusterForce,
-                desiredMove.z * thrusterForce
+                desiredMove.x * thrusterCombatForce,
+                desiredMove.y * thrusterCombatForce,
+                desiredMove.z > 0 ? desiredMove.z * engineCombatForce : desiredMove.z * thrusterCombatForce
             );
-
-            if (desiredMove.z > 0)
-            {
-                if (launchMode)
-                    finalForce.z = desiredMove.z * engineLaunchForce;
-                else
-                    finalForce.z = desiredMove.z * engineForce;
-            }
+        }
+        else
+        {
+            finalForce = new Vector3d(
+                desiredMove.x * thrusterCruiseForce,
+                desiredMove.y * thrusterCruiseForce,
+                desiredMove.z > 0 ? desiredMove.z * engineCruiseForce : desiredMove.z * thrusterCruiseForce
+            );
         }
 
         if (finalForce.sqrMagnitude > 0.0001)
             scaledRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
+        fuel -= (CalculateFuelBurn(finalForce.x, engineCombatForce) 
+                + CalculateFuelBurn(finalForce.y, engineCombatForce) 
+                + CalculateFuelBurn(finalForce.z, engineCombatForce)) * Time.fixedDeltaTime;
 
         // Calculate local torque to apply
         Vector3d desiredRotate;
@@ -233,7 +313,12 @@ public class Ship : NetworkBehaviour
         if (autoStabilizeRot && !rotating)
         {
             Vector3 localAngularVelocity = transform.InverseTransformDirection(scaledRigidbody.angularVelocity.ToVector3());
-            Vector3 error = stableLocalAngularVelocity - localAngularVelocity;
+            Vector3 finalStableLocalAngVel = stableLocalAngularVelocity;
+            if (matchTargetAngularVelocity && targetingSystem != null && targetingSystem.lockedTarget != null)
+            {
+                finalStableLocalAngVel = transform.InverseTransformDirection(targetingSystem.lockedTarget.scaledRigidbody.angularVelocity.ToVector3());
+            }
+            Vector3 error = finalStableLocalAngVel - localAngularVelocity;
 
             float tx = xRotatePID.GetOutput(error.x, Time.fixedDeltaTime);
             float ty = yRotatePID.GetOutput(error.y, Time.fixedDeltaTime);
@@ -242,16 +327,36 @@ public class Ship : NetworkBehaviour
             desiredRotate = Vector3d.ClampMagnitude(desiredRotate, 1f);
         }
 
-        Vector3d finalTorque = new Vector3d(
-            desiredRotate.x * thrusterTorque.x,
-            desiredRotate.y * thrusterTorque.y,
-            desiredRotate.z * thrusterTorque.z
-        );
+        Vector3d finalTorque;
+        if (combatMode)
+        {
+            finalTorque = new Vector3d(
+                desiredRotate.x * thrusterCombatTorque.x,
+                desiredRotate.y * thrusterCombatTorque.y,
+                desiredRotate.z * thrusterCombatTorque.z
+            );
+        }
+        else
+        {
+            finalTorque = new Vector3d(
+                desiredRotate.x * thrusterCruiseTorque.x,
+                desiredRotate.y * thrusterCruiseTorque.y,
+                desiredRotate.z * thrusterCruiseTorque.z
+            );
+        }
 
         if (finalTorque.sqrMagnitude > 0.0001)
+        {
             scaledRigidbody.AddRelativeTorque(finalTorque, ForceMode.Force);
+        }
+        fuel -= (CalculateFuelBurn(finalTorque.x, thrusterCombatTorque.x) 
+                + CalculateFuelBurn(finalTorque.y, thrusterCombatTorque.y) 
+                + CalculateFuelBurn(finalTorque.z, thrusterCombatTorque.z)) * Time.fixedDeltaTime;
+        
+        // Idling fuel consumption
+        fuel -= idleFuelConsumption * Time.fixedDeltaTime;
 
-        if (IsOwner || IsOffline)
+        if (IsOwnerOrOffline)
         {
             UpdateOwnerEffects(finalForce, desiredRotate, finalTorque);
         }
@@ -269,7 +374,7 @@ public class Ship : NetworkBehaviour
         if (hasForce && finalForce.z > 0.0)
         {
             // Main engine effects
-            float t = (float)finalForce.z / engineLaunchForce;
+            float t = (float)finalForce.z / engineCombatForce;
             if (!rocketTrail.gameObject.activeSelf)
             {
                 rocketTrail.gameObject.SetActive(true);
@@ -284,6 +389,11 @@ public class Ship : NetworkBehaviour
 
     private void UpdateOwnerEffects(Vector3d finalForce, Vector3d desiredRotate, Vector3d finalTorque)
     {
+        fuelIndicator.UpdateUI(fuel, maxFuel);
+        if (alertSystem != null)
+        {
+            alertSystem.ToggleLowFuelAlert(fuel / maxFuel < 0.25f);
+        }
         // Visual effects for force
         bool hasForce = finalForce.sqrMagnitude > 0.0001;
         bool usingThrusters =
@@ -304,19 +414,19 @@ public class Ship : NetworkBehaviour
                     -(float)(finalForce.y / magnitude) * thrusterRadiusY,
                     -(float)(finalForce.z / magnitude) * thrusterRadiusZ
                 );
-                thrusterAudioSource.volume = (float)magnitude / thrusterForce * thrusterVolumeScale;
+                thrusterAudioSource.volume = (float)magnitude / thrusterCombatForce * thrusterVolumeScale;
             }
 
             // Main engine effects
             if (usingMainEngine)
             {
-                float t = (float)finalForce.z / engineLaunchForce;
+                float t = (float)finalForce.z / engineCombatForce;
                 if (!rocketTrail.gameObject.activeSelf)
                 {
                     rocketTrail.gameObject.SetActive(true);
                 }
                 rocketTrail.transform.localScale = t * engineTrailScale * Vector3.one;
-                engineAudioSource.clip = launchMode ? launchEngineClip : normalEngineClip;
+                engineAudioSource.clip = combatMode ? launchEngineClip : normalEngineClip;
                 engineAudioSource.volume = t * engineVolumeScale;
                 if (!engineAudioSource.isPlaying)
                     engineAudioSource.Play();
@@ -357,13 +467,13 @@ public class Ship : NetworkBehaviour
         if (scaledRigidbody.velocity != Vector3d.zero)
             velocityDirectionPivot.rotation = Quaternion.LookRotation(scaledRigidbody.velocity.ToVector3(), transform.up);
 
-        // Update camera movement
-        if (cameraControl != null)
+        // Update inertial effects
+        if (inertialEffects != null)
         {
             Rigidbody rb = scaledRigidbody.attachedRigidbody;
 
             // Local-space linear acceleration: a = F/m (stays local, not TransformVector'd)
-            Vector3 localLinAcc = hasForce ? finalForce.ToVector3() / rb.mass : Vector3.zero;
+            Vector3 localLinAcc = hasForce ? (finalForce / scaledRigidbody.mass).ToVector3() : Vector3.zero;
 
             // Local-space angular acceleration: α = I⁻¹τ
             // First rotate torque into the principal-axis frame, divide, then rotate back to local.
@@ -378,8 +488,7 @@ public class Ship : NetworkBehaviour
                 );
                 localAngAcc = rb.inertiaTensorRotation * principalAlpha;
             }
-
-            cameraControl.UpdateForceTorqueMovement(localLinAcc, localAngAcc);
+            inertialEffects.UpdateEffects(localLinAcc, localAngAcc, transform.InverseTransformDirection(scaledRigidbody.angularVelocity.ToVector3()));
         }
     }
 
@@ -405,7 +514,7 @@ public class Ship : NetworkBehaviour
         // if (collisionInfo.transformB.CompareTag("Projectile") || collisionInfo.transformB.CompareTag("Torpedo"))
         //     return;
 
-        double sqrImpulse = scaledCollideImpulseScale * collisionInfo.impulse.sqrMagnitude / (scaledRigidbody.attachedRigidbody.mass * scaledRigidbody.attachedRigidbody.mass);
+        double sqrImpulse = scaledCollideImpulseScale * collisionInfo.impulse.sqrMagnitude / (scaledRigidbody.mass * scaledRigidbody.mass);
         if (sqrImpulse < minImpulse * minImpulse)
             return;
 
@@ -436,7 +545,7 @@ public class Ship : NetworkBehaviour
         //     return;
 
         Vector3 impulse = collision.impulse;
-        double sqrImpulse = unityCollideImpulseScale * impulse.sqrMagnitude / (scaledRigidbody.attachedRigidbody.mass * scaledRigidbody.attachedRigidbody.mass);
+        double sqrImpulse = unityCollideImpulseScale * impulse.sqrMagnitude / (scaledRigidbody.mass * scaledRigidbody.mass);
         if (sqrImpulse < minImpulse * minImpulse)
             return;
 
@@ -452,7 +561,7 @@ public class Ship : NetworkBehaviour
         float t = Mathf.Clamp01((-relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
         float attenuation = Mathf.Lerp(minRamAttenuation, maxRamAttenuation, t);
         Debug.Log($"Attenuation: {attenuation}");
-        float damage = (float)(attenuation * sqrImpulse);
+        float damage = (float)(attenuation * Math.Sqrt(sqrImpulse));
         if (!IsOffline)
             ApplyCollideDamageToObservers(damage, contact.point);
         else
@@ -473,6 +582,8 @@ public class Ship : NetworkBehaviour
 
     public void SetAutoRotStabilization(int state)
     {
+        if (!IsOwnerOrOffline)
+            return;
         autoStabilizeRot = state == 1;
         if (IsOwner)
             SendAutoRotStabilizationToServer(autoStabilizeRot);
@@ -486,6 +597,8 @@ public class Ship : NetworkBehaviour
 
     public void SetAutoPosStabilization(int state)
     {
+        if (!IsOwnerOrOffline)
+            return;
         autoStabilizePos = state == 1;
         if (IsOwner)
             SendAutoPosStabilizationToServer(autoStabilizePos);
@@ -499,6 +612,8 @@ public class Ship : NetworkBehaviour
 
     public void ToggleRelativeVelocity(int state)
     {
+        if (!IsOwnerOrOffline)
+            return;
         useRelativeVelocity = state == 1;
         if (IsOwner)
             SendRelativeVelocityToServer(useRelativeVelocity);
@@ -506,6 +621,8 @@ public class Ship : NetworkBehaviour
 
     public void SetStableConfiguration(int state)
     {
+        if (!IsOwnerOrOffline)
+            return;
         if (state == 0)
         {
             stableVelocity = Vector3.zero;
@@ -534,21 +651,91 @@ public class Ship : NetworkBehaviour
 
     public void ToggleRollYaw(int state)
     {
+        if (!IsOwnerOrOffline)
+            return;
         rollMode = state == 0;
         if (IsOwner)
             SendRollYawToggleToServer(rollMode);
     }
 
     [ServerRpc]
-    private void SendLaunchModeToServer(bool launchMode)
+    private void SetCombatModeServerRpc(bool combatMode)
     {
-        this.launchMode = launchMode;
+        this.combatMode = combatMode;
     }
 
-    public void ToggleLaunchMode(int state)
+    public void ToggleCombatMode(int state)
     {
-        launchMode = state == 1;
+        if (!IsOwnerOrOffline)
+            return;
+        combatMode = state == 1;
         if (IsOwner)
-            SendLaunchModeToServer(launchMode);
+            SetCombatModeServerRpc(combatMode);
+    }
+
+    [ServerRpc]
+    private void SetMatchTargetAngularVelocityServerRpc(bool value)
+    {
+        this.matchTargetLinearVelocity = value;
+    }
+
+
+    public void ToggleMatchTargetAngularVelocity(int state)
+    {
+        if (!IsOwnerOrOffline)
+            return;
+        matchTargetAngularVelocity = state == 1;
+        if (IsOwner)
+            SetMatchTargetAngularVelocityServerRpc(matchTargetAngularVelocity);
+    }
+
+    [ServerRpc]
+    private void SetMatchTargetLinearVelocityServerRpc(bool value)
+    {
+        this.matchTargetLinearVelocity = value;
+    }
+
+    public void ToggleMatchTargetLinearVelocity(int state)
+    {
+        if (!IsOwnerOrOffline)
+            return;
+        matchTargetLinearVelocity = state == 1;
+        if (IsOwner)
+            SetMatchTargetLinearVelocityServerRpc(matchTargetLinearVelocity);
+    }
+
+    [ServerRpc]
+    private void SetMatchTargetDistance(float distance)
+    {
+        this.matchDistance = distance;
+    }
+
+    private void SetTargetMatchDistance()
+    {
+        if (!IsOwnerOrOffline)
+            return;
+        if (matchDistance < 0)
+            return;
+        if (targetingSystem != null && targetingSystem.lockedTarget != null)
+        {
+            matchDistance = (float)(targetingSystem.lockedTarget.scaledRigidbody.scaledTransform.realPosition - scaledRigidbody.scaledTransform.realPosition).magnitude;
+            if (IsOwner)
+                SetMatchTargetDistance(matchDistance);
+        }
+    }
+
+    public void ToggleMatchTargetDistance(int state)
+    {
+        if (!IsOwnerOrOffline)
+            return;
+        if (state == 0)
+        {
+            matchDistance = -1;
+        }
+        else
+        {
+            matchDistance = 0;
+            SetTargetMatchDistance();
+        }
     }
 }

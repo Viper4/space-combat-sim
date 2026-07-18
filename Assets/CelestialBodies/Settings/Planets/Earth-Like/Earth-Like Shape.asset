@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Earth-Like Shape
   m_EditorClassIdentifier: 
   radius: 1
-  meshFilterResolution: 200
-  levelOfDetail: 4
+  meshFilterResolution: 32
+  levelOfDetail: 5
   meshColliderResolution: 0
   filterLayers:
   - enabled: 1
@@ -63,7 +63,6 @@ MonoBehaviour:
         ridgeWidth: 2
         rimBlend: 0.05
         floorSmoothness: 0.05
-        blendRandomness: 0.01
       valleyNoiseSettings:
         scale: {x: 0, y: 0, z: 0}
         seed: {x: 0, y: 0, z: 0}
@@ -120,7 +119,6 @@ MonoBehaviour:
         ridgeWidth: 2
         rimBlend: 0.05
         floorSmoothness: 0.05
-        blendRandomness: 0.01
       valleyNoiseSettings:
         scale: {x: 0, y: 0, z: 0}
         seed: {x: 0, y: 0, z: 0}
@@ -177,7 +175,6 @@ MonoBehaviour:
         ridgeWidth: 2
         rimBlend: 0.05
         floorSmoothness: 0.05
-        blendRandomness: 0.01
       valleyNoiseSettings:
         scale: {x: 0, y: 0, z: 0}
         seed: {x: 0, y: 0, z: 0}

@@ -73,7 +73,7 @@ public class CraterFilter : IFilter
             // blend the two across the rim instead of a hard branch
             float u = Mathf.InverseLerp(1f - settings.rimBlend, 1f + settings.rimBlend, x);
             float t = Mathf.SmoothStep(0f, 1f, u);
-            height += Mathf.Lerp(bowl, ridge, Mathf.Clamp01(t + (Random.value - 0.5f) * 2f * settings.blendRandomness));
+            height += Mathf.Lerp(bowl, ridge, t);
         }
 
         return height;

@@ -24,6 +24,12 @@ public class SliderIndicator : MonoBehaviour
 
     private void Awake()
     {
+        GetFillImages();
+    }
+
+    private void GetFillImages()
+    {
+        fillImages.Clear();
         foreach (Slider slider in sliders)
         {
             fillImages.Add(slider.fillRect.GetComponent<Image>());
@@ -32,6 +38,10 @@ public class SliderIndicator : MonoBehaviour
 
     public void UpdateUI(float numerator, float denominator)
     {
+        if (sliders.Count != fillImages.Count)
+        {
+            GetFillImages();
+        }
         float percent = numerator / denominator;
         Color color = progressGradient.Evaluate(percent);
         if (sliders.Count > 0)

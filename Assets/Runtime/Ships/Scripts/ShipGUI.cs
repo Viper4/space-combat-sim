@@ -6,8 +6,6 @@ public class ShipGUI : MonoBehaviour
 {
     private static readonly int OpenHash = Animator.StringToHash("Open");
     private static readonly int CloseHash = Animator.StringToHash("Close");
-    private static readonly int OpenRadar = Animator.StringToHash("OpenRadar");
-    private static readonly int CloseRadar = Animator.StringToHash("CloseRadar");
     [SerializeField] private Animator animator;
     [SerializeField] private GameObject canvas;
 
@@ -35,8 +33,6 @@ public class ShipGUI : MonoBehaviour
     private IEnumerator ToggleGUI()
     {
         open = !open;
-        if (radarActive)
-            yield break;
         if (open)
         {
             canvas.SetActive(true);
@@ -59,15 +55,6 @@ public class ShipGUI : MonoBehaviour
 
     public void ToggleRadarActive(bool value)
     {
-        if (radarActive && !value)
-        {
-            animator.SetTrigger(CloseRadar);
-        }
-        else if (open && !radarActive && value)
-        {
-            animator.SetTrigger(OpenRadar);
-        }
         radarActive = value;
-        canvas.SetActive(open && !radarActive);
     }
 }

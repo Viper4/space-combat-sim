@@ -5,8 +5,8 @@ using System.Text;
 using System.Threading;
 using FishNet;
 using FishNet.Connection;
-using FishNet.Managing.Scened;
 using FishNet.Managing.Server;
+using FishNet.Object;
 using FishNet.Transporting;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -16,8 +16,8 @@ using UnityEngine.Networking;
 /// hosting private lobbies, and joining via invite code or direct IP.
 ///
 /// Setup:
-///   1. Attach to a persistent (DontDestroyOnLoad) GameObject in your bootstrap scene.
-///   2. Set mainServerAddress / mainServerPort to your dedicated server.
+///   1. Attach to a persistent (DontDestroyOnLoad) GameObject in the bootstrap scene.
+///   2. Set mainServerAddress / mainServerPort to the dedicated server.
 ///   3. Set privateServerPort to any open port for player-hosted lobbies (default 7771).
 ///   4. Set connectionTimeoutSeconds to match Tugboat's ClientConnectTimeout / 1000 (default 5).
 ///   5. LobbyUI wires its buttons to the public methods here.
@@ -38,7 +38,7 @@ public class LobbyManager : MonoBehaviour
     // -- Inspector --------------------------------------------------------------
 
     [Header("Main Server")]
-    [SerializeField] private string mainServerAddress = "your-server.example.com";
+    [SerializeField] private string mainServerAddress = "This shit dont exist yet ☺";
     [SerializeField] private ushort mainServerPort    = 7770;
 
     [Header("Private Lobby")]
@@ -50,6 +50,8 @@ public class LobbyManager : MonoBehaviour
     [Tooltip("If LocalConnectionState reaches Started but drops again within this window, "
            + "we report 'server full' rather than a generic disconnect.")]
     [SerializeField] private float kickWindowSeconds = 2f;
+
+    [SerializeField] private NetworkObject playerInfoRelayPrefab;
 
     // -- State ------------------------------------------------------------------
 
@@ -91,7 +93,7 @@ public class LobbyManager : MonoBehaviour
     // -- Private ----------------------------------------------------------------
 
     private bool _isHosting;
-    private int  _maxPlayers; // 0 = unlimited
+    private int  _maxPlayers = 16; // 0 = unlimited
 
     // Connection diagnostics — set on every attempt, read in ClassifyAndFireFailure()
     private enum ConnectTarget { MainServer, PrivateLobby }
@@ -102,6 +104,8 @@ public class LobbyManager : MonoBehaviour
     private bool    _everReachedStarted;   // true once LocalConnectionState.Started fires
     private float   _connectedStartTime;   // Time.time when Started first fired
     private bool    _disconnectingIntentionally; // Set by Disconnect() to suppress error messages
+
+    private string _localUsername;
 
     // -- Lifecycle --------------------------------------------------------------
 
@@ -126,7 +130,10 @@ public class LobbyManager : MonoBehaviour
     private void OnDisable()
     {
         if (InstanceFinder.ClientManager != null)
+        {
             InstanceFinder.ClientManager.OnClientConnectionState -= HandleClientState;
+            InstanceFinder.ClientManager.OnRemoteConnectionState -= HandleRemoteConnectionClient;
+        }
         if (InstanceFinder.ServerManager != null)
         {
             InstanceFinder.ServerManager.OnServerConnectionState -= HandleServerState;
@@ -136,9 +143,14 @@ public class LobbyManager : MonoBehaviour
 
     // -- Public API -------------------------------------------------------------
 
+    public void UpdatePlayerCount()
+    {
+        OnPlayerCountChanged?.Invoke(InstanceFinder.ClientManager.Clients.Count, _maxPlayers);
+    }
+
     public void LoadSingleplayer()
     {
-        
+        SceneLoader.Instance.BeginOfflineLoad("MainScene");
     }
 
     /// <summary>Connect to the always-on main server.</summary>
@@ -169,34 +181,86 @@ public class LobbyManager : MonoBehaviour
 
         // Server starts first, then the local client connects to loopback.
         SetPort(privateServerPort);
-        InstanceFinder.ServerManager.StartConnection();
+        if (!InstanceFinder.ServerManager.StartConnection())
+        {
+            Fail("Server failed to start. This usually occurs when the specified port is unavailable.");
+            return;
+        }
         InstanceFinder.ServerManager.OnRemoteConnectionState += HandleRemoteConnectionServer;
 
         SetTransport("localhost", privateServerPort);
         _connectionStartTime = Time.time;
-        InstanceFinder.ClientManager.StartConnection();
+        if (!InstanceFinder.ClientManager.StartConnection())
+        {
+            Fail("Client failed to start. This usually occurs when the specified port is unavailable.");
+            InstanceFinder.ServerManager.OnRemoteConnectionState -= HandleRemoteConnectionServer;
+            return;
+        }
+        InstanceFinder.ClientManager.OnRemoteConnectionState += HandleRemoteConnectionClient;
 
         SetState(LobbyState.Hosting);
         StartCoroutine(FetchPublicIPAndFireCode(privateServerPort));
     }
 
+    public void SetPrivateLobbyPort(ushort port)
+    {
+        privateServerPort = port;
+    }
+
+    public ushort GetPrivateLobbyPort()
+    {
+        return privateServerPort;
+    }
+
+    public void SetMaxPlayersAsHost(int maxPlayers)
+    {
+        SetMaxPlayers(maxPlayers);
+        PlayerInfoRelay.Instance.SendMaxPlayersObserversRpc(maxPlayers);
+    }
+
     public void SetMaxPlayers(int maxPlayers)
     {
         _maxPlayers = Mathf.Max(0, maxPlayers);
-        OnPlayerCountChanged?.Invoke(InstanceFinder.ServerManager.Clients.Count, _maxPlayers);
+        UpdatePlayerCount();
+    }
+    
+    public string GetLocalUsername()
+    {
+        return _localUsername;
+    }
+
+    public void UpdatePlayerUsername()
+    {
+        PlayerInfo currentInfo = PlayerInfo.Default(InstanceFinder.ClientManager.Connection.ClientId);
+        PlayerRegistry.TryGetPlayer(currentInfo.ClientId, out currentInfo);
+        currentInfo.Username = _localUsername;
+        if (PlayerInfoRelay.Instance != null)
+            PlayerInfoRelay.Instance.SendPlayerInfoServerRpc(currentInfo, InstanceFinder.ClientManager.Connection);
+        // Submitting ServerRPC will update PlayerInfo for all clients including this one, but to avoid lag should update locally too
+        PlayerRegistry.SetPlayer(currentInfo);
     }
 
     public void SetPlayerUsername(string username)
     {
-        if (!InstanceFinder.ClientManager.Started)
+        _localUsername = username;
+        PlayerInfoRelay relay = PlayerInfoRelay.Instance;
+        
+        if (!InstanceFinder.IsClientStarted)
+        {
+            Debug.LogWarning("[LobbyManager] Cannot submit username because client is not started.");
             return;
-        PlayerInfo currentInfo = PlayerInfo.Default(InstanceFinder.ClientManager.Connection.ClientId);
-        PlayerRegistry.TryGetPlayer(currentInfo.ClientId, out currentInfo);
-        currentInfo.Username = username;
-        if (PlayerInfoRelay.Instance != null)
-            PlayerInfoRelay.Instance.SubmitPlayerInfoServerRpc(currentInfo, InstanceFinder.ClientManager.Connection);
-        // Submitting ServerRPC will update PlayerInfo for all clients including this one, but to avoid lag should update locally too
-        PlayerRegistry.SetPlayer(currentInfo);
+        }
+        if (!relay.IsSpawned)
+        {
+            Debug.LogWarning("[LobbyManager] Cannot submit username because PlayerInfoRelay is not spawned.");
+            return;
+        }
+        if (!relay.IsClientInitialized)
+        {
+            Debug.LogWarning("[LobbyManager] Cannot submit username because PlayerInfoRelay is not client initialized.");
+            return;
+        }
+        UpdatePlayerUsername();
     }
 
     /// <summary>Join using a base-64 invite code from HostPrivateLobby.</summary>
@@ -228,16 +292,24 @@ public class LobbyManager : MonoBehaviour
         StopAllCoroutines(); // Cancel any in-progress ValidateAndConnect
 
         if (InstanceFinder.IsClientStarted)
+        {
+            InstanceFinder.ClientManager.OnRemoteConnectionState -= HandleRemoteConnectionClient;
             InstanceFinder.ClientManager.StopConnection();
+        }
 
         if (_isHosting && InstanceFinder.IsServerStarted)
         {
+            if (PlayerInfoRelay.Instance != null)
+            {
+                InstanceFinder.ServerManager.Despawn(PlayerInfoRelay.Instance);
+            }
             InstanceFinder.ServerManager.OnRemoteConnectionState -= HandleRemoteConnectionServer;
             InstanceFinder.ServerManager.StopConnection(sendDisconnectMessage: true);
         }
 
         _isHosting = false;
         SetState(LobbyState.Disconnected);
+        SceneLoader.Instance.BeginOfflineLoad("StartScene");
     }
 
     // -- Invite Code ------------------------------------------------------------
@@ -323,7 +395,12 @@ public class LobbyManager : MonoBehaviour
         // -- 3. All checks passed — start the connection ------------------------
         _connectionStartTime = Time.time;
         SetTransport(address, port);
-        InstanceFinder.ClientManager.StartConnection();
+        if (!InstanceFinder.ClientManager.StartConnection())
+        {
+            Fail("Client failed to start. This usually occurs when the specified port is unavailable.");
+            yield break;
+        }
+        InstanceFinder.ClientManager.OnRemoteConnectionState += HandleRemoteConnectionClient;
     }
 
     /// <summary>
@@ -369,10 +446,11 @@ public class LobbyManager : MonoBehaviour
     {
         SetState(LobbyState.Disconnected);
         OnConnectionFailed?.Invoke(message);
+        Debug.Log($"[LobbyManager] Connection failed: {message}");
     }
 
     // -- Max Players ------------------------------------------------------------
-
+    
     /// <summary>
     /// Server-side: runs only on the hosting machine.
     /// Enforces the max-player cap and fires OnPlayerCountChanged for the host UI.
@@ -391,7 +469,16 @@ public class LobbyManager : MonoBehaviour
             }
         }
 
-        OnPlayerCountChanged?.Invoke(InstanceFinder.ServerManager.Clients.Count, _maxPlayers);
+        UpdatePlayerCount();
+    }
+
+    /// <summary>
+    /// Client-side: runs on non hosting machines.
+    /// Fires OnPlayerCountChanged for the client UI.
+    /// </summary>
+    private void HandleRemoteConnectionClient(RemoteConnectionStateArgs args)
+    {
+        UpdatePlayerCount();
     }
 
     // -- Transport --------------------------------------------------------------
@@ -429,6 +516,17 @@ public class LobbyManager : MonoBehaviour
             Debug.LogWarning("[LobbyManager] Could not fetch public IP — invite code will use 127.0.0.1 (LAN only).");
         string ip = ok ? req.downloadHandler.text.Trim() : "127.0.0.1";
         OnInviteCodeReady?.Invoke(GenerateInviteCode(ip, port));
+        Debug.Log($"[LobbyManager] Hosting on {ip}:{port}");
+
+        // Spawn PlayerInfoRelay
+        if (PlayerInfoRelay.Instance != null)
+        {
+            InstanceFinder.ServerManager.Despawn(PlayerInfoRelay.Instance);
+        }
+        NetworkObject relay = Instantiate(playerInfoRelayPrefab);
+        yield return new WaitUntil(() => InstanceFinder.ServerManager.Started);
+        Debug.Log($"[LobbyManager] Spawned PlayerInfoRelay.");
+        InstanceFinder.ServerManager.Spawn(relay);
     }
 
     // -- Internal State ---------------------------------------------------------
@@ -451,7 +549,9 @@ public class LobbyManager : MonoBehaviour
                 _connectedStartTime = Time.time;
                 // Hosting stays in Hosting; a pure client moves to Connected.
                 if (State == LobbyState.Connecting)
+                {
                     SetState(LobbyState.Connected);
+                }
                 break;
 
             case LocalConnectionState.Stopped:
@@ -469,9 +569,14 @@ public class LobbyManager : MonoBehaviour
                 if (!_disconnectingIntentionally)
                 {
                     if (wasConnecting)
+                    {
                         ClassifyAndFireFailure();
+                    }
                     else if (wasLive)
+                    {
+                        SceneLoader.Instance.BeginOfflineLoad("StartScene");
                         OnConnectionFailed?.Invoke("Lost connection to the server.");
+                    }
                 }
                 _disconnectingIntentionally = false;
                 break;

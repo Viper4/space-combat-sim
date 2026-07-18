@@ -11,7 +11,6 @@ public class Radar : MonoBehaviour
 
     [SerializeField] private Ship ship;
     [SerializeField] private ShipGUI shipGUI;
-    [SerializeField] private HUDSystem _HUDSystem;
     [SerializeField] private AlertSystem alertSystem;
 
     [SerializeField] private float[] radarRanges;
@@ -229,7 +228,7 @@ public class Radar : MonoBehaviour
                     }
                 }
 
-                if (_HUDSystem.radarHudActive)
+                if (HUDSystem.Instance.radarHudActive)
                 {
                     Vector3d relativeAcceleration = radarTarget.acceleration - ship.radarTarget.acceleration;
                     Vector3d relativeVelocity = radarTarget.scaledRigidbody.velocity - ship.scaledRigidbody.velocity;
@@ -246,12 +245,12 @@ public class Radar : MonoBehaviour
                         "\nCLS " + SpaceMath.SpeedToFormattedString(closingVelocity, "F2") +
                         "\nETA " + ETA;
 
-                    double predictTime = arrivalTime < 0.0 ? distance / 25.0 : arrivalTime;
+                    double predictTime = arrivalTime < 0.0 ? distance * 0.0025f : arrivalTime;
                     Vector3d predictedPosition = radarTarget.scaledRigidbody.scaledTransform.realPosition + radarTarget.scaledRigidbody.velocity * predictTime + 0.5 * predictTime * predictTime * radarTarget.acceleration;
 
-                    if (!_HUDSystem.UpdateObject(radarTarget, details, predictedPosition))
+                    if (!HUDSystem.Instance.UpdateObject(radarTarget, details, predictedPosition))
                     {
-                        HUDObject newHUDObject = _HUDSystem.CreateObject(radarTarget, details, predictedPosition);
+                        HUDObject newHUDObject = HUDSystem.Instance.CreateObject(radarTarget, details, predictedPosition);
                         switch (radarTarget.transform.tag)
                         {
                             case "Ship":
@@ -377,5 +376,10 @@ public class Radar : MonoBehaviour
             return;
         config.on = false;
         alertConfigs[tag] = config;
+    }
+
+    public float GetCurrentRange()
+    {
+        return radarRanges[rangeIndex];
     }
 }

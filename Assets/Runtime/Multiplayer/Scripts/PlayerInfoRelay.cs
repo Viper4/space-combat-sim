@@ -1,15 +1,17 @@
+using System;
 using System.Collections.Generic;
 using FishNet;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Transporting;
+using UnityEngine;
+using System.Collections;
 
 public class PlayerInfoRelay : NetworkBehaviour
 {
     public static PlayerInfoRelay Instance { get; private set; }
 
-    // Server-side authoritative copy.
-    private readonly Dictionary<int, PlayerInfo> serverPlayers = new();
+    public Action OnPlayerInfoChanged;
 
     private void Awake()
     {
@@ -19,11 +21,36 @@ public class PlayerInfoRelay : NetworkBehaviour
             return;
         }
         Instance = this;
+        if (InstanceFinder.IsClientStarted)
+        {
+            StartCoroutine(WaitToInitializePlayerData());
+        }
+    }
+
+    private IEnumerator WaitToInitializePlayerData()
+    {
+        yield return new WaitUntil(() => IsClientInitialized);
+
+        // Ask server for current player infos.
+        GetInitialDataServerRpc(LocalConnection);
+        // Then submit my player info
+        LobbyManager.Instance.UpdatePlayerUsername();
+        if (!PlayerRegistry.TryGetPlayer(LocalConnection.ClientId, out var thisInfo))
+        {
+            Debug.LogWarning($"[PlayerInfoRelay] Failed to get local client's player info, manually setting Username.");
+            thisInfo = PlayerInfo.Default(LocalConnection.ClientId);
+            thisInfo.Username = LobbyManager.Instance.GetLocalUsername();
+        }
+        SendPlayerInfoServerRpc(thisInfo, LocalConnection);
+
+        // Also need to ensure LobbyManager stuff is properly setup
+        LobbyManager.Instance.UpdatePlayerCount();
     }
 
     private void OnEnable()
     {
-        InstanceFinder.ServerManager.OnRemoteConnectionState += HandleRemoteConnectionState;
+        if (InstanceFinder.ServerManager != null)
+            InstanceFinder.ServerManager.OnRemoteConnectionState += HandleRemoteConnectionState;
     }
 
     private void OnDisable()
@@ -32,39 +59,26 @@ public class PlayerInfoRelay : NetworkBehaviour
             InstanceFinder.ServerManager.OnRemoteConnectionState -= HandleRemoteConnectionState;
     }
 
-    public override void OnStartClient()
-    {
-        base.OnStartClient();
-        if (!IsOwner)
-            return;
-
-        // Ask server for current player list.
-        RequestInitialPlayerDataServerRpc();
-        // Submit my player info
-        if (!PlayerRegistry.TryGetPlayer(LocalConnection.ClientId, out PlayerInfo thisInfo))
-            thisInfo = PlayerInfo.Default(LocalConnection.ClientId);
-        SubmitPlayerInfoServerRpc(thisInfo);
-    }
-
     // ---------------------------------------------------------
     // CLIENT -> SERVER
     // ---------------------------------------------------------
 
     [ServerRpc(RequireOwnership = false)]
-    public void SubmitPlayerInfoServerRpc(PlayerInfo info, NetworkConnection sender = null)
+    public void SendPlayerInfoServerRpc(PlayerInfo info, NetworkConnection sender = null)
     {
         if (sender == null)
             return;
 
         // Force correct client id.
         info.ClientId = sender.ClientId;
-        serverPlayers[sender.ClientId] = info;
+        PlayerRegistry.SetPlayer(info);
+        Debug.Log($"[PlayerInfoRelay] Updated PlayerInfo ({info.Username}) for client {sender.ClientId} on the Server.");
 
         BroadcastPlayerInfoObserversRpc(info);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void RequestInitialPlayerDataServerRpc(NetworkConnection sender = null)
+    private void GetInitialDataServerRpc(NetworkConnection sender = null)
     {
         if (sender == null)
             return;
@@ -74,7 +88,7 @@ public class PlayerInfoRelay : NetworkBehaviour
         foreach (var pair in PlayerRegistry.Players)
             infos.Add(pair.Value);
 
-        TargetReceiveInitialData(sender, infos.ToArray());
+        SendInitialDataTargetRpc(sender, infos.ToArray());
     }
 
     // ---------------------------------------------------------
@@ -85,6 +99,14 @@ public class PlayerInfoRelay : NetworkBehaviour
     private void BroadcastPlayerInfoObserversRpc(PlayerInfo info)
     {
         PlayerRegistry.SetPlayer(info);
+        OnPlayerInfoChanged?.Invoke();
+        Debug.Log($"[PlayerInfoRelay] Updated PlayerInfo ({info.Username}) for client {info.ClientId} for the local client.");
+    }
+
+    [ObserversRpc]
+    public void SendMaxPlayersObserversRpc(int maxPlayers)
+    {
+        LobbyManager.Instance.SetMaxPlayers(maxPlayers);
     }
 
     // ---------------------------------------------------------
@@ -92,22 +114,26 @@ public class PlayerInfoRelay : NetworkBehaviour
     // ---------------------------------------------------------
 
     [TargetRpc]
-    private void TargetReceiveInitialData(NetworkConnection conn, PlayerInfo[] infos)
+    private void SendInitialDataTargetRpc(NetworkConnection conn, PlayerInfo[] infos)
     {
         foreach (PlayerInfo info in infos)
             PlayerRegistry.SetPlayer(info);
+        OnPlayerInfoChanged?.Invoke();
+        Debug.Log($"[PlayerInfoRelay] Received all PlayerInfos from Server for the local client.");
     }
 
     // ---------------------------------------------------------
-    // DISCONNECTS FOR SERVER AND ALL CLIENTS
+    // CONNECTS/DISCONNECTS FOR SERVER AND ALL CLIENTS
     // ---------------------------------------------------------
 
     private void HandleRemoteConnectionState(NetworkConnection conn, RemoteConnectionStateArgs args)
     {
-        // Connecting players need to send their info themselves
-        if (args.ConnectionState != RemoteConnectionState.Stopped)
-            return;
-
-        PlayerRegistry.RemovePlayer(conn.ClientId);
+        // Connecting players need to send their info 
+        switch (args.ConnectionState)
+        {
+            case RemoteConnectionState.Stopped:
+                PlayerRegistry.RemovePlayer(conn.ClientId);
+                break;
+        }
     }
 }

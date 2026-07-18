@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using FishNet.Managing.Scened;
 using UnityEngine;
@@ -11,6 +12,9 @@ public class SceneLoader : DefaultSceneProcessor
     [SerializeField] private SliderIndicator progressIndicator;
 
     private AsyncOperation manualOperation;
+
+    public Action OnStartSceneLoad;
+    public Action OnEndSceneLoad;
 
     private void Awake()
     {
@@ -33,6 +37,7 @@ public class SceneLoader : DefaultSceneProcessor
 
         manualOperation = op;
         loadingPanel.SetActive(true);
+        OnStartSceneLoad?.Invoke();
 
         while (!IsPercentComplete())
         {
@@ -41,18 +46,53 @@ public class SceneLoader : DefaultSceneProcessor
 
         manualOperation = null;
         loadingPanel.SetActive(false);
+
+        if (sceneName == "StartScene")
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        OnEndSceneLoad?.Invoke();
     }
 
     public override void LoadStart(LoadQueueData queueData)
     {
         base.LoadStart(queueData);
         loadingPanel.SetActive(true);
+        OnStartSceneLoad?.Invoke();
+        string sceneNames = "";
+        for(int i = 0; i < queueData.SceneLoadData.SceneLookupDatas.Length; i++)
+        {
+            if (i == queueData.SceneLoadData.SceneLookupDatas.Length - 1)
+            {
+                sceneNames += queueData.SceneLoadData.SceneLookupDatas[i].Name;
+            }
+            else
+            {
+                sceneNames += queueData.SceneLoadData.SceneLookupDatas[i].Name + ", ";
+            }
+        }
+        Debug.Log($"[SceneLoader] Started scene load for {sceneNames}");
     }
 
     public override void LoadEnd(LoadQueueData queueData)
     {
         base.LoadEnd(queueData);
         loadingPanel.SetActive(false);
+        OnEndSceneLoad?.Invoke();
+        string sceneNames = "";
+        for(int i = 0; i < queueData.SceneLoadData.SceneLookupDatas.Length; i++)
+        {
+            if (i == queueData.SceneLoadData.SceneLookupDatas.Length - 1)
+            {
+                sceneNames += queueData.SceneLoadData.SceneLookupDatas[i].Name;
+            }
+            else
+            {
+                sceneNames += queueData.SceneLoadData.SceneLookupDatas[i].Name + ", ";
+            }
+        }
+        Debug.Log($"[SceneLoader] Ended scene load for {sceneNames}");
     }
 
     /// <summary>

@@ -10,25 +10,27 @@ using FishNet.Connection;
 [RequireComponent(typeof(StatSystem))]
 public class Turret : NetworkBehaviour
 {
-    [Header("Turret")] public StatSystem statSystem;
-    [SerializeField] private TurretSystem turretSystem;
-
+    [Header("Parts")]
     public bool active = true;
-    [SerializeField] protected LayerMask ignoreLayers;
-    private float currentYaw;
-    private float currentPitch;
+    public StatSystem statSystem;
+    [SerializeField] private TurretSystem turretSystem;
     [SerializeField] private Transform origin;
     public Transform platform;
     public Transform barrel;
     public Transform firePoint;
 
+    [Header("Limits")]
+    [SerializeField] protected LayerMask ignoreLayers;
+    private float currentYaw;
+    private float currentPitch;
     [SerializeField] private Vector3 minAngles;
     [SerializeField] private Vector3 maxAngles;
     [SerializeField] private float rotateSpeed = 180f;
 
+    [Header("Shooting")]
     [SerializeField] private float maxShootDelta = 0.05f;
     [SerializeField, Tooltip("One bullet per fireRate seconds.")] private float fireRate = 0.15f;
-    [SerializeField] protected float fireTime = 0;
+    private float nextFireTime = 0f;
     [SerializeField] protected GameObject projectilePrefab;
     [SerializeField] private GameObject shootParticles;
     [SerializeField] protected float projectileSpeed = 50;
@@ -46,6 +48,7 @@ public class Turret : NetworkBehaviour
     private RadarTarget bestDefTarget = null;
     public RadarTarget currentTarget;
 
+    [Header("Targeting")]
     [SerializeField, Range(0, 1), Tooltip("0=only use velocity to estimate target arrival time, 1=acceleration dominant estimate of arrival time")] private float accelerationHeuristic = 0.5f;
     [SerializeField] private string explosiveTag;
 
@@ -58,6 +61,7 @@ public class Turret : NetworkBehaviour
 
     public GameObject UIModel;
 
+    [Header("Destruction")]
     public bool destroyed = false;
     [SerializeField, Tooltip("Percent of health lost before enabling damaged particles.")] private float damagedThreshold = 0.5f;
     [SerializeField] private ParticleSystem damagedParticles;
@@ -68,6 +72,10 @@ public class Turret : NetworkBehaviour
 
     [SerializeField] private bool test;
     private Queue<KeyValuePair<float, Vector3d>> predictions = new Queue<KeyValuePair<float, Vector3d>>();
+
+    [SerializeField] private bool overrideShoot = false;
+
+    private bool IsOwnerOrOffline => IsOwner || IsOffline;
 
     private void Start()
     {
@@ -116,90 +124,94 @@ public class Turret : NetworkBehaviour
     {
         if (!active)
             return;
-        
-        if (IsOffline || IsOwner)
+
+        if (!IsOwnerOrOffline)
+            return;
+    
+        if (currentTarget != null)
         {
-            if (currentTarget != null)
+            // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
+            Vector3d realFirePoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+            Vector3d realTargetPos = currentTarget.scaledRigidbody.scaledTransform.realPosition;
+            Vector3d relativePosition = realTargetPos - realFirePoint;
+
+            if (relativePosition.sqrMagnitude > turretSystem.detectRadius * turretSystem.detectRadius)
             {
-                // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
-                Vector3d realFirePoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
-                Vector3d realTargetPos = currentTarget.scaledRigidbody.scaledTransform.realPosition;
-                Vector3d relativePosition = realTargetPos - realFirePoint;
-
-                if (relativePosition.sqrMagnitude > turretSystem.detectRadius * turretSystem.detectRadius)
-                {
-                    currentTarget = null;
-                    return;
-                }
-
-                Vector3d targetVelocity = currentTarget.scaledRigidbody.velocity;
-                Vector3d relativeVelocity = targetVelocity - turretSystem.ship.scaledRigidbody.velocity;
-                
-                // Assume the bullet's acceleration after getting fired is only from gravity
-                Vector3d projectileAcceleration = turretSystem.ship.scaledRigidbody.GetGravity();
-                Vector3d relativeAcceleration = currentTarget.acceleration - projectileAcceleration;
-
-                // Maybe add noise or something to bulletTime
-                double bulletTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration, projectileSpeed);
-                Vector3d predictedRelativePos = relativePosition
-                        + (relativeVelocity * bulletTime)
-                        + (0.5 * bulletTime * bulletTime * relativeAcceleration);
-                Vector3d direction = predictedRelativePos.normalized;
-                Vector3d simulatedVelocity = turretSystem.ship.scaledRigidbody.velocity + direction * projectileSpeed;
-                Vector3d simulatedPos = realFirePoint + simulatedVelocity * bulletTime + 0.5 * bulletTime * bulletTime * projectileAcceleration;
-                aimDirection = direction.ToVector3();
-
-                var prediction = new KeyValuePair<float, Vector3d>(Time.time + (float)bulletTime, simulatedPos);
-                predictions.Enqueue(prediction);
-
-                if (!shoot && !turretSystem.manualControl && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
-                    shoot = true;
+                currentTarget = null;
+                return;
             }
 
-            if (aimDirection.sqrMagnitude > 0.00001f)
+            Vector3d targetVelocity = currentTarget.scaledRigidbody.velocity;
+            Vector3d relativeVelocity = targetVelocity - turretSystem.ship.scaledRigidbody.velocity;
+            
+            // Assume the bullet's acceleration after getting fired is only from gravity
+            Vector3d projectileAcceleration = turretSystem.ship.scaledRigidbody.GetGravity();
+            Vector3d relativeAcceleration = currentTarget.acceleration - projectileAcceleration;
+
+            // Maybe add noise or something to bulletTime
+            double bulletTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration, projectileSpeed);
+            Vector3d predictedRelativePos = relativePosition
+                    + (relativeVelocity * bulletTime)
+                    + (0.5 * bulletTime * bulletTime * relativeAcceleration);
+            Vector3d direction = predictedRelativePos.normalized;
+            Vector3d simulatedVelocity = turretSystem.ship.scaledRigidbody.velocity + direction * projectileSpeed;
+            Vector3d simulatedPos = realFirePoint + simulatedVelocity * bulletTime + 0.5 * bulletTime * bulletTime * projectileAcceleration;
+            aimDirection = direction.ToVector3();
+
+            var prediction = new KeyValuePair<float, Vector3d>(Time.time + (float)bulletTime, simulatedPos);
+            predictions.Enqueue(prediction);
+
+            if (!shoot && !turretSystem.manualControl && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
+                shoot = true;
+        }
+
+        if (aimDirection.sqrMagnitude > 0.0001f)
+        {
+            Vector3 localDir = platform.parent.InverseTransformDirection(aimDirection);
+            float targetYaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
+            targetYaw = Mathf.Clamp(SpaceMath.NormalizeAngle(targetYaw), minAngles.y, maxAngles.y);
+
+            Quaternion yawRotation = Quaternion.Euler(0f, targetYaw, 0f);
+            Vector3 yawSpaceDir = Quaternion.Inverse(yawRotation) * localDir;
+            float targetPitch = -Mathf.Atan2(yawSpaceDir.y, yawSpaceDir.z) * Mathf.Rad2Deg;
+            targetPitch = Mathf.Clamp(SpaceMath.NormalizeAngle(targetPitch), minAngles.x, maxAngles.x);
+
+            currentYaw = Mathf.MoveTowardsAngle(currentYaw, targetYaw, rotateSpeed * Time.fixedDeltaTime);
+            currentPitch = Mathf.MoveTowardsAngle(currentPitch, targetPitch, rotateSpeed * Time.fixedDeltaTime);
+
+            platform.localRotation = Quaternion.Euler(0f, currentYaw, 0f);
+            barrel.localRotation = Quaternion.Euler(currentPitch, 0f, 0f);
+
+            Debug.DrawRay(origin.position, aimDirection * 1000f, Color.red, Time.fixedDeltaTime);
+            Debug.DrawRay(origin.position, origin.forward * 1000f, Color.yellow, Time.fixedDeltaTime);
+
+            if (!turretSystem.manualControl && currentTarget != null)
             {
-                Vector3 localDir = platform.parent.InverseTransformDirection(aimDirection);
-                float targetYaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
-                targetYaw = Mathf.Clamp(SpaceMath.NormalizeAngle(targetYaw), minAngles.y, maxAngles.y);
-
-                Quaternion yawRotation = Quaternion.Euler(0f, targetYaw, 0f);
-                Vector3 yawSpaceDir = Quaternion.Inverse(yawRotation) * localDir;
-                float targetPitch = -Mathf.Atan2(yawSpaceDir.y, yawSpaceDir.z) * Mathf.Rad2Deg;
-                targetPitch = Mathf.Clamp(SpaceMath.NormalizeAngle(targetPitch), minAngles.x, maxAngles.x);
-
-                currentYaw = Mathf.MoveTowardsAngle(currentYaw, targetYaw, rotateSpeed * Time.fixedDeltaTime);
-                currentPitch = Mathf.MoveTowardsAngle(currentPitch, targetPitch, rotateSpeed * Time.fixedDeltaTime);
-
-                platform.localRotation = Quaternion.Euler(0f, currentYaw, 0f);
-                barrel.localRotation = Quaternion.Euler(currentPitch, 0f, 0f);
-
-                Debug.DrawRay(origin.position, aimDirection * 1000f, Color.red, Time.fixedDeltaTime);
-                Debug.DrawRay(origin.position, origin.forward * 1000f, Color.yellow, Time.fixedDeltaTime);
-
-                if (!turretSystem.manualControl && currentTarget != null)
+                if ((aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
                 {
-                    if ((aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
+                    if (!shoot)
                     {
-                        if (!shoot)
-                        {
-                            SetShoot(true);
-                        }
+                        SetShoot(true);
                     }
-                    else
+                }
+                else
+                {
+                    if (shoot)
                     {
-                        if (shoot)
-                        {
-                            SetShoot(false);
-                        }
+                        SetShoot(false);
                     }
                 }
             }
         }
 
-        if (!obstructed && shoot && turretSystem.currentAmmo > 0)
+        if (overrideShoot)
         {
-            fireTime += Time.deltaTime;
-            if (fireTime >= fireRate)
+            SetShoot(true);
+        }
+
+        if (Time.fixedTime >= nextFireTime)
+        {
+            if (!obstructed && shoot && turretSystem.currentAmmo > 0)
             {
                 if (IsOffline)
                 {
@@ -216,6 +228,7 @@ public class Turret : NetworkBehaviour
                     FireVisualBullet();
                 }
             }
+            nextFireTime += fireRate;
         }
     }
 
@@ -343,9 +356,17 @@ public class Turret : NetworkBehaviour
     /// </summary>
     private void FireVisualBullet()
     {
-        ScaledRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation).GetComponent<ScaledRigidbody>();
-        projectileRB.velocity = turretSystem.ship.scaledRigidbody.velocity + firePoint.forward.ToVector3d() * projectileSpeed;
-        projectileRB.scaledTransform.realPosition = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        Vector3d realBulletPoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        // Retarded hack needed to prevent ScaledTransform from running Awake() and overriding transform.position with a zero Vector realPosition
+        firePoint.gameObject.SetActive(false);
+        ScaledRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation, firePoint).GetComponent<ScaledRigidbody>();
+        ScaledTransform projectileScaledTransform = projectileRB.GetComponent<ScaledTransform>();
+        projectileScaledTransform.realPosition = realBulletPoint;
+        
+        firePoint.gameObject.SetActive(true);
+        projectileRB.transform.SetParent(null);
+        // These methods need ScaledRigidbody to be initialized, so we call Awake() by setting it active before calling these
+        projectileRB.velocity = turretSystem.ship.scaledRigidbody.velocity + (firePoint.forward * projectileSpeed).ToVector3d();
         projectileRB.DestroyScaledColliders(); // Server takes authority over simulating physics
 
         Collider projectileCollider = projectileRB.GetComponent<Collider>();
@@ -371,11 +392,18 @@ public class Turret : NetworkBehaviour
 
     private void FireRealBullet()
     {
-        fireTime = 0;
         turretSystem.OnTurretFire();
-        ScaledRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation).GetComponent<ScaledRigidbody>();
-        projectileRB.velocity = turretSystem.ship.scaledRigidbody.velocity + firePoint.forward.ToVector3d() * projectileSpeed;
-        projectileRB.scaledTransform.realPosition = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        Vector3d realBulletPoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        // Retarded hack needed to prevent ScaledTransform from running Awake() and overriding transform.position with a zero Vector realPosition
+        firePoint.gameObject.SetActive(false);
+        ScaledRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation, firePoint).GetComponent<ScaledRigidbody>();
+        ScaledTransform projectileScaledTransform = projectileRB.GetComponent<ScaledTransform>();
+        projectileScaledTransform.realPosition = realBulletPoint;
+
+        firePoint.gameObject.SetActive(true);
+        projectileRB.transform.SetParent(null);
+        // These methods need ScaledRigidbody to be initialized, so we call Awake() by setting it active before calling these
+        projectileRB.velocity = turretSystem.ship.scaledRigidbody.velocity + (firePoint.forward * projectileSpeed).ToVector3d();
         projectileRB.IgnoreScaledRigidbody(turretSystem.ship.scaledRigidbody, true);
 
         Collider projectileCollider = projectileRB.GetComponent<Collider>();
@@ -455,8 +483,8 @@ public class Turret : NetworkBehaviour
         ignoreColliders.Add(collider);
     }
 
-    public void SetFireTime(float percentMax)
+    public void SetFireOffset(int index, int turretCount)
     {
-        fireTime = percentMax * fireRate;
+        nextFireTime = Time.fixedTime + index * fireRate / turretCount;
     }
 }

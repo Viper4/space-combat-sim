@@ -19,7 +19,6 @@ public class ScaledSpacePhysics : MonoBehaviour
     public const double percent = 0.2;
     public const double slop = 0.01;
     public const double restitutionThreshold = 1.0;
-    
     [SerializeField] private int maxGridLevels;
     [SerializeField] private double baseGridCellSize;
     [SerializeField] private int cellScalingFactor;
@@ -52,12 +51,10 @@ public class ScaledSpacePhysics : MonoBehaviour
     {
         yield return new WaitForEndOfFrame(); // Avoid changing the scaledColliders while iterating it
         int index = colliderIndexMap[collider.id];
-
         int lastIndex = scaledColliders.Count - 1;
-
         ScaledCollider last = scaledColliders[lastIndex];
 
-        // Swap collider to remove to end of list for fast removal and maintain indices
+        // Replace with collider at end of list for fast removal and maintain indices
         scaledColliders[index] = last;
         colliderIndexMap[last.id] = index;
 
@@ -97,6 +94,8 @@ public class ScaledSpacePhysics : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (FloatingWorldOrigin.Instance == null)
+            return;
         HashSet<Pair> currentCollisions = new HashSet<Pair>();
 
         // Run logic per ScaledRigidbody
@@ -111,10 +110,14 @@ public class ScaledSpacePhysics : MonoBehaviour
         stopwatch.Start();
         foreach (ScaledCollider collider in scaledColliders)
         {
+            if (collider.scaledRigidbody == null)
+                continue;
             stopwatch1.Reset();
             stopwatch1.Start();
             foreach (ScaledCollider candidate in hGrid.GetCandidates(collider))
             {
+                if (candidate.scaledRigidbody == null)
+                    continue;
                 Pair collisionKey = collider.id < candidate.id ? new Pair(collider.id, candidate.id) : new Pair(candidate.id, collider.id);
                 if ((!collider.scaledRigidbody.active && !candidate.scaledRigidbody.active) || currentCollisions.Contains(collisionKey))
                     continue;
@@ -172,7 +175,7 @@ public class ScaledSpacePhysics : MonoBehaviour
         stopwatch.Stop();
         fullLoopTicks = stopwatch.ElapsedTicks;
         // Debug.Log($"Full loop ticks: {fullLoopTicks}, Get candidates loop ticks: {getCandidatesTicks - collisionCheckTicks}, Check Collision ticks: {collisionCheckTicks}");
-
+        
         // Detect collision exits
         foreach (Pair collision in previousCollisions)
         {
@@ -231,12 +234,10 @@ public class ScaledSpacePhysics : MonoBehaviour
 
         // Use start-of-frame positions as the sweep origin
         Vector3d relPos0 = startPosB - startPosA;  // relative pos at frame start
-        Vector3d relDisp = dispB - dispA;           // relative displacement over frame
+        Vector3d relDisp = dispB - dispA;          // relative displacement over frame
         
-        // Quick reject: objects moving apart at frame start
+        // Cant do reject with objects moving apart at frame start, since massive acceleration could still cause intersect
         double bCoeff = 2.0 * Vector3d.Dot(relPos0, relDisp);
-        if (bCoeff >= 0)
-            return false;
 
         // Only need CCD if relative displacement exceeds the gap
         double gap = Math.Sqrt(relPos0.sqrMagnitude) - minDistance;
@@ -300,10 +301,6 @@ public class ScaledSpacePhysics : MonoBehaviour
             double minDistSq = minDistance * minDistance;
             double cCoeff   = r0Sq - minDistSq;
 
-            // Reject: separating at frame start
-            if (bCoeff >= 0.0)
-                return false;
-
             // Reject: already overlapping — let discrete solver handle it
             if (cCoeff < 0.0)
                 return false;
@@ -366,8 +363,8 @@ public class ScaledSpacePhysics : MonoBehaviour
             return;
 
         // Calculate impulse magnitude
-        double invMassA = collision.colliderA.scaledRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderA.scaledRigidbody.attachedRigidbody.mass;
-        double invMassB = collision.colliderB.scaledRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderB.scaledRigidbody.attachedRigidbody.mass;
+        double invMassA = collision.colliderA.scaledRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderA.scaledRigidbody.mass;
+        double invMassB = collision.colliderB.scaledRigidbody.isKinematic ? 0.0 : 1.0 / collision.colliderB.scaledRigidbody.mass;
 
         float avgRestitution = Math.Abs(velocityAlongNormal) < restitutionThreshold ? 0f : (collision.colliderA.restitution + collision.colliderB.restitution) * 0.5f;
         double impulseMagnitude = -(1.0 + avgRestitution) * velocityAlongNormal / (invMassA + invMassB);
@@ -379,11 +376,19 @@ public class ScaledSpacePhysics : MonoBehaviour
         collision.colliderB.scaledRigidbody.AddForceAtPosition(collision.impulse, collision.contactPoint, ForceMode.Impulse);
 
         // Resolve intersection
-        double correctionMagnitude = Math.Max(collision.penetration - slop, 0.0) * percent / (invMassA + invMassB);
+        /*double correctionMagnitude = Math.Max(collision.penetration - slop, 0.0) * percent / (invMassA + invMassB);
         Vector3d correction = correctionMagnitude * collision.normal;
-
         collision.colliderA.scaledRigidbody.scaledTransform.realPosition -= correction * invMassA;
-        collision.colliderB.scaledRigidbody.scaledTransform.realPosition += correction * invMassB;
+        collision.colliderB.scaledRigidbody.scaledTransform.realPosition += correction * invMassB;*/
+
+        if (collision.colliderA.scaledRigidbody.mass < collision.colliderB.scaledRigidbody.mass)
+        {
+            collision.colliderA.scaledRigidbody.scaledTransform.realPosition -= collision.normal * collision.penetration;
+        }
+        else
+        {
+            collision.colliderB.scaledRigidbody.scaledTransform.realPosition += collision.normal * collision.penetration;
+        }
     }
 
     public List<ScaledCollider> GetOverlapSphere(Vector3d position, double radius, int layerMask, bool ignoreTriggers)

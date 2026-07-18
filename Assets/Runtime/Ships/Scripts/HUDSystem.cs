@@ -3,6 +3,8 @@ using FishNet.Connection;
 using FishNet.Object;
 using SpaceStuff;
 using UnityEngine;
+using System.Collections;
+using FishNet;
 
 public class HUDSystem : NetworkBehaviour
 {
@@ -23,23 +25,57 @@ public class HUDSystem : NetworkBehaviour
 
     private Dictionary<uint, HUDObject> radarIDHUDPair = new Dictionary<uint, HUDObject>();
 
-    private void Start()
+    private void Awake()
     {
-        if (Instance != null && Instance != this)
+        if (!InstanceFinder.IsOffline)
         {
-            Destroy(gameObject);
             return;
         }
+
+        if (Instance != null)
+        {
+            Destroy(Instance.gameObject);
+        }
         Instance = this;
-        radarHudParent.SetActive(radarHudActive);
-        combatPanel.gameObject.SetActive(combatHudActive);
+        Debug.Log("Set HUDSYSTEM Instance Offline");
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+
+        if (IsOwner)
+        {
+            if (Instance != null)
+            {
+                Destroy(Instance.gameObject);
+            }
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
     private Vector3 CalculateHUDPosition(Vector3d realPosition, string tag)
     {
         Vector3d camRealPos = FloatingWorldOrigin.Instance.GetRealCameraPosition();
         Vector3 direction = (realPosition - camRealPos).normalized.ToVector3();
-        var distanceOffset = tag switch
+        float distanceOffset = tag switch
+        {
+            "Projectile" => -0.05f, // Projectiles highest priority
+            "Ship" => 0.0f,
+            _ => 0.05f,
+        };
+        Vector3 position = Camera.main.transform.position + direction * (radarHUDDistance + distanceOffset);
+        return position;
+    }
+
+    private Vector3 CalculateHUDPosition(Vector3 renderPosition, string tag)
+    {
+        Vector3 direction = (renderPosition - Camera.main.transform.position).normalized;
+        float distanceOffset = tag switch
         {
             "Projectile" => -0.05f, // Projectiles highest priority
             "Ship" => 0.0f,
@@ -82,6 +118,7 @@ public class HUDSystem : NetworkBehaviour
         if (target.useScaleForBounds)
         {
             // Use ellipse based on lossy scale of target's transform and its rotation
+
             quad = SpaceGeometry.GetEllipsoidBoundingBox(target.transform.position, target.transform.lossyScale, target.transform.rotation, Camera.main);
         }
         else

@@ -50,7 +50,7 @@ public class Torpedo : NetworkBehaviour
         scaledRigidbody = GetComponent<ScaledRigidbody>();
         thisRadarTarget = GetComponent<RadarTarget>();
         thrusterTorque = _collider.height * thrusterForce;
-        engineAcceleration = engineForce / scaledRigidbody.attachedRigidbody.mass;
+        engineAcceleration = (float)(engineForce / scaledRigidbody.mass);
         xPID = new PIDController(proportionalGain, integralGain, derivativeGain);
         yPID = new PIDController(proportionalGain, integralGain, derivativeGain);
         zPID = new PIDController(proportionalGain, integralGain, derivativeGain);
@@ -112,7 +112,7 @@ public class Torpedo : NetworkBehaviour
         Vector3d brakeAcceleration = -torpedoDir * engineAcceleration * perpendicularFactor;
         Vector3d desiredAcceleration = targetDir * engineAcceleration + pnAcceleration + brakeAcceleration;
 
-        Vector3d desiredForce = desiredAcceleration * scaledRigidbody.attachedRigidbody.mass;
+        Vector3d desiredForce = desiredAcceleration * scaledRigidbody.mass;
         Vector3 localDesiredForce = transform.InverseTransformDirection(desiredForce.ToVector3());
         
         // Clamp lateral (X/Y) force by magnitude, not per-component
@@ -190,7 +190,8 @@ public class Torpedo : NetworkBehaviour
 
         if (target == thisRadarTarget)
         {
-            Detonate(scaledRigidbody.scaledTransform.realPosition);
+            Debug.Log("Torpedo self destruct");
+            Detonate(scaledRigidbody.scaledTransform.realPosition, null);
         }
     }
 
@@ -210,11 +211,19 @@ public class Torpedo : NetworkBehaviour
         if (scaledRigidbody.scaledTransform.visible)
         {
             ScaledTransform explosion = Instantiate(explosionPrefab, transform.position, transform.rotation).GetComponent<ScaledTransform>();
+            if (explosion.TryGetComponent<ScaledRigidbody>(out var explosionRB))
+            {
+                explosionRB.velocity = scaledRigidbody.velocity;
+            }
+            if (explosion.TryGetComponent<AudioSource>(out var explosionAudio))
+            {
+                explosionAudio.enabled = false;
+            }
             explosion.realPosition = new Vector3d(x, y, z);
         }
     }
 
-    public void Detonate(Vector3d contactPoint)
+    public void Detonate(Vector3d contactPoint, ScaledRigidbody collidedRB)
     {
         if (!IsServerOrOffline)
             return;
@@ -227,6 +236,17 @@ public class Torpedo : NetworkBehaviour
         Vector3 contactOriginLocalPoint = (contactPoint - FloatingWorldOrigin.Instance.scaledTransform.realPosition).ToVector3();
 
         ScaledTransform explosion = Instantiate(explosionPrefab, transform.position, transform.rotation).GetComponent<ScaledTransform>();
+        if (explosion.TryGetComponent<ScaledRigidbody>(out var explosionRB))
+        {
+            if (collidedRB != null)
+                explosionRB.velocity = collidedRB.velocity;
+            else
+                explosionRB.velocity = scaledRigidbody.velocity;
+        }
+        if (explosion.TryGetComponent<AudioSource>(out var explosionAudio))
+        {
+            explosionAudio.enabled = false;
+        }
         explosion.realPosition = contactPoint;
 
         HashSet<Transform> hitTransforms = new HashSet<Transform>();
@@ -258,7 +278,12 @@ public class Torpedo : NetworkBehaviour
                 case "Torpedo":
                     Torpedo otherTorpedo = otherRB.GetComponent<Torpedo>();
                     if (otherTorpedo != this)
-                        otherTorpedo.Detonate(contactPoint);
+                    {
+                        Debug.Log("Chain torpedo detonate");
+                        double distance = (otherTorpedo.scaledRigidbody.scaledTransform.realPosition - scaledRigidbody.scaledTransform.realPosition).sqrMagnitude;
+                        float percent = (float)(distance / (explosionRadius * explosionRadius));
+                        otherTorpedo.DelayedDetonate(contactPoint, collidedRB, 0.25f * percent);
+                    }
                     break;
                 case "Shields": // Should work fine for ship shields too
                     // Apply damage
@@ -288,8 +313,23 @@ public class Torpedo : NetworkBehaviour
             target.alertSystem.IncrementTorpedoLock(-1);
 
         if (!IsOffline)
-            InstanceFinder.ServerManager.Despawn(NetworkObject);
+            ServerManager.Despawn(NetworkObject);
         Destroy(gameObject);
+    }
+
+    private IEnumerator DetonateDelayRoutine(Vector3d contactPoint, ScaledRigidbody collidedRB, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        Detonate(contactPoint, collidedRB);
+    }
+
+    public void DelayedDetonate(Vector3d contactPoint, ScaledRigidbody collidedRB, float delay)
+    {
+        if (!IsServerOrOffline)
+            return;
+        if (detonating) // Prevent stack overflow
+            return;
+        StartCoroutine(DetonateDelayRoutine(contactPoint, collidedRB, delay));
     }
 
     private void OnScaledCollide(ScaledSpacePhysics.CollisionInfo collisionInfo)
@@ -298,7 +338,10 @@ public class Torpedo : NetworkBehaviour
         Vector3d velocityB = collisionInfo.colliderB == null ? Vector3d.zero : collisionInfo.colliderB.scaledRigidbody.velocity;
         Vector3d relativeVelocity = velocityA - velocityB;
         if (relativeVelocity.sqrMagnitude > collideSpeedThreshold * collideSpeedThreshold)
-            Detonate(collisionInfo.contactPoint);
+        {
+            Debug.Log($"Scaled collide detonate with {collisionInfo.colliderA.name} and {collisionInfo.colliderB.name}");
+            Detonate(collisionInfo.contactPoint, collisionInfo.colliderB.scaledRigidbody);
+        }
     }
 
     private void OnScaledTrigger(ScaledCollider otherCollider)
@@ -307,7 +350,8 @@ public class Torpedo : NetworkBehaviour
             return;
         if (otherCollider.scaledRigidbody == target.scaledRigidbody || otherCollider.transform == target.transform)
         {
-            Detonate(scaledRigidbody.scaledTransform.realPosition);
+            Debug.Log($"Scaled trigger detonate with {otherCollider.name}");
+            Detonate(scaledRigidbody.scaledTransform.realPosition, otherCollider.scaledRigidbody);
         }
     }
 
@@ -328,7 +372,10 @@ public class Torpedo : NetworkBehaviour
         Vector3d relativeVelocity = scaledRigidbody.velocity - velocityB;
         Vector3d contactPoint = scaledRigidbody.scaledTransform.TransformRenderPoint(collision.GetContact(0).point);
         if (relativeVelocity.sqrMagnitude > collideSpeedThreshold * collideSpeedThreshold)
-            Detonate(contactPoint);
+        {
+            Debug.Log($"Normal collide detonate with {collision.gameObject.name}");
+            Detonate(contactPoint, otherDoubleRB);
+        }
     }
 
     private void OnTriggerEnter(Collider other)
@@ -338,9 +385,10 @@ public class Torpedo : NetworkBehaviour
         if (scaledRigidbody.scaledTransform.inScaledSpace || other.isTrigger)
             return;
 
-        if (other == target.transform || (other.transform.TryGetComponent<RadarTarget>(out var otherTarget) && otherTarget.GetID() == target.GetID()))
+        if (other.transform == target.transform || (other.transform.TryGetComponent<RadarTarget>(out var otherTarget) && otherTarget.GetID() == target.GetID()))
         {
-            Detonate(scaledRigidbody.scaledTransform.realPosition);
+            Debug.Log($"Normal trigger detonate with {other.name}");
+            Detonate(scaledRigidbody.scaledTransform.realPosition, other.GetComponent<ScaledRigidbody>());
         }
     }
 }

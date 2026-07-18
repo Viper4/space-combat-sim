@@ -19,18 +19,18 @@ public class CelestialBodyGeneratorEditor : Editor
             if (celestialBody.autoUpdate && check.changed)
             {
                 celestialBody.GetComponent<ScaledTransform>();
-                celestialBody.GenerateCelestialBody();
+                celestialBody.GenerateCelestialBody(inEditor: true);
             }
         }
 
         if(GUILayout.Button("Generate"))
         {
-            celestialBody.GenerateCelestialBody();
+            celestialBody.GenerateCelestialBody(inEditor: true);
         }
 
         if (GUILayout.Button("Generate Random"))
         {
-            celestialBody.GenerateRandomCelestialBody();
+            celestialBody.GenerateCelestialBody(randomizeSeeds: true, inEditor: true);
         }
 
         if (GUILayout.Button("Generate Colors")) 

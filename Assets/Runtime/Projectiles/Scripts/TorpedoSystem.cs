@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using SpaceStuff;
 using UnityEngine.InputSystem;
 using FishNet.Object;
+using FishNet;
 
 [RequireComponent(typeof(Ship))]
 public class TorpedoSystem : NetworkBehaviour
@@ -29,25 +30,9 @@ public class TorpedoSystem : NetworkBehaviour
     private void Start()
     {
         ship = GetComponent<Ship>();
-        TryGetComponent(out targetingSystem);
         launchedTorpedoes = new Torpedo[torpedoPoints.Length];
         if (IsOffline)
             Init();
-    }
-
-    private void Init()
-    {
-        if (initialized)
-            return;
-        targetingSystem.OnTargetChange += SetTarget;
-        GameManager.Instance.inputActions.Player.Secondary.performed += TryLaunchTorpedo;
-        initialized = true;
-    }
-
-    private void OnDestroy()
-    {
-        targetingSystem.OnTargetChange -= SetTarget;
-        GameManager.Instance.inputActions.Player.Secondary.performed -= TryLaunchTorpedo;
     }
 
     public override void OnStartClient()
@@ -56,6 +41,23 @@ public class TorpedoSystem : NetworkBehaviour
         if (!IsOwner)
             return;
         Init();
+    }
+
+    private void Init()
+    {
+        if (initialized)
+            return;
+        if (TryGetComponent(out targetingSystem))
+            targetingSystem.OnTargetChange += SetTarget;
+        GameManager.Instance.inputActions.Player.Secondary.performed += TryLaunchTorpedo;
+        initialized = true;
+    }
+
+    private void OnDestroy()
+    {
+        if (targetingSystem != null)
+            targetingSystem.OnTargetChange -= SetTarget;
+        GameManager.Instance.inputActions.Player.Secondary.performed -= TryLaunchTorpedo;
     }
 
     [ObserversRpc(ExcludeOwner = true)]
@@ -72,6 +74,12 @@ public class TorpedoSystem : NetworkBehaviour
         }
     }
 
+    [ServerRpc]
+    private void ToggleBayDoorServerRpc(bool open)
+    {
+        ToggleBayDoorObserversRpc(open);
+    }
+
     public void TorpedoBaySwitch(int state)
     {
         if (!IsOwnerOrOffline)
@@ -86,15 +94,15 @@ public class TorpedoSystem : NetworkBehaviour
             bayDoorAnimation.Play("CloseTorpedoBay");
         }
         if (!IsOffline)
-            ToggleBayDoorObserversRpc(torpedoBayDoorOpen);
+            ToggleBayDoorServerRpc(torpedoBayDoorOpen);
     }
 
     private void LaunchTorpedo(int i)
     {
         launchAudio.ResetPlay(true);
-        Vector3d launchPosition = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(torpedoPoints[i].transform.position);
+
         if (IsOffline || IsServerInitialized)
-            launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(launchPosition, ship.scaledRigidbody.velocity, targetingSystem.lockedTarget, i, ship.radarTarget.team);
+            launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(ship.scaledRigidbody.scaledTransform, ship.scaledRigidbody.velocity, targetingSystem.lockedTarget, i, ship.radarTarget.team);
         UpdateTorpedoUI(i, false);
     }
 
@@ -171,15 +179,25 @@ public class TorpedoSystem : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void SetTargetServerRpc(uint targetId)
+    private void SetTargetServerRpc(int targetObjectId)
     {
-        if (!RadarRegistry.TryGet(targetId, out var target))
+        if (!ServerManager.Objects.Spawned.TryGetValue(targetObjectId, out NetworkObject targetNetObject))
+        {
+            Debug.LogWarning($"[TorpedoSystem] Server could not find target with net object ID: {targetObjectId}");
             return;
+        }
+
+        if (!targetNetObject.TryGetComponent<RadarTarget>(out var radarTarget))
+        {
+            Debug.LogWarning($"[TorpedoSystem] Server could not find RadarTarget component on net object ID: {targetObjectId}");
+            return;
+        }
+
         for (int i = 0; i < launchedTorpedoes.Length; i++)
         {
             if (launchedTorpedoes[i] == null)
                 continue;
-            launchedTorpedoes[i].SetTarget(target);
+            launchedTorpedoes[i].SetTarget(radarTarget);
         }
     }
 
@@ -205,7 +223,12 @@ public class TorpedoSystem : NetworkBehaviour
             }
             else
             {
-                SetTargetServerRpc(targetingSystem.lockedTarget.GetID());
+                if (!targetingSystem.lockedTarget.TryGetComponent<NetworkObject>(out var targetNetObject))
+                {
+                    Debug.LogWarning("[TorpedoSystem] Cannot send RPC to server as locked target does not have attached NetworkObject component.");
+                    return;
+                }
+                SetTargetServerRpc(targetNetObject.ObjectId);
             }
         }
     }

@@ -1,3 +1,4 @@
+using FishNet.Object;
 using SpaceStuff;
 using System;
 using System.Collections;
@@ -5,7 +6,7 @@ using UnityEngine;
 using Random = UnityEngine.Random;
 
 [RequireComponent(typeof(ScaledTransform), typeof(ScaledRigidbody))]
-public class CelestialBody : MonoBehaviour
+public class CelestialBody : NetworkBehaviour
 {
     private const double v = 4.0 / 3.0 * Math.PI;
     private const double G = 6.6743e-11;
@@ -28,6 +29,8 @@ public class CelestialBody : MonoBehaviour
 
     [Header("Orbit")]
     [SerializeField] private CelestialBody orbitTarget;
+    [SerializeField] private bool tidallyLocked = false;
+    [SerializeField] private bool overrideRotationAxis = false;
 
     private double mass;
     private float temperature;
@@ -36,12 +39,34 @@ public class CelestialBody : MonoBehaviour
     private bool initialized;
     public bool pauseUpdates = false;
 
+    private bool IsServerOrOffline => IsServerInitialized || IsOffline;
+
     private void Awake()
     {
         scaledTransform = GetComponent<ScaledTransform>();
         scaledRigidbody = GetComponent<ScaledRigidbody>();
         TryGetComponent(out generator);
         TryGetComponent(out spaceLight);
+
+        if (IsOffline)
+            Init();
+    }
+
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+
+        Init();
+        if (generator != null)
+            InitializeObserversRpc(scale.x, scale.y, scale.z, scaledRigidbody.mass, generator.GetSeeds());
+        else
+            InitializeObserversRpc(scale.x, scale.y, scale.z, scaledRigidbody.mass, null);
+    }
+
+    private void Init()
+    {
+        if (!IsServerOrOffline)
+            return;
 
         switch (generationSettings.bodyType)
         {
@@ -78,8 +103,7 @@ public class CelestialBody : MonoBehaviour
                 scale = new Vector3d(randomX, randomY, randomZ);
 
                 float density = Random.Range(generationSettings.densityRange.x, generationSettings.densityRange.y);
-                mass = density * v * scale.x * scale.y * scale.z;
-                scaledRigidbody.attachedRigidbody.mass = (float)mass;
+                scaledRigidbody.mass = density * v * scale.x * scale.y * scale.z;
                 break;
             case GenerationSettings.BodyType.Star:
                 GenerationSettings.StarTypeRule[] rules = generationSettings.starDistributions;
@@ -105,7 +129,7 @@ public class CelestialBody : MonoBehaviour
                 float t = Random.value;
                 double massInSolarMasses = Mathf.Lerp(picked.minMass, picked.maxMass, t);
                 mass = massInSolarMasses * solarMass;
-                scaledRigidbody.attachedRigidbody.mass = (float)mass;
+                scaledRigidbody.mass = (float)mass;
 
                 temperature = Mathf.Lerp(picked.minTemperature, picked.maxTemperature, t);
 
@@ -148,6 +172,9 @@ public class CelestialBody : MonoBehaviour
                     if (picked.starType == GenerationSettings.StarType.CarbonStar)
                         tint = new Color(1f, 0.1f, 0.1f, 1f);
                     spaceLight.SetTemperature(temperature, tint);
+
+                    if (!IsOffline)
+                        SetSpaceLightObserversRpc(temperature, tint);
                 }
                 break;
             case GenerationSettings.BodyType.BlackHole:
@@ -164,8 +191,10 @@ public class CelestialBody : MonoBehaviour
 
         Vector3 min = generationSettings.initialAngularVelocityRange[0];
         Vector3 max = generationSettings.initialAngularVelocityRange[1];
-
         scaledRigidbody.angularVelocity = new Vector3d(Random.Range(min.x, max.x), Random.Range(min.y, max.y), Random.Range(min.z, max.z));
+
+        if (generator != null)
+            generator.Init();
 
         initialized = true;
 
@@ -173,6 +202,28 @@ public class CelestialBody : MonoBehaviour
         {
             StartCoroutine(SetOrbitalVelocity());
         }
+    }
+
+    [ObserversRpc(ExcludeServer = true, BufferLast = true)]
+    private void InitializeObserversRpc(double scaleX, double scaleY, double scaleZ, double mass, Vector3[] seeds)
+    {
+        Debug.Log($"[CelestialBody] {name} initialized from server data.");
+        scaledTransform.realScale = new Vector3d(scaleX, scaleY, scaleZ);
+        scaledRigidbody.mass = mass;
+        if (generator != null)
+            generator.Init(seeds);
+        if (gravitySettings != null && gravitySettings.applyGravity)
+        {
+            ScaledSpacePhysics.Instance.GravityStep += ApplyGravity;
+        }
+        initialized = true;
+    }
+
+    [ObserversRpc(ExcludeServer = true, BufferLast = true)]
+    private void SetSpaceLightObserversRpc(float temperature, Color tint)
+    {
+        if (spaceLight != null)
+            spaceLight.SetTemperature(temperature, tint);
     }
 
     public bool Initialized()
@@ -200,8 +251,8 @@ public class CelestialBody : MonoBehaviour
         if (orbitTarget.orbitTarget == this)
         {
             // Handle binary systems
-            double massA = scaledRigidbody.attachedRigidbody.mass;
-            double massB = orbitTarget.scaledRigidbody.attachedRigidbody.mass;
+            double massA = scaledRigidbody.mass;
+            double massB = orbitTarget.scaledRigidbody.mass;
             Vector3d barycenter = (posA * massA + posB * massB) / (massA + massB);
 
             Vector3d rA = posA - barycenter;
@@ -242,22 +293,82 @@ public class CelestialBody : MonoBehaviour
 
         // Inherit target's velocity to handle nested orbits
         scaledRigidbody.velocity = orbitTarget.scaledRigidbody.velocity + orbitVelocity;
+
+        if (tidallyLocked)
+        {
+            // Set angular velocity so the body is always facing the orbit target
+            double angularSpeed = orbitVelocity.magnitude / distance;
+            Vector3d rotationAxis;
+            if (overrideRotationAxis)
+            {
+                rotationAxis = Vector3d.Cross(toCenter, orbitVelocity).normalized;
+            }
+            else
+            {
+                rotationAxis = transform.up.ToVector3d();
+            }
+
+            scaledRigidbody.angularVelocity = rotationAxis * angularSpeed;
+        }
+    }
+
+    private void UpdateTidalLock()
+    {
+        if (!tidallyLocked || orbitTarget == null || overrideRotationAxis)
+            return;
+
+        Vector3d up = transform.up.ToVector3d();
+
+        // Desired forward direction toward parent.
+        Vector3d desiredForward = (orbitTarget.scaledTransform.realPosition - scaledTransform.realPosition).normalized;
+
+        // Project onto plane perpendicular to spin axis.
+        desiredForward -= up * Vector3d.Dot(desiredForward, up);
+
+        if (desiredForward.sqrMagnitude < 1e-10)
+            return;
+
+        desiredForward.Normalize();
+
+        // Current forward projected onto same plane.
+        Vector3d currentForward = transform.forward.ToVector3d();
+        currentForward -= up * Vector3d.Dot(currentForward, up);
+        currentForward.Normalize();
+
+        // Signed angle around the spin axis.
+        double angle = Math.Atan2(Vector3d.Dot(up, Vector3d.Cross(currentForward, desiredForward)), Vector3d.Dot(currentForward, desiredForward));
+
+        // Orbital angular speed.
+        double distance = (orbitTarget.scaledTransform.realPosition - scaledTransform.realPosition).magnitude;
+
+        double g = orbitTarget.CalculateGravityAcceleration(scaledTransform.realPosition);
+
+        double orbitalAngularSpeed = Math.Sqrt(g / distance);
+
+        // Small correction to eliminate drift.
+        const double correctionGain = 0.5;
+
+        scaledRigidbody.angularVelocity = up * (orbitalAngularSpeed + angle * correctionGain);
     }
 
     private void FixedUpdate()
     {
-        if (generator == null || pauseUpdates)
+        if (!initialized || generator == null || pauseUpdates)
             return;
+
+        if (IsServerOrOffline && tidallyLocked && !overrideRotationAxis)
+        {
+            UpdateTidalLock();
+        }
+        
         if (scaledTransform.visible)
         {
             if (!generator.generated && generationSettings.autoGenerate)
             {
-                if (!generator.initialized && generationSettings.randomShapeGeneration)
-                    generator.GenerateRandomCelestialBody();
-                else
-                    generator.GenerateCelestialBody();
+                generator.GenerateCelestialBody();
                 scaledTransform.ResetVisualComponents(originalLayer);
                 scaledTransform.UpdateVisualComponents();
+                scaledTransform.UpdateRealRadius();
             }
 
             if (!generationSettings.simple && Camera.main != null)
@@ -266,6 +377,7 @@ public class CelestialBody : MonoBehaviour
                 {
                     scaledTransform.ResetVisualComponents(originalLayer);
                     scaledTransform.UpdateVisualComponents();
+                    scaledTransform.UpdateRealRadius();
                 }
             }
         }

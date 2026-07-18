@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8f95416c3bab0074b8d81d969793f7ec, type: 3}
   m_Name: Asteroid Generation
   m_EditorClassIdentifier: 
-  simple: 1
+  simple: 0
   autoGenerate: 1
   randomShapeGeneration: 0
   sphere: 0

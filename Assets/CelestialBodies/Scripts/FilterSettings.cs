@@ -67,8 +67,6 @@ public class FilterSettings
         public float rimBlend = 0.05f;
         [Range(0, 1)]
         public float floorSmoothness = 0.05f;
-        [Range(0, 1)]
-        public float blendRandomness = 0.01f;
     }
 
     [System.Serializable]

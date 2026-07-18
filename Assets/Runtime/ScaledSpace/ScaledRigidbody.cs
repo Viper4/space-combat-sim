@@ -23,6 +23,8 @@ public class ScaledRigidbody : MonoBehaviour
         {
             if (_active != value)
             {
+                if (attachedRigidbody == null)
+                    attachedRigidbody = GetComponent<Rigidbody>();
                 if (value)
                 {
                     attachedRigidbody.isKinematic = true;
@@ -40,6 +42,23 @@ public class ScaledRigidbody : MonoBehaviour
                 }
             }
             _active = value;
+        }
+    }
+
+    [SerializeField] private double _mass;
+    public double mass
+    {
+        get
+        {
+            return _mass;
+        }
+        set
+        {
+            if (value < 0.0000001)
+                return;
+            _mass = value;
+            if (attachedRigidbody != null)
+                attachedRigidbody.mass = (float)value;
         }
     }
 
@@ -65,7 +84,17 @@ public class ScaledRigidbody : MonoBehaviour
     {
         get
         {
-            return _velocity;
+            if (_active)
+            {
+                return _velocity;
+            }
+            else
+            {
+                if (FloatingWorldOrigin.Instance == null)
+                    return attachedRigidbody.linearVelocity.ToVector3d();
+                else
+                    return attachedRigidbody.linearVelocity.ToVector3d() + FloatingWorldOrigin.Instance.scaledRigidbody._velocity;
+            }
         }
         set
         {
@@ -86,7 +115,14 @@ public class ScaledRigidbody : MonoBehaviour
     {
         get
         {
-            return _angularVelocity;
+            if (_active)
+            {
+                return _angularVelocity;
+            }
+            else
+            {
+                return attachedRigidbody.angularVelocity.ToVector3d();
+            }
         }
         set
         {
@@ -126,8 +162,6 @@ public class ScaledRigidbody : MonoBehaviour
     public List<ScaledCollider> scaledColliders {get; private set;}
     public Vector3d prevPos;
 
-    public Vector3d inverseInertiaTensor;
-
     private void Awake()
     {
         scaledTransform = GetComponent<ScaledTransform>();
@@ -136,9 +170,16 @@ public class ScaledRigidbody : MonoBehaviour
         prevPos = scaledTransform.realPosition;
         id = nextId++;
 
-        inverseInertiaTensor = new Vector3d(1.0 / attachedRigidbody.inertiaTensor.x, 1.0 / attachedRigidbody.inertiaTensor.y, 1.0 / attachedRigidbody.inertiaTensor.z);
+        if (_mass < 0.0000001)
+            mass = 0.0000001;
 
         CheckSpeed();
+    }
+
+    private void OnValidate()
+    {
+        if (_mass < 0.0000001)
+            mass = 0.0000001;
     }
 
     private void OnDestroy()
@@ -232,10 +273,10 @@ public class ScaledRigidbody : MonoBehaviour
 
         Vector3d newVelocity = forceMode switch
         {
-            ForceMode.Impulse => _velocity + (force / attachedRigidbody.mass),
+            ForceMode.Impulse => _velocity + (force / _mass),
             ForceMode.VelocityChange => _velocity + force,
             ForceMode.Acceleration => _velocity + (force * Time.fixedDeltaTime),
-            _ => _velocity + (force * (Time.fixedDeltaTime / attachedRigidbody.mass)),
+            _ => _velocity + (force * (Time.fixedDeltaTime / _mass)),
         };
         if (newVelocity.sqrMagnitude < speedLimit * speedLimit)
         {
@@ -415,6 +456,8 @@ public class ScaledRigidbody : MonoBehaviour
 
     public void DestroyScaledColliders()
     {
+        if (scaledColliders.Count == 0)
+            return;
         for(int i = scaledColliders.Count; i >= 0; i--)
         {
             Destroy(scaledColliders[i].gameObject);
@@ -438,7 +481,7 @@ public class ScaledRigidbody : MonoBehaviour
             return;
 
         // Calculate impulse magnitude
-        double invMassA = isKinematic ? 0.0 : 1.0 / attachedRigidbody.mass;
+        double invMassA = isKinematic ? 0.0 : 1.0 / _mass;
 
         float avgRestitution = Math.Abs(velocityAlongNormal) < ScaledSpacePhysics.restitutionThreshold ? 0f : scaledColliders.Count > 0 ? (scaledColliders[0].restitution + restitutionB) * 0.5f : restitutionB;
         double impulseMagnitude = -(1.0 + avgRestitution) * velocityAlongNormal / (invMassA + invMassB);
@@ -453,14 +496,13 @@ public class ScaledRigidbody : MonoBehaviour
         if (isKinematic || !_active)
             return;
 
-        Debug.Log("Handling manual collision");
-
         // Need to handle collisions between unity colliders and scaled rigidbodies
         ContactPoint contact = collision.GetContact(0);
         Vector3d normal = -contact.normal.ToVector3d();
         Vector3d realContactPoint = scaledTransform.TransformRenderPoint(contact.point);
 
         Rigidbody otherRB = collision.rigidbody;
+
         Vector3d relativeVelocity;
         double invMassB;
         float restitutionB;
@@ -468,7 +510,7 @@ public class ScaledRigidbody : MonoBehaviour
         {
             relativeVelocity = -_velocity;
             invMassB = 0.0;
-            restitutionB = 0f;
+            restitutionB = 0.5f;
         }
         else
         {
@@ -481,12 +523,12 @@ public class ScaledRigidbody : MonoBehaviour
             else if (FloatingWorldOrigin.Instance.scaledRigidbody.id == id)
             {
                 relativeVelocity = otherRB.linearVelocity.ToVector3d();
-                restitutionB = 0f;
+                restitutionB = 0.5f;
             }
             else
             {
                 relativeVelocity = otherRB.linearVelocity.ToVector3d() - _velocity;
-                restitutionB = 0f;
+                restitutionB = 0.5f;
             }
         }
         ResolveCollision(realContactPoint, relativeVelocity, normal, invMassB, restitutionB);

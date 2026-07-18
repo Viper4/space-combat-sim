@@ -1,11 +1,10 @@
-using System.Collections;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using SpaceStuff;
 using UnityEngine;
 
 public class TerrainChunk
 {
+    private const int visibilitySamples = 64;
+
     private TerrainChunk[] children;
     private ShapeGenerator shapeGenerator;
     private Vector3 localPosition;
@@ -20,6 +19,7 @@ public class TerrainChunk
     private Vector3 localRight;
     private Vector3 localForward;
     private TerrainChunkObject chunkObject;
+    private Vector3[] vertices;
 
     public TerrainChunk(ShapeGenerator shapeGenerator, ShapeSettings settings, float maxScreenSize, Vector3 localUp, int row, int col, int rootLOD)
     {
@@ -74,7 +74,7 @@ public class TerrainChunk
         if (chunkObject == null)
             return;
         Mesh filterMesh = chunkObject.meshFilter.sharedMesh; // Cant get shared mesh outside main thread
-        Vector3[] vertices = new Vector3[filterResolution * filterResolution]; // resolution vertices on each side of the mesh
+        vertices = new Vector3[filterResolution * filterResolution]; // resolution vertices on each side of the mesh
         int[] triangles = new int[(filterResolution - 1) * (filterResolution - 1) * 6]; // 2 triangles per square so (resolution - 1)^2 faces * 2 tris * 3 vertices per tri
         int triangleIndex = 0;
         Vector2[] uv = filterMesh.uv;
@@ -84,7 +84,7 @@ public class TerrainChunk
         {
             for (int x = 0; x < filterResolution; x++)
             {
-                vertices[i] = shapeGenerator.CalculatePointOnSphere(GetPointOnCubeSphere(new Vector2(x, y) / (filterResolution - 1)));
+                vertices[i] = shapeGenerator.EvaluatePointOnSphere(GetPointOnCubeSphere(new Vector2(x, y) / (filterResolution - 1)));
 
                 if (x != filterResolution - 1 && y != filterResolution - 1)
                 {
@@ -120,7 +120,7 @@ public class TerrainChunk
             chunkObject.meshCollider.sharedMesh = new Mesh();
         }
         Mesh colliderMesh = chunkObject.meshCollider.sharedMesh;
-        Vector3[] vertices = new Vector3[colliderResolution * colliderResolution];
+        Vector3[] colliderVertices = new Vector3[colliderResolution * colliderResolution];
         int[] triangles = new int[(colliderResolution - 1) * (colliderResolution - 1) * 6];
         int triangleIndex = 0;
 
@@ -129,7 +129,7 @@ public class TerrainChunk
         {
             for (int x = 0; x < colliderResolution; x++)
             {
-                vertices[i] = shapeGenerator.CalculatePointOnSphere(GetPointOnCubeSphere(new Vector2(x, y) / (colliderResolution - 1)));
+                colliderVertices[i] = shapeGenerator.EvaluatePointOnSphere(GetPointOnCubeSphere(new Vector2(x, y) / (colliderResolution - 1)));
 
                 if (x != colliderResolution - 1 && y != colliderResolution - 1)
                 {
@@ -147,7 +147,7 @@ public class TerrainChunk
         }
 
         colliderMesh.Clear();
-        colliderMesh.vertices = vertices;
+        colliderMesh.vertices = colliderVertices;
         colliderMesh.triangles = triangles;
         colliderMesh.RecalculateNormals();
         chunkObject.meshCollider.convex = true;
@@ -173,6 +173,88 @@ public class TerrainChunk
         chunkObject.meshFilter.sharedMesh.uv = uv;
     }
 
+    private bool IsMeshVisible(Camera camera, Transform parent, Vector3 centerPoint, out Vector3 visiblePoint)
+    {
+        int step = Mathf.Max(1, vertices.Length / visibilitySamples);
+        for (int i = 0; i < vertices.Length; i += step)
+        {
+            Vector3 worldPoint = parent.TransformPoint(vertices[i]);
+            visiblePoint = worldPoint;
+
+            if (IsPointVisible(camera, worldPoint, centerPoint))
+                return true;
+        }
+        visiblePoint = centerPoint;
+        return false;
+    }
+
+    private bool IsBoundsVisible(Camera camera, Vector3 centerPoint)
+    {
+        // Check if inside camera frustum
+        Plane[] planes = new Plane[6];
+        GeometryUtility.CalculateFrustumPlanes(camera, planes);
+
+        if (!GeometryUtility.TestPlanesAABB(planes, chunkObject.meshRenderer.bounds))
+            return false;
+        
+        // Horizon test
+        Bounds chunkBounds = chunkObject.meshRenderer.bounds;
+        Vector3 boundsMin = chunkBounds.min;
+        Vector3 boundsMax = chunkBounds.max;
+
+        Vector3[] testPoints = new Vector3[9];
+
+        testPoints[0] = chunkBounds.center;
+        testPoints[1] = boundsMin;
+        testPoints[2] = boundsMax;
+        testPoints[3] = new Vector3(boundsMin.x, boundsMax.y, boundsMin.z);
+        testPoints[4] = new Vector3(boundsMin.x, boundsMax.y, boundsMax.z);
+        testPoints[5] = new Vector3(boundsMax.x, boundsMin.y, boundsMin.z);
+        testPoints[6] = new Vector3(boundsMax.x, boundsMin.y, boundsMax.z);
+        testPoints[7] = new Vector3(boundsMax.x, boundsMax.y, boundsMin.z);
+        testPoints[8] = new Vector3(boundsMin.x, boundsMin.y, boundsMax.z);
+        Vector3 toCamera;
+        Vector3 surfaceNormal;
+        for (int i = 0; i < 8; i++)
+        {
+            toCamera = (camera.transform.position - testPoints[i]).normalized;
+            surfaceNormal = (testPoints[i] - centerPoint).normalized;
+            if (Vector3.Dot(surfaceNormal, toCamera) > 0f)
+                return true;
+        }
+        return false;
+    }
+
+    private bool IsPointVisible(Camera camera, Vector3 renderPoint, Vector3 centerPoint)
+    {
+        // Check if inside camera frustum
+        Vector3 viewport = camera.WorldToViewportPoint(renderPoint);
+
+        if (viewport.z <= 0f ||
+            viewport.x < 0f || viewport.x > 1f ||
+            viewport.y < 0f || viewport.y > 1f)
+            return false;
+
+        // Horizon test
+        Vector3 toCamera = (camera.transform.position - renderPoint).normalized;
+        Vector3 surfaceNormal = (renderPoint - centerPoint).normalized;
+        return Vector3.Dot(surfaceNormal, toCamera) > 0f;
+    }
+
+    public void RecursiveSetActive(bool active)
+    {
+        if (chunkObject != null && chunkObject.gameObject.activeSelf != active)
+            chunkObject.gameObject.SetActive(active);
+        if (children == null || children.Length == 0)
+            return;
+        foreach(TerrainChunk child in children)
+        {
+            if (child == null)
+                continue;
+            child.RecursiveSetActive(active);
+        }
+    }
+
     public void GenerateEmptyTree(Transform parent, ColorGenerator colorGenerator)
     {
         if (chunkObject == null)
@@ -190,15 +272,13 @@ public class TerrainChunk
         chunkObject.meshFilter.sharedMesh = new Mesh();
     }
 
-    public void GenerateTree(Vector3d realCamPos, ScaledTransform parent, ColorGenerator colorGenerator)
+    private void IncreaseLOD()
     {
-        Vector3 worldRenderPos = parent.transform.TransformPoint(localPosition);
-        double sqrDistance = (realCamPos - parent.TransformRenderPoint(worldRenderPos)).sqrMagnitude;
-        if (detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < 4.0f * width * width * parent.scaleFactor * parent.scaleFactor)
+        if (chunkObject != null && chunkObject.gameObject.activeSelf)
+            chunkObject.gameObject.SetActive(false);
+        
+        if (children == null || children.Length == 0)
         {
-            // Camera is close enough to this chunk that we need to increase the LOD so generate children with higher LOD in this chunk
-            if (chunkObject != null && chunkObject.gameObject.activeSelf)
-                chunkObject.gameObject.SetActive(false);
             children = new TerrainChunk[4];
             float nextWidth = width * 0.5f;
             float nextSqrMaxScreenSize = sqrMaxScreenSize * 4f;
@@ -228,6 +308,20 @@ public class TerrainChunk
                 nextWidth, nextSqrMaxScreenSize, 
                 filterResolution, colliderResolution, maxLOD, detailLevel + 1, 
                 localUp, nextLocalRight, nextLocalForward); // Bottom left
+        }
+    }
+
+    public void GenerateTree(Vector3d realCamPos, ScaledTransform parent, ColorGenerator colorGenerator)
+    {
+        Vector3 worldRenderPos = parent.transform.TransformPoint(localPosition);
+        double sqrDistance = (realCamPos - parent.TransformRenderPoint(worldRenderPos)).sqrMagnitude;
+        double realWidth = width * parent.realRadius;
+
+        if (detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < 4.0 * realWidth * realWidth)
+        {
+            // Camera is close enough to this chunk which is also visible to the cam
+            // so we need to increase the LOD so generate children with higher LOD in this chunk
+            IncreaseLOD();
 
             foreach (TerrainChunk chunk in children)
             {
@@ -266,25 +360,28 @@ public class TerrainChunk
     /// <returns>Whether the chunk generated new chunks</returns>
     public bool UpdateTree(Vector3d realCamPos, ScaledTransform parent, ColorGenerator colorGenerator)
     {
-        Vector3 worldRenderPos = parent.transform.TransformPoint(localPosition);
-        double sqrDistance = (realCamPos - parent.TransformRenderPoint(worldRenderPos)).sqrMagnitude;
-        if (detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < 4.0f * width * width * parent.scaleFactor * parent.scaleFactor)
+        Vector3 worldRenderPos;
+        bool isVisible;
+        if (chunkObject != null)
         {
-            // Camera is close enough to this chunk that we need to increase the LOD so generate children with higher LOD in this chunk
-            if(chunkObject != null && chunkObject.gameObject.activeSelf)
-                chunkObject.gameObject.SetActive(false);
-            if (children == null || children.Length == 0)
-            {
-                children = new TerrainChunk[4];
-                float nextWidth = width * 0.5f;
-                float nextSqrMaxScreenSize = sqrMaxScreenSize * 4f;
-                Vector3 nextLocalRight = localRight * 0.5f;
-                Vector3 nextLocalForward = localForward * 0.5f;
-                children[0] = new TerrainChunk(shapeGenerator, localPosition + nextLocalRight - nextLocalForward, nextWidth, nextSqrMaxScreenSize, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Top left
-                children[1] = new TerrainChunk(shapeGenerator, localPosition + nextLocalRight + nextLocalForward, nextWidth, nextSqrMaxScreenSize, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Top right
-                children[2] = new TerrainChunk(shapeGenerator, localPosition - nextLocalRight + nextLocalForward, nextWidth, nextSqrMaxScreenSize, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Bottom right
-                children[3] = new TerrainChunk(shapeGenerator, localPosition - nextLocalRight - nextLocalForward, nextWidth, nextSqrMaxScreenSize, filterResolution, colliderResolution, maxLOD, detailLevel + 1, localUp, nextLocalRight, nextLocalForward); // Bottom left
-            }
+            worldRenderPos = chunkObject.meshRenderer.bounds.center;
+            isVisible = IsBoundsVisible(Camera.main, parent.transform.position);
+            // isVisible = IsMeshVisible(Camera.main, parent.transform, parent.transform.position, out worldRenderPos);
+        }
+        else
+        {
+            worldRenderPos = parent.transform.TransformPoint(localPosition);
+            isVisible = IsPointVisible(Camera.main, worldRenderPos, parent.transform.position);
+        }
+
+        double sqrDistance = (realCamPos - parent.TransformRenderPoint(worldRenderPos)).sqrMagnitude;
+        double realWidth = width * parent.realRadius;
+
+        if (isVisible && detailLevel >= 0 && detailLevel < maxLOD && sqrDistance < 4.0 * realWidth * realWidth)
+        {
+            // Camera is close enough to this chunk which is also visible to the cam
+            // so we need to increase the LOD so generate children with higher LOD in this chunk
+            IncreaseLOD();
 
             bool generated = false;
             foreach (TerrainChunk chunk in children)
@@ -311,8 +408,16 @@ public class TerrainChunk
                 UpdateUVs(colorGenerator);
                 return true;
             }
-            if (!chunkObject.gameObject.activeSelf)
+            if (chunkObject != null && !chunkObject.gameObject.activeSelf)
                 chunkObject.gameObject.SetActive(true);
+
+            if (children != null && children.Length > 0)
+            {
+                foreach (TerrainChunk chunk in children)
+                {
+                    chunk.RecursiveSetActive(false);
+                }
+            }
             return false;
         }
     }

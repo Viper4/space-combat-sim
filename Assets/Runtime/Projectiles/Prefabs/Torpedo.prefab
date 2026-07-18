@@ -132,7 +132,7 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 2
+  m_CollisionDetection: 0
 --- !u!136 &2688048666450355157
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -202,9 +202,12 @@ MonoBehaviour:
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 10
-  dynamicScaleFactor: 0
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
+  realRadius: 8.848053932189941
+  useRealScaleForRadius: 0
+  index: -1
+  worldSpaceOnlyRenderers: []
 --- !u!114 &2821699641902407001
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -217,6 +220,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
+  _mass: 300
   _isKinematic: 0
   speedThreshold: 100
   _velocity:
@@ -228,10 +232,6 @@ MonoBehaviour:
     y: 0
     z: 0
   prevPos:
-    x: 0
-    y: 0
-    z: 0
-  inverseInertiaTensor:
     x: 0
     y: 0
     z: 0
@@ -251,10 +251,10 @@ MonoBehaviour:
     x: 0
     y: 0
     z: -0.9
-  radius: 0.12
+  radius: 0.2
   isTrigger: 0
   restitution: 0
-  hGridLevel: -1
+  listIndex: -1
   overrideUnity: 0
 --- !u!114 &5523896917430819422
 MonoBehaviour:
@@ -272,10 +272,10 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0.9
-  radius: 0.12
+  radius: 0.2
   isTrigger: 0
   restitution: 0
-  hGridLevel: -1
+  listIndex: -1
   overrideUnity: 0
 --- !u!114 &1404306499154668698
 MonoBehaviour:
@@ -293,10 +293,10 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  radius: 0.12
+  radius: 0.2
   isTrigger: 0
   restitution: 0
-  hGridLevel: -1
+  listIndex: -1
   overrideUnity: 0
 --- !u!114 &2848928438514413154
 MonoBehaviour:
@@ -317,7 +317,7 @@ MonoBehaviour:
   radius: 10
   isTrigger: 1
   restitution: 0
-  hGridLevel: -1
+  listIndex: -1
   overrideUnity: 0
 --- !u!114 &6577287821693102537
 MonoBehaviour:
@@ -336,7 +336,7 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 8624868431337818510}
   active: 0
   _collider: {fileID: 2688048666450355157}
-  engineForce: 50000
+  engineForce: 300000
   thrusterForce: 500
   proportionalGain: 5.118147
   integralGain: 0
@@ -390,6 +390,9 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 8624868431337818510}
   _networkObjectCache: {fileID: 8624868431337818510}
   snapshotRate: 10
+  interpolate: 1
+  controlType: 1
+  activeWhenOffline: 1
 --- !u!114 &8624868431337818510
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -420,7 +423,7 @@ MonoBehaviour:
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 12
+  <PrefabId>k__BackingField: 19
   <SpawnableCollectionId>k__BackingField: 0
   <AssetPathHash>k__BackingField: 17792068308959698063
   SceneId: 0
@@ -448,7 +451,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584192617891388083
+  _initializedTimestamp: -8584172532178725570
 --- !u!1001 &4109854028599492452
 PrefabInstance:
   m_ObjectHideFlags: 0

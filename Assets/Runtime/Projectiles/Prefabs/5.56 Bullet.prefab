@@ -34,7 +34,7 @@ Transform:
   m_GameObject: {fileID: 1854897518929172335}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.39999998, z: 16.6}
+  m_LocalPosition: {x: 0, y: -1, z: 10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -123,7 +123,7 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 1
+  m_CollisionDetection: 0
 --- !u!96 &7463985350487387813
 TrailRenderer:
   serializedVersion: 4
@@ -132,7 +132,7 @@ TrailRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1854897518929172335}
-  m_Enabled: 0
+  m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -173,7 +173,7 @@ TrailRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Time: 0.01
+  m_Time: 0.025
   m_PreviewTimeScale: 1
   m_Parameters:
     serializedVersion: 3
@@ -278,6 +278,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
+  _mass: 0.01
   _isKinematic: 0
   speedThreshold: -1
   _velocity:
@@ -289,10 +290,6 @@ MonoBehaviour:
     y: 0
     z: 0
   prevPos:
-    x: 0
-    y: 0
-    z: 0
-  inverseInertiaTensor:
     x: 0
     y: 0
     z: 0
@@ -324,8 +321,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScaledTransform
   _realPosition:
     x: 0
-    y: 0.6000000238418579
-    z: 6.599999904632568
+    y: 0
+    z: 0
   _realScale:
     x: 1
     y: 1
@@ -335,9 +332,13 @@ MonoBehaviour:
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 10
-  dynamicScaleFactor: 0
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
+  realRadius: 5.0286760330200195
+  useRealScaleForRadius: 0
+  index: -1
+  worldSpaceOnlyRenderers:
+  - {fileID: 7463985350487387813}
 --- !u!114 &1289931754431887923
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -354,8 +355,8 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  radius: 0.01
+  radius: 0.0125
   isTrigger: 0
   restitution: 0
-  hGridLevel: -1
+  listIndex: -1
   overrideUnity: 1

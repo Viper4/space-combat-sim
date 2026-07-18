@@ -39,7 +39,7 @@ public class Bullet : MonoBehaviour
                 ship.statSystem.Damage(damageAmount);
                 break;
             case "Torpedo":
-                collisionInfo.transformB.GetComponent<Torpedo>().Detonate(collisionInfo.contactPoint);
+                collisionInfo.transformB.GetComponent<Torpedo>().Detonate(collisionInfo.contactPoint, null);
                 break;
             case "Shields":
                 collisionInfo.transformB.GetComponent<Shields>().Damage(damageAmount, collisionInfo.contactPoint.ToVector3());
@@ -65,7 +65,7 @@ public class Bullet : MonoBehaviour
                 ship.statSystem.Damage(damageAmount);
                 break;
             case "Torpedo":
-                collision.transform.GetComponent<Torpedo>().Detonate(scaledRigidbody.scaledTransform.TransformRenderPoint(contactPoint));
+                collision.transform.GetComponent<Torpedo>().Detonate(scaledRigidbody.scaledTransform.TransformRenderPoint(contactPoint), null);
                 break;
             case "Shields":
                 collision.transform.GetComponent<Shields>().Damage(damageAmount, contactPoint);

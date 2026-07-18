@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using System.Collections;
 using System;
-using UnityEngine.Events;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 public class GameManager : MonoBehaviour
 {
@@ -15,6 +15,10 @@ public class GameManager : MonoBehaviour
     public GameSettings gameSettings;
     public float sensitivityScale = 0.02f;
     public bool IsPaused;
+    public Volume globalVolume;
+    public Vignette vignette;
+    public ColorAdjustments colorAdjustments;
+    public float volumeMultiplier = 1f;
 
     private Dictionary<string, int> rangedSettingMap = new Dictionary<string, int>();
     [SerializeField] private bool loadSettings = true;
@@ -37,8 +41,14 @@ public class GameManager : MonoBehaviour
                 LoadSettings();
             }
             rangedSettingsActions = new Action[gameSettings.rangedSettings.Count];
-            int volumeIndex = GetRangedSettingIndex("Master Volume");
-            rangedSettingsActions[volumeIndex] += OnVolumeUpdated;
+            // int volumeIndex = GetRangedSettingIndex("Master Volume");
+            // rangedSettingsActions[volumeIndex] += OnVolumeUpdated;
+            globalVolume = GetComponentInChildren<Volume>();
+            if(globalVolume != null)
+            {
+                globalVolume.profile.TryGet(out vignette);
+                globalVolume.profile.TryGet(out colorAdjustments);
+            }
         }
         else
         {
@@ -70,31 +80,9 @@ public class GameManager : MonoBehaviour
                 Screen.fullScreenMode = FullScreenMode.MaximizedWindow;
             }
         }
+
+        AudioListener.volume = GetRangedSettingValue("Master Volume") * volumeMultiplier;
     }
-
-    // public int RegisterSpaceLight(SpaceLight light)
-    // {
-    //     spaceLights.Add(light);
-    //     return spaceLights.Count-1;
-    // }
-
-    // public void UpdateLightIntensity(int index)
-    // {
-    //     if (spaceLights == null || spaceLights.Count == 0)
-    //         return;
-    //     // Just use first index to reset highest rather than iterate in a update loop
-    //     if (index == 0)
-    //     {
-    //         highestSpaceLightIntensity = spaceLights[index].intensity;
-    //     }
-    //     else
-    //     {
-    //         if (spaceLights[index].intensity > highestSpaceLightIntensity)
-    //         {
-    //             highestSpaceLightIntensity = spaceLights[index].intensity;
-    //         }
-    //     }
-    // }
 
     private void ClearActions()
     {
@@ -174,10 +162,5 @@ public class GameManager : MonoBehaviour
         }
         Debug.LogWarning($"Failed to get ranged setting value for: '{settingName}'");
         return 1.0f;
-    }
-
-    private void OnVolumeUpdated()
-    {
-        AudioListener.volume = GetRangedSettingValue("Master Volume");
     }
 }

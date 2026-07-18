@@ -8,12 +8,14 @@ public class HGrid
 {
     public struct GridCell : IEquatable<GridCell>
     {
+        public int level;
         public int x;
         public int y;
         public int z;
 
-        public GridCell(int x, int y, int z)
+        public GridCell(int level, int x, int y, int z)
         {
+            this.level = level;
             this.x = x;
             this.y = y;
             this.z = z;
@@ -21,28 +23,28 @@ public class HGrid
 
         public bool Equals(GridCell other)
         {
-            return x == other.x && y == other.y && z == other.z;
+            return level == other.level && x == other.x && y == other.y && z == other.z;
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(x, y, z);
+            return HashCode.Combine(level, x, y, z);
         }
 
         public override string ToString()
         {
-            return "(" + x + ", " + y + ", " + z + ")";
+            return level + " (" + x + ", " + y + ", " + z + ")";
         }
     }
 
     private int maxLevels;
     private double[] levelCellSizes;
-    private Dictionary<GridCell, List<ScaledCollider>>[] levels;
+    private Dictionary<GridCell, List<ScaledCollider>> grids;
 
     public HGrid(int maxLevels, double baseCellSize, int scalingFactor)
     {
         this.maxLevels = maxLevels;
-        levels = new Dictionary<GridCell, List<ScaledCollider>>[maxLevels];
+        grids = new Dictionary<GridCell, List<ScaledCollider>>();
 
         levelCellSizes = new double[maxLevels];
         levelCellSizes[0] = baseCellSize;
@@ -50,7 +52,6 @@ public class HGrid
         {
             if (i > 0)
                 levelCellSizes[i] = levelCellSizes[i - 1] * scalingFactor;
-            levels[i] = new Dictionary<GridCell, List<ScaledCollider>>();
         }
     }
 
@@ -68,9 +69,11 @@ public class HGrid
         return maxLevels - 1;
     }
 
-    private GridCell GetCell(Vector3d pos, double cellSize)
+    private GridCell GetCell(Vector3d pos, int level)
     {
+        double cellSize = levelCellSizes[level];
         return new GridCell(
+            level,
             (int)Math.Floor(pos.x / cellSize),
             (int)Math.Floor(pos.y / cellSize),
             (int)Math.Floor(pos.z / cellSize)
@@ -79,35 +82,44 @@ public class HGrid
 
     public void Clear()
     {
-        for (int i = 0; i < maxLevels; i++)
-            levels[i].Clear();
+        grids.Clear();
     }
 
-    private void Insert(ScaledCollider collider, int level, GridCell cell)
+    private void Insert(ScaledCollider collider, GridCell cell)
     {
-        if(!levels[level].TryGetValue(cell, out var list))
+        if(!grids.TryGetValue(cell, out var list))
         {
             list = new List<ScaledCollider>();
-            levels[level].Add(cell, list);
+            grids.Add(cell, list);
         }
+        collider.listIndex = list.Count;
         list.Add(collider);
     }
 
-    private void Remove(ScaledCollider collider, int level, GridCell cell)
+    private void Remove(ScaledCollider collider, GridCell cell)
     {
-        if(!levels[level].TryGetValue(cell, out var list))
+        if(!grids.TryGetValue(cell, out var list))
         {
-            Debug.Log($"Failed to remove {collider.id} {collider.name}");
+            Debug.LogWarning($"[HGrid] Failed to remove {collider.id} {collider.name}");
             return;
         }
-        list.Remove(collider);
+        if (list.Count <= 0)
+            return; // Already removed it
+        int lastIndex = list.Count - 1;
+        ScaledCollider last = list[lastIndex];
+
+        // Replace with collider at end of list for fast removal and maintain indices
+        list[collider.listIndex] = last;
+        last.listIndex = collider.listIndex;
+        list.RemoveAt(lastIndex);
     }
 
     public void Delete(ScaledCollider collider)
     {
-        if (collider.hGridLevel == -1)
+        if (collider.listIndex == -1)
             return;
-        Remove(collider, collider.hGridLevel, collider.hGridCell);
+        Remove(collider, collider.hGridCell);
+        collider.listIndex = -1;
     }
 
     public void UpdatePosition(ScaledCollider collider)
@@ -119,25 +131,22 @@ public class HGrid
         double effectiveRadius = collider.GetRadius() + displacement;
         int newLevel = GetLevel(effectiveRadius);
 
-        if (collider.hGridLevel == -1)
+        if (collider.listIndex == -1)
         {
-            collider.hGridLevel = newLevel;
-            collider.hGridCell = GetCell(collider.GetRealCenter(), levelCellSizes[newLevel]);
-            Insert(collider, collider.hGridLevel, collider.hGridCell);
+            collider.hGridCell = GetCell(collider.GetRealCenter(), newLevel);
+            Insert(collider, collider.hGridCell);
             return;
         }
 
-        int prevLevel = collider.hGridLevel;
         GridCell prevCell = collider.hGridCell;
-        GridCell newCell = GetCell(collider.GetRealCenter(), levelCellSizes[newLevel]);
+        GridCell newCell = GetCell(collider.GetRealCenter(), newLevel);
 
         // Re-insert only when the level or cell actually changes
-        if (newLevel != prevLevel || !newCell.Equals(prevCell))
+        if (!newCell.Equals(prevCell))
         {
-            Remove(collider, prevLevel, prevCell);
-            collider.hGridLevel = newLevel;
+            Remove(collider, prevCell);
             collider.hGridCell = newCell;
-            Insert(collider, newLevel, newCell);
+            Insert(collider, newCell);
         }
     }
 
@@ -146,34 +155,34 @@ public class HGrid
         // Keep velocity inflation consistent with UpdatePosition
         double displacement = collider.scaledRigidbody.velocity.magnitude * Time.fixedDeltaTime;
         int newLevel = GetLevel(collider.GetRadius() + displacement);
-        int prevLevel = collider.hGridLevel;
+        int prevLevel = collider.hGridCell.level;
 
         if (prevLevel == newLevel)
             return;
 
-        if (prevLevel != -1)
-            Remove(collider, prevLevel, collider.hGridCell);
+        if (collider.listIndex != -1)
+            Remove(collider, collider.hGridCell);
 
-        collider.hGridLevel = newLevel;
-        collider.hGridCell = GetCell(collider.GetRealCenter(), levelCellSizes[newLevel]);
-        Insert(collider, collider.hGridLevel, collider.hGridCell);
+        collider.hGridCell = GetCell(collider.GetRealCenter(), newLevel);
+        Insert(collider, collider.hGridCell);
     }
 
     public IEnumerable<ScaledCollider> GetCandidates(ScaledCollider collider)
     {
-        if (collider.hGridLevel == -1)
+        int baseLevel = collider.hGridCell.level;
+        if (collider.listIndex == -1)
         {
             double displacement = collider.scaledRigidbody.velocity.magnitude * Time.fixedDeltaTime;
-            collider.hGridLevel = GetLevel(collider.GetRadius() + displacement);
+            baseLevel = GetLevel(collider.GetRadius() + displacement);
         }
 
         Vector3d pos = collider.GetRealCenter();
 
         // Check this level and above only — smaller objects do their own upward search,
         // so pairs are never missed and never double-checked at mismatched levels.
-        for (int level = collider.hGridLevel; level < maxLevels; level++)
+        for (int level = baseLevel; level < maxLevels; level++)
         {
-            GridCell center = GetCell(pos, levelCellSizes[level]);
+            GridCell center = GetCell(pos, level);
             // 3×3×3 neighborhood is sufficient: the inflation guarantee means a fast
             // object's prevPos and realPos both map to the same cell or one neighbor
             // at that object's level (displacement ≤ cellSize/2 by GetLevel's invariant).
@@ -181,13 +190,13 @@ public class HGrid
             for (int dy = -1; dy <= 1; dy++)
             for (int dz = -1; dz <= 1; dz++)
             {
-                GridCell cell = new GridCell(center.x + dx, center.y + dy, center.z + dz);
-                if (!levels[level].TryGetValue(cell, out var list))
+                GridCell cell = new GridCell(level, center.x + dx, center.y + dy, center.z + dz);
+                if (!grids.TryGetValue(cell, out var list))
                     continue;
 
-                foreach (ScaledCollider other in list) // ToList to avoid collection getting modified while iterating (this is slow though)
+                foreach (ScaledCollider other in list)
                 {
-                    if (collider.id == other.id || collider.IsIgnoring(other.id) || other.IsIgnoring(collider.id))
+                    if (other == null || collider.id == other.id || collider.IsIgnoring(other.id) || other.IsIgnoring(collider.id))
                         continue;
                     yield return other;
                 }
@@ -209,20 +218,22 @@ public class HGrid
             Vector3d min = position - Vector3d.one * (radius + maxColliderRadius);
             Vector3d max = position + Vector3d.one * (radius + maxColliderRadius);
 
-            GridCell minCell = GetCell(min, cellSize);
-            GridCell maxCell = GetCell(max, cellSize);
+            GridCell minCell = GetCell(min, level);
+            GridCell maxCell = GetCell(max, level);
 
             for (int x = minCell.x; x <= maxCell.x; x++)
             for (int y = minCell.y; y <= maxCell.y; y++)
             for (int z = minCell.z; z <= maxCell.z; z++)
             {
-                GridCell cell = new GridCell(x, y, z);
+                GridCell cell = new GridCell(level, x, y, z);
 
-                if (!levels[level].TryGetValue(cell, out var list))
+                if (!grids.TryGetValue(cell, out var list))
                     continue;
 
                 foreach (ScaledCollider collider in list)
                 {
+                    if (collider == null)
+                        continue;
                     yield return collider;
                 }
             }
