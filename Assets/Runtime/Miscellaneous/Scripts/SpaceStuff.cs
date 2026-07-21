@@ -3,14 +3,40 @@ using System;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using UnityEngine.Internal;
-using System.Runtime.InteropServices;
+using FishNet.CodeGenerating;
+using FishNet.Serializing;
 
 namespace SpaceStuff
 {
+    public static class Vector3dSerializer
+    {
+        public static void WriteVector3d(
+            this Writer writer,
+            Vector3d value)
+        {
+            writer.WriteDouble(value.x);
+            writer.WriteDouble(value.y);
+            writer.WriteDouble(value.z);
+        }
+
+        public static Vector3d ReadVector3d(
+            this Reader reader)
+        {
+            Vector3d result = new Vector3d
+            {
+                x = reader.ReadDouble(),
+                y = reader.ReadDouble(),
+                z = reader.ReadDouble()
+            };
+
+            return result;
+        }
+    }
+
     //
     // Summary:
     //     Representation of 3D vectors and points in double precision.
-    [Serializable]
+    [Serializable, UseGlobalCustomSerializer]
     public struct Vector3d : IEquatable<Vector3d>, IFormattable
     {
         //public const double kEpsilon = 1E-05;

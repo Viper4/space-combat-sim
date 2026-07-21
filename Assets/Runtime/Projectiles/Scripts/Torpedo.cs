@@ -4,7 +4,6 @@ using UnityEngine;
 using SpaceStuff;
 using System;
 using FishNet.Object;
-using FishNet;
 
 [RequireComponent(typeof(ScaledRigidbody), typeof(RadarTarget))]
 public class Torpedo : NetworkBehaviour
@@ -25,7 +24,7 @@ public class Torpedo : NetworkBehaviour
     [SerializeField] private float integralGain = 0.0f;
     [SerializeField] private float derivativeGain = 4.0f;
 
-    [SerializeField] private GameObject rocketParticles;
+    [SerializeField] private GameObject rocketTrail;
 
     [SerializeField, Tooltip("Collisions with a relative speed above this will detonate the torpedo.")] private float collideSpeedThreshold = 100f;
     [SerializeField] private GameObject explosionPrefab;
@@ -82,8 +81,7 @@ public class Torpedo : NetworkBehaviour
             return;
         if (!active || target == null)
         {
-            if (rocketParticles.activeSelf)
-                rocketParticles.SetActive(false);
+            SetRocketTrailActive(false);
             return;
         }
 
@@ -128,14 +126,12 @@ public class Torpedo : NetworkBehaviour
         if (localDesiredForce.z >= 0.0f)
         {
             localDesiredForce.z = Mathf.Min(localDesiredForce.z, engineForce);
-            if (!rocketParticles.activeSelf)
-                rocketParticles.SetActive(true);
+            SetRocketTrailActive(true);
         }
         else
         {
             localDesiredForce.z = Mathf.Max(localDesiredForce.z, -thrusterForce);
-            if (rocketParticles.activeSelf)
-                rocketParticles.SetActive(false);
+            SetRocketTrailActive(false);
         }
 
         scaledRigidbody.AddRelativeForce(localDesiredForce.ToVector3d(), ForceMode.Force);
@@ -160,6 +156,23 @@ public class Torpedo : NetworkBehaviour
         }
     }
 
+    [ObserversRpc(ExcludeServer = true, BufferLast = true)]
+    private void SetRocketTrailActiveObserversRpc(bool active)
+    {
+        if (rocketTrail.activeSelf != active)
+            rocketTrail.SetActive(active);
+    }
+
+    private void SetRocketTrailActive(bool active)
+    {
+        if(rocketTrail.activeSelf != active)
+        {
+            rocketTrail.SetActive(active);
+            if (IsServerInitialized)
+                SetRocketTrailActiveObserversRpc(active);
+        }
+    }
+
     public void Activate(RadarTarget target, float delay)
     {
         if (!IsServerOrOffline)
@@ -175,7 +188,7 @@ public class Torpedo : NetworkBehaviour
         _collider.enabled = true;
         scaledRigidbody.EnableScaledColliders(true);
         if (thisRadarTarget.alertWhenTargeting && target != null && target.alertSystem != null)
-            target.alertSystem.IncrementTorpedoLock(1);
+            target.alertSystem.IncrementMissileLock(1);
     }
 
     public void SetTarget(RadarTarget newTarget)
@@ -183,10 +196,10 @@ public class Torpedo : NetworkBehaviour
         if (!IsServerOrOffline)
             return;
         if (thisRadarTarget.alertWhenTargeting && target != null && target.alertSystem != null)
-            target.alertSystem.IncrementTorpedoLock(-1);
+            target.alertSystem.IncrementMissileLock(-1);
         target = newTarget;
         if (thisRadarTarget.alertWhenTargeting && target != null && target.alertSystem != null)
-            target.alertSystem.IncrementTorpedoLock(1);
+            target.alertSystem.IncrementMissileLock(1);
 
         if (target == thisRadarTarget)
         {
@@ -201,26 +214,40 @@ public class Torpedo : NetworkBehaviour
         return Mathf.Max(-(maxDamage / (explosionRadius * explosionRadius)) * sqrDistance + maxDamage + minDamage, 0f);
     }
 
-    [ObserversRpc(ExcludeServer = true)]
-    private void DetonateObserversRpc(double x, double y, double z)
+    private void InstantiateExplosion(Vector3d position, Vector3d hitVelocity, double hitMass)
     {
-        if (detonating)
-            return;
-        detonating = true;
-
         if (scaledRigidbody.scaledTransform.visible)
         {
             ScaledTransform explosion = Instantiate(explosionPrefab, transform.position, transform.rotation).GetComponent<ScaledTransform>();
             if (explosion.TryGetComponent<ScaledRigidbody>(out var explosionRB))
             {
-                explosionRB.velocity = scaledRigidbody.velocity;
+                explosionRB.velocity = Vector3d.Lerp(hitVelocity, scaledRigidbody.velocity, scaledRigidbody.mass / (scaledRigidbody.mass + hitMass));
             }
-            if (explosion.TryGetComponent<AudioSource>(out var explosionAudio))
+            explosion.realPosition = position;
+            if (scaledRigidbody.scaledTransform.inScaledSpace && explosion.TryGetComponent<AudioSource>(out var explosionAudio))
             {
                 explosionAudio.enabled = false;
             }
-            explosion.realPosition = new Vector3d(x, y, z);
         }
+    }
+
+    [ObserversRpc(ExcludeServer = true)]
+    private void DetonateObserversRpc(Vector3d position, int hitNetId)
+    {
+        if (detonating)
+            return;
+        detonating = true;
+        Vector3d hitVelocity = Vector3d.zero;
+        double hitMass = 0.0;
+        if (hitNetId != -1 && ClientManager.Objects.Spawned.TryGetValue(hitNetId, out var networkObject))
+        {
+            if (networkObject.TryGetComponent<ScaledRigidbody>(out var hitRB))
+            {
+                hitVelocity = hitRB.velocity;
+                hitMass = hitRB.mass;
+            }
+        }
+        InstantiateExplosion(position, hitVelocity, hitMass);
     }
 
     public void Detonate(Vector3d contactPoint, ScaledRigidbody collidedRB)
@@ -230,24 +257,21 @@ public class Torpedo : NetworkBehaviour
         if (detonating) // Prevent stack overflow
             return;
         detonating = true;
+        Vector3d hitVelocity = collidedRB == null ? Vector3d.zero : collidedRB.velocity;
+        double hitMass = collidedRB == null ? 0.0 : collidedRB.mass;
         if (!IsOffline)
-            DetonateObserversRpc(contactPoint.x, contactPoint.y, contactPoint.z);
+        {
+            int hitNetId = -1;
+            if (collidedRB != null && collidedRB.TryGetComponent<NetworkObject>(out var hitNetworkObject))
+            {
+                hitNetId = hitNetworkObject.ObjectId;
+            }
+            DetonateObserversRpc(contactPoint, hitNetId);
+        }
 
         Vector3 contactOriginLocalPoint = (contactPoint - FloatingWorldOrigin.Instance.scaledTransform.realPosition).ToVector3();
 
-        ScaledTransform explosion = Instantiate(explosionPrefab, transform.position, transform.rotation).GetComponent<ScaledTransform>();
-        if (explosion.TryGetComponent<ScaledRigidbody>(out var explosionRB))
-        {
-            if (collidedRB != null)
-                explosionRB.velocity = collidedRB.velocity;
-            else
-                explosionRB.velocity = scaledRigidbody.velocity;
-        }
-        if (explosion.TryGetComponent<AudioSource>(out var explosionAudio))
-        {
-            explosionAudio.enabled = false;
-        }
-        explosion.realPosition = contactPoint;
+        InstantiateExplosion(contactPoint, hitVelocity, hitMass);
 
         HashSet<Transform> hitTransforms = new HashSet<Transform>();
         List<ScaledCollider> overlapColliders = ScaledSpacePhysics.Instance.GetOverlapSphere(contactPoint, explosionRadius, ~ignoreLayers, true);
@@ -310,7 +334,7 @@ public class Torpedo : NetworkBehaviour
         }
 
         if (target != null && target.alertSystem != null)
-            target.alertSystem.IncrementTorpedoLock(-1);
+            target.alertSystem.IncrementMissileLock(-1);
 
         if (!IsOffline)
             ServerManager.Despawn(NetworkObject);

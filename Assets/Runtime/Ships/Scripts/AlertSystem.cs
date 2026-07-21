@@ -1,33 +1,57 @@
 using System;
 using FishNet.Connection;
 using FishNet.Object;
-using TMPro;
+using UnityEngine.UI;
 using UnityEngine;
+using System.Collections.Generic;
 
 public class AlertSystem : NetworkBehaviour
 {
-    [SerializeField] private AudioSource alertAudioSource;
+    [SerializeField] private AudioSource lockAudioSource;
+    [SerializeField] private AudioSource contactAudioSource;
     [SerializeField] private AudioClip radarLockClip;
-    [SerializeField] private AudioClip torpedoLockClip;
+    [SerializeField] private AudioClip missileLockClip;
     [SerializeField] private AudioClip contactClip;
     [SerializeField] private AudioClip specialContactClip;
 
-    [SerializeField] private GameObject overGPanel;
-    [SerializeField] private GameObject radarLockPanel;
-    [SerializeField] private GameObject torpedoLockPanel;
-    [SerializeField] private GameObject fuelPanel;
+    [SerializeField] private Button[] alertButtons;
+    private bool[] alertMutes;
+    private Dictionary<string, int> alertMap = new Dictionary<string, int>();
+
+    [SerializeField] private Color unmutedColor = Color.red;
+    [SerializeField] private Color mutedColor = Color.softRed;
 
     private int radarLocks = 0;
-    private int torpedoLocks = 0;
+    private int missileLocks = 0;
 
     private bool IsOwnerOrOffline => IsOwner || IsOffline;
-    private bool IsServerOrOffline => IsServerInitialized || IsOffline;
 
+    private void Awake()
+    {
+        alertMutes = new bool[alertButtons.Length];
+        foreach (Button button in alertButtons)
+        {
+            int index = Array.IndexOf(alertButtons, button);
+            alertMap.Add(button.name, index);
+            button.onClick.AddListener(() => OnClickAlertButton(index));
+        }
+    }
+
+    private void OnDestroy()
+    {
+        alertMap.Clear();
+        for(int i = 0; i < alertButtons.Length; i++)
+        {
+            alertButtons[i].onClick.RemoveAllListeners();
+        }
+    }
 
     [TargetRpc]
     private void NewContactTargetRpc(NetworkConnection conn)
     {
-        alertAudioSource.PlayOneShot(contactClip);
+        contactAudioSource.Stop();
+        contactAudioSource.clip = contactClip;
+        contactAudioSource.Play();
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -41,7 +65,9 @@ public class AlertSystem : NetworkBehaviour
     {
         if (IsOwnerOrOffline)
         {
-            alertAudioSource.PlayOneShot(contactClip);
+            contactAudioSource.Stop();
+            contactAudioSource.clip = contactClip;
+            contactAudioSource.Play();
         }
         else
         {
@@ -52,7 +78,9 @@ public class AlertSystem : NetworkBehaviour
     [TargetRpc]
     private void NewSpecialContactTargetRpc(NetworkConnection conn)
     {
-        alertAudioSource.PlayOneShot(specialContactClip);
+        contactAudioSource.Stop();
+        contactAudioSource.clip = specialContactClip;
+        contactAudioSource.Play();
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -66,7 +94,9 @@ public class AlertSystem : NetworkBehaviour
     {
         if (IsOwnerOrOffline)
         {
-            alertAudioSource.PlayOneShot(specialContactClip);
+            contactAudioSource.Stop();
+            contactAudioSource.clip = specialContactClip;
+            contactAudioSource.Play();
         }
         else
         {
@@ -80,26 +110,31 @@ public class AlertSystem : NetworkBehaviour
             return;
         if (radarLocks > 0)
         {
-            if (alertAudioSource.clip != radarLockClip)
-                alertAudioSource.clip = radarLockClip;
-            if (!alertAudioSource.isPlaying)
-                alertAudioSource.Play();
-            if (radarLockPanel != null)
-                radarLockPanel.SetActive(true);
+            if (lockAudioSource.clip != radarLockClip)
+                lockAudioSource.clip = radarLockClip;
+            if (alertMap.TryGetValue("Radar Lock", out int index))
+            {
+                alertButtons[index].gameObject.SetActive(true);
+                lockAudioSource.mute = alertMutes[index];
+            }
+            if (!lockAudioSource.mute && !lockAudioSource.isPlaying)
+                lockAudioSource.Play();
         }
         else if (radarLocks <= 0)
         {
             radarLocks = 0;
-            if (torpedoLocks <= 0)
+            if (missileLocks <= 0)
             {
-                alertAudioSource.Stop();
+                lockAudioSource.Stop();
             }
             else
             {
-                alertAudioSource.clip = torpedoLockClip;
+                UpdateMissileLock(); // Shouldn't cause stack overflow since it will take the >0 path
             }
-            if (radarLockPanel != null)
-                radarLockPanel.SetActive(false);
+            if (alertMap.TryGetValue("Radar Lock", out int index))
+            {
+                alertButtons[index].gameObject.SetActive(false);
+            }
         }
     }
 
@@ -130,71 +165,105 @@ public class AlertSystem : NetworkBehaviour
         }
     }
 
-    private void UpdateTorpedoLock()
+    private void UpdateMissileLock()
     {
         if (!IsOwnerOrOffline)
             return;
-        if (torpedoLocks > 0)
+        if (missileLocks > 0)
         {
-            if (alertAudioSource.clip != torpedoLockClip)
-                alertAudioSource.clip = torpedoLockClip;
-            if (!alertAudioSource.isPlaying)
-                alertAudioSource.Play();
-            if (torpedoLockPanel != null)
-                torpedoLockPanel.SetActive(true);
+            if (lockAudioSource.clip != missileLockClip)
+                lockAudioSource.clip = missileLockClip;
+            if (alertMap.TryGetValue("Missile Lock", out int index))
+            {
+                alertButtons[index].gameObject.SetActive(true);
+                lockAudioSource.mute = alertMutes[index];
+            }
+            if (!lockAudioSource.mute && !lockAudioSource.isPlaying)
+                lockAudioSource.Play();
         }
-        else if (torpedoLocks <= 0)
+        else if (missileLocks <= 0)
         {
-            torpedoLocks = 0;
+            missileLocks = 0;
             if (radarLocks <= 0)
             {
-                alertAudioSource.Stop();
+                lockAudioSource.Stop();
             }
             else
             {
-                alertAudioSource.clip = radarLockClip;
+                UpdateRadarLock(); // Shouldn't cause stack overflow since it will take the >0 path
             }
-            if (torpedoLockPanel != null)
-                torpedoLockPanel.SetActive(false);
+            if (alertMap.TryGetValue("Missile Lock", out int index))
+            {
+                alertButtons[index].gameObject.SetActive(false);
+            }
         }
     }
 
     [TargetRpc]
-    private void SetTorpedoLockTargetRpc(NetworkConnection conn, int amount)
+    private void SetMissileLockTargetRpc(NetworkConnection conn, int amount)
     {
-        this.torpedoLocks += amount;
-        UpdateTorpedoLock();
+        this.missileLocks += amount;
+        UpdateMissileLock();
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void TrySendTorpedoLockServerRpc(NetworkConnection target, int amount)
+    private void TrySendMissileLockServerRpc(NetworkConnection target, int amount)
     {
         // TODO: Validate request
-        SetRadarLockTargetRpc(target, amount);
+        SetMissileLockTargetRpc(target, amount);
     }
 
-    public void IncrementTorpedoLock(int amount)
+    public void IncrementMissileLock(int amount)
     {
-        torpedoLocks += amount;
+        missileLocks += amount;
         if (IsOwnerOrOffline)
         {
-            UpdateTorpedoLock();
+            UpdateMissileLock();
         }
         else
         {
-            TrySendTorpedoLockServerRpc(Owner, amount);
+            TrySendMissileLockServerRpc(Owner, amount);
         }
     }
 
-    public void ToggleOverGAlert(bool value)
+    public void SetAlert(string name, bool value)
     {
-        if (overGPanel != null && overGPanel.activeSelf != value)
-            overGPanel.SetActive(value);
+        if (alertMap.TryGetValue(name, out int index))
+        {
+            if (alertButtons[index].gameObject.activeSelf != value)
+            {
+                alertButtons[index].gameObject.SetActive(value);
+                if (alertButtons[index].TryGetComponent<AudioSource>(out var alertAudioSource))
+                {
+                    if (alertAudioSource.isActiveAndEnabled && !alertAudioSource.isPlaying)
+                    {
+                        alertAudioSource.Play();
+                    }
+                }
+            }
+        }
     }
 
-    public void ToggleLowFuelAlert(bool value)
+    private void OnClickAlertButton(int index)
     {
-        if (fuelPanel != null && fuelPanel.activeSelf != value)
-            fuelPanel.SetActive(value);
+        if (index < 0 || index >= alertButtons.Length)
+            return;
+        alertMutes[index] = !alertMutes[index];
+        alertButtons[index].image.color = alertMutes[index] ? mutedColor : unmutedColor;
+        switch (alertButtons[index].name)
+        {
+            case "Radar Lock":
+                lockAudioSource.mute = alertMutes[index];
+                break;
+            case "Missile Lock":
+                lockAudioSource.mute = alertMutes[index];
+                break;
+            default:
+                if (alertButtons[index].TryGetComponent<AudioSource>(out var alertAudioSource))
+                {
+                    alertAudioSource.mute = alertMutes[index];
+                }
+                break;
+        }
     }
 }

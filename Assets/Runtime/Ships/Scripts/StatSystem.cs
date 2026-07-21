@@ -13,9 +13,9 @@ public class StatSystem : MonoBehaviour
 
     [SerializeField] private ParticleSystem damageParticles;
 
-    [SerializeField] private UnityEvent onDamage;
-    [SerializeField] private UnityEvent onHeal;
-    [SerializeField] private UnityEvent<float> onDeath;
+    public UnityEvent onDamage;
+    public UnityEvent onHeal;
+    public UnityEvent<float> onDeath;
 
     // Prevent lag from excessive event calls or excessive slider value changes, and allow for smooth animation
     private float lastDamageTime = 0;

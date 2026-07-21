@@ -68,7 +68,10 @@ public class ScaledSpaceVisuals : MonoBehaviour
     private IEnumerator UpdateScaleFactorsRoutine()
     {
         updating = true;
-        yield return new WaitWhile(() => FloatingWorldOrigin.Instance == null || Camera.main == null);
+        while (FloatingWorldOrigin.Instance == null || Camera.main == null)
+        {
+            yield return new WaitForFixedUpdate();
+        }
 
         lastUpdateTime = Time.time;
 

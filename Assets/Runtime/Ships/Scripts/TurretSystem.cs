@@ -10,7 +10,7 @@ using System.Collections;
 [RequireComponent(typeof(Ship), typeof(TargetingSystem))]
 public class TurretSystem : MonoBehaviour
 {
-    [HideInInspector] public Ship ship;
+    private Ship ship;
     private TargetingSystem targetingSystem;
     
     [SerializeField] private int maxAmmo = 10000;

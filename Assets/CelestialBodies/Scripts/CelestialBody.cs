@@ -32,7 +32,6 @@ public class CelestialBody : NetworkBehaviour
     [SerializeField] private bool tidallyLocked = false;
     [SerializeField] private bool overrideRotationAxis = false;
 
-    private double mass;
     private float temperature;
     private Vector3d scale = Vector3d.zero;
 
@@ -61,6 +60,7 @@ public class CelestialBody : NetworkBehaviour
             InitializeObserversRpc(scale.x, scale.y, scale.z, scaledRigidbody.mass, generator.GetSeeds());
         else
             InitializeObserversRpc(scale.x, scale.y, scale.z, scaledRigidbody.mass, null);
+        Debug.Log($"[CelestialBody] Sent {name} init data to observers.");
     }
 
     private void Init()
@@ -128,8 +128,7 @@ public class CelestialBody : NetworkBehaviour
 
                 float t = Random.value;
                 double massInSolarMasses = Mathf.Lerp(picked.minMass, picked.maxMass, t);
-                mass = massInSolarMasses * solarMass;
-                scaledRigidbody.mass = (float)mass;
+                scaledRigidbody.mass = massInSolarMasses * solarMass;
 
                 temperature = Mathf.Lerp(picked.minTemperature, picked.maxTemperature, t);
 
@@ -202,26 +201,32 @@ public class CelestialBody : NetworkBehaviour
         {
             StartCoroutine(SetOrbitalVelocity());
         }
+
+        Debug.Log($"[CelestialBody] {name} initialized locally.");
     }
 
     [ObserversRpc(ExcludeServer = true, BufferLast = true)]
     private void InitializeObserversRpc(double scaleX, double scaleY, double scaleZ, double mass, Vector3[] seeds)
     {
-        Debug.Log($"[CelestialBody] {name} initialized from server data.");
+        if (IsServerInitialized)
+            return;
+        Debug.Log($"[CelestialBody] {name} initializing from server data.");
         scaledTransform.realScale = new Vector3d(scaleX, scaleY, scaleZ);
         scaledRigidbody.mass = mass;
-        if (generator != null)
-            generator.Init(seeds);
         if (gravitySettings != null && gravitySettings.applyGravity)
         {
             ScaledSpacePhysics.Instance.GravityStep += ApplyGravity;
         }
+        if (generator != null)
+            generator.Init(seeds);
         initialized = true;
     }
 
     [ObserversRpc(ExcludeServer = true, BufferLast = true)]
     private void SetSpaceLightObserversRpc(float temperature, Color tint)
     {
+        if (IsServerInitialized)
+            return;
         if (spaceLight != null)
             spaceLight.SetTemperature(temperature, tint);
     }
@@ -353,7 +358,7 @@ public class CelestialBody : NetworkBehaviour
 
     private void FixedUpdate()
     {
-        if (!initialized || generator == null || pauseUpdates)
+        if (FloatingWorldOrigin.Instance == null || !initialized || generator == null || pauseUpdates)
             return;
 
         if (IsServerOrOffline && tidallyLocked && !overrideRotationAxis)
@@ -406,7 +411,7 @@ public class CelestialBody : NetworkBehaviour
         // g = (Gm)/r^2
         // m = mass of body
         // r = distance between centers
-        return G * mass / (scaledTransform.realPosition - point).sqrMagnitude;
+        return G * scaledRigidbody.mass / (scaledTransform.realPosition - point).sqrMagnitude;
     }
 
     private void OnDestroy()

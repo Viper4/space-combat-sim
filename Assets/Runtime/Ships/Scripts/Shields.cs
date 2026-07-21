@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -5,7 +6,9 @@ using UnityEngine;
 public class Shields : MonoBehaviour
 {
     private StatSystem statSystem;
+    [SerializeField] private Ship ship;
     [SerializeField, Tooltip("The thing this shield is protecting.")] private StatSystem protectedStatSystem;
+    [SerializeField] private AlertSystem alertSystem;
 
     private bool active;
     [SerializeField] private GameObject colliderObject;
@@ -23,14 +26,20 @@ public class Shields : MonoBehaviour
     [SerializeField] private float damageDurationScale = 0.01f;
     [SerializeField] private float damageMagnitudeScale = 0.005f;
 
+
     // Start is called before the first frame update
     void Start()
     {
         statSystem = GetComponent<StatSystem>();
+        statSystem.onDeath.AddListener(OnDeath);
         shieldRenderer = colliderObject.GetComponent<MeshRenderer>();
         shieldMaterial = shieldRenderer.material; // Clone material
         shieldCollider = colliderObject.GetComponent<Collider>();
         colliderObject.SetActive(active);
+        if (alertSystem != null)
+        {
+            alertSystem.SetAlert("Shields", false);
+        }
     }
 
     private void OnDestroy()
@@ -42,15 +51,9 @@ public class Shields : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-
-    }
-
     public void ToggleShields(int state)
     {
-        if (statSystem.health <= 0)
+        if (statSystem.health <= 0 || (ship != null && ship.isShutdown))
             return;
         
         active = state == 1;
@@ -76,13 +79,17 @@ public class Shields : MonoBehaviour
         }
     }
 
-    public void OnDeath(float remainingDamage)
+    private void OnDeath(float remainingDamage)
     {
         active = false;
         colliderObject.SetActive(false);
         if (damageAfterDeath && protectedStatSystem != null)
             protectedStatSystem.Damage(remainingDamage);
         StartCoroutine(DieAnimation());
+        if (alertSystem != null)
+        {
+            alertSystem.SetAlert("Shields", true);
+        }
     }
 
     private IEnumerator DieAnimation()

@@ -97,23 +97,64 @@ public class TorpedoSystem : NetworkBehaviour
             ToggleBayDoorServerRpc(torpedoBayDoorOpen);
     }
 
-    private void LaunchTorpedo(int i)
+    private void LaunchTorpedo(int i, RadarTarget lockedTarget)
     {
         launchAudio.ResetPlay(true);
 
         if (IsOffline || IsServerInitialized)
-            launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(ship.scaledRigidbody.scaledTransform, ship.scaledRigidbody.velocity, targetingSystem.lockedTarget, i, ship.radarTarget.team);
+            launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(ship.scaledRigidbody.scaledTransform, ship.scaledRigidbody.velocity, lockedTarget, i, ship.radarTarget.team);
         UpdateTorpedoUI(i, false);
     }
 
-    [ObserversRpc(ExcludeServer = true)]
-    private void NonServerLaunchTorpedo(int i)
+    private void LaunchTorpedo(int i, int targetObjectId)
     {
-        LaunchTorpedo(i);
+        if (targetObjectId == -1)
+        {
+            LaunchTorpedo(i, null);
+            return;
+        }
+        NetworkObject networkObject;
+        if (IsClientInitialized)
+        {
+            if (!ClientManager.Objects.Spawned.TryGetValue(targetObjectId, out networkObject))
+            {
+                Debug.LogWarning($"[TorpedoSystem] Client cannot find network object with ID: {targetObjectId}. Launching torpedo with null target.");
+                LaunchTorpedo(i, null);
+                return;
+            }
+        }
+        else if (IsServerInitialized)
+        {
+            if (!ServerManager.Objects.Spawned.TryGetValue(targetObjectId, out networkObject))
+            {
+                Debug.LogWarning($"[TorpedoSystem] Server cannot find network object with ID: {targetObjectId}. Launching torpedo with null target.");
+                LaunchTorpedo(i, null);
+                return;
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[TorpedoSystem] Cannot launch torpedo using network object ID as client nor server are initialized.");
+            return;
+        }
+        
+        if (!networkObject.TryGetComponent<RadarTarget>(out var radarTarget))
+        {
+            Debug.LogWarning($"[TorpedoSystem] Network object {networkObject.name} does not have a RadarTarget component. Launching torpedo with null target.");
+            LaunchTorpedo(i, null);
+            return;
+        }
+        LaunchTorpedo(i, radarTarget);
+    }
+
+    [ObserversRpc(ExcludeServer = true)]
+    private void LaunchTorpedoObserversRpc(int i, int targetObjectId)
+    {
+        LaunchTorpedo(i, targetObjectId);
     }
 
     [ServerRpc]
-    private void LaunchTorpedoServerRpc()
+    private void LaunchTorpedoServerRpc(int targetObjectId)
     {
         if (!torpedoBayDoorOpen || !canLaunch)
             return;
@@ -121,8 +162,8 @@ public class TorpedoSystem : NetworkBehaviour
         {
             if (torpedoPoints[i].hasTorpedo)
             {
-                NonServerLaunchTorpedo(i);
-                LaunchTorpedo(i);
+                LaunchTorpedoObserversRpc(i, targetObjectId);
+                LaunchTorpedo(i, targetObjectId);
                 break;
             }
         }
@@ -139,7 +180,7 @@ public class TorpedoSystem : NetworkBehaviour
             {
                 if (torpedoPoints[i].hasTorpedo)
                 {
-                    LaunchTorpedo(i);
+                    LaunchTorpedo(i, targetingSystem.lockedTarget);
                     break;
                 }
             }
@@ -147,7 +188,19 @@ public class TorpedoSystem : NetworkBehaviour
         }
         else if (IsOwner)
         {
-            LaunchTorpedoServerRpc();
+            if (targetingSystem.lockedTarget == null)
+            {
+                LaunchTorpedoServerRpc(-1);
+            }
+            else if (!targetingSystem.lockedTarget.TryGetComponent<NetworkObject>(out var targetNetworkObject))
+            {
+                Debug.LogWarning($"[TorpedoSystem] Locked target does not have a NetworkObject component. Sending null target to server.");
+                LaunchTorpedoServerRpc(-1);
+            }
+            else
+            {
+                LaunchTorpedoServerRpc(targetNetworkObject.ObjectId);
+            }
             if (!IsServerInitialized)
                 StartCoroutine(LaunchCooldown());
         }
@@ -183,13 +236,13 @@ public class TorpedoSystem : NetworkBehaviour
     {
         if (!ServerManager.Objects.Spawned.TryGetValue(targetObjectId, out NetworkObject targetNetObject))
         {
-            Debug.LogWarning($"[TorpedoSystem] Server could not find target with net object ID: {targetObjectId}");
+            Debug.LogWarning($"[TorpedoSystem] Server failed to set target as it cannot find a network object with ID: {targetObjectId}");
             return;
         }
 
         if (!targetNetObject.TryGetComponent<RadarTarget>(out var radarTarget))
         {
-            Debug.LogWarning($"[TorpedoSystem] Server could not find RadarTarget component on net object ID: {targetObjectId}");
+            Debug.LogWarning($"[TorpedoSystem] Server failed to set target as it cannot find a RadarTarget component on network object: {targetNetObject.name}");
             return;
         }
 
@@ -225,7 +278,7 @@ public class TorpedoSystem : NetworkBehaviour
             {
                 if (!targetingSystem.lockedTarget.TryGetComponent<NetworkObject>(out var targetNetObject))
                 {
-                    Debug.LogWarning("[TorpedoSystem] Cannot send RPC to server as locked target does not have attached NetworkObject component.");
+                    Debug.LogWarning("[TorpedoSystem] Cannot set server's target as locked target does not have a NetworkObject component.");
                     return;
                 }
                 SetTargetServerRpc(targetNetObject.ObjectId);

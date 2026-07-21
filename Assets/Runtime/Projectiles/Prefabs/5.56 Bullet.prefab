@@ -173,7 +173,7 @@ TrailRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Time: 0.025
+  m_Time: 0.02
   m_PreviewTimeScale: 1
   m_Parameters:
     serializedVersion: 3
@@ -280,12 +280,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
   _mass: 0.01
   _isKinematic: 0
-  speedThreshold: -1
   _velocity:
     x: 0
     y: 0
     z: 0
   _angularVelocity:
+    x: 0
+    y: 0
+    z: 0
+  gravityAcceleration:
     x: 0
     y: 0
     z: 0

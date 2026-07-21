@@ -21,25 +21,30 @@ public class ScaledRigidbody : MonoBehaviour
         }
         set
         {
-            if (_active != value)
+            if (attachedRigidbody == null)
+                attachedRigidbody = GetComponent<Rigidbody>();
+
+            if (FloatingWorldOrigin.Instance != null && FloatingWorldOrigin.Instance.scaledRigidbody == this)
             {
-                if (attachedRigidbody == null)
-                    attachedRigidbody = GetComponent<Rigidbody>();
-                if (value)
+                _active = true;
+                attachedRigidbody.isKinematic = true;
+                return;
+            }
+
+            if (value)
+            {
+                attachedRigidbody.isKinematic = true;
+            }
+            else
+            {
+                attachedRigidbody.isKinematic = false;
+                if (FloatingWorldOrigin.Instance != null)
                 {
-                    attachedRigidbody.isKinematic = true;
+                    // Floating origin stays static so need to use relative velocity
+                    Vector3 relativeVelocity = (_velocity - FloatingWorldOrigin.Instance.scaledRigidbody.velocity).ToVector3();
+                    attachedRigidbody.linearVelocity = relativeVelocity;
                 }
-                else
-                {
-                    attachedRigidbody.isKinematic = false;
-                    if (FloatingWorldOrigin.Instance != null)
-                    {
-                        // Floating origin stays static so need to use relative velocity
-                        Vector3 relativeVelocity = (_velocity - FloatingWorldOrigin.Instance.scaledRigidbody.velocity).ToVector3();
-                        attachedRigidbody.linearVelocity = relativeVelocity;
-                    }
-                    attachedRigidbody.angularVelocity = _angularVelocity.ToVector3();
-                }
+                attachedRigidbody.angularVelocity = _angularVelocity.ToVector3();
             }
             _active = value;
         }
@@ -77,24 +82,13 @@ public class ScaledRigidbody : MonoBehaviour
     }
 
     public Rigidbody attachedRigidbody {get; private set;}
-    [SerializeField, Tooltip("Switch to rigidbody if speed is below this threshold, ScaledRigidbody if above. Always ScaledRigidbody if negative.")] private float speedThreshold = -1;
 
     [SerializeField] private Vector3d _velocity;
     public Vector3d velocity
     {
         get
         {
-            if (_active)
-            {
-                return _velocity;
-            }
-            else
-            {
-                if (FloatingWorldOrigin.Instance == null)
-                    return attachedRigidbody.linearVelocity.ToVector3d();
-                else
-                    return attachedRigidbody.linearVelocity.ToVector3d() + FloatingWorldOrigin.Instance.scaledRigidbody._velocity;
-            }
+            return _velocity;
         }
         set
         {
@@ -136,8 +130,8 @@ public class ScaledRigidbody : MonoBehaviour
             }
         }
     }
-
-    private Vector3d gravityAcceleration;
+    public bool affectedByGravity = true;
+    [SerializeField] private Vector3d gravityAcceleration;
 
     /// <summary>
     /// Event fired when this RB enters collision with another RB in scaled space
@@ -172,8 +166,6 @@ public class ScaledRigidbody : MonoBehaviour
 
         if (_mass < 0.0000001)
             mass = 0.0000001;
-
-        CheckSpeed();
     }
 
     private void OnValidate()
@@ -214,19 +206,18 @@ public class ScaledRigidbody : MonoBehaviour
     {
         if (_isKinematic || ScaledSpacePhysics.Instance == null)
             return;
-        prevPos = scaledTransform.realPosition;
-
-        CheckSpeed();
 
         gravityAcceleration = Vector3d.zero;
-        ScaledSpacePhysics.Instance.InvokeGravityStep(this);
-        AddForce(gravityAcceleration, ForceMode.Acceleration);
+        if (affectedByGravity)
+        {
+            ScaledSpacePhysics.Instance.InvokeGravityStep(this);
+            AddForce(gravityAcceleration, ForceMode.Acceleration);
+        }
 
+        double sqrAngularSpeed = _angularVelocity.sqrMagnitude;
         if (_active)
         {
             scaledTransform.realPosition += _velocity * Time.fixedDeltaTime;
-
-            double sqrAngularSpeed = _angularVelocity.sqrMagnitude;
 
             if (sqrAngularSpeed > 0.00001)
             {
@@ -238,32 +229,11 @@ public class ScaledRigidbody : MonoBehaviour
             }
         }
 
-        if ((prevPos - scaledTransform.realPosition).sqrMagnitude > 0.001)
+        if (_velocity.sqrMagnitude > 0.0001 || sqrAngularSpeed > 0.0001)
         {
             ScaledSpacePhysics.Instance.UpdateGridPos(this);
         }
-    }
-
-    private void CheckSpeed()
-    {
-        if (speedThreshold < 0)
-        {
-            if (!_active)
-                active = true;
-            return;
-        }
-        if (FloatingWorldOrigin.Instance == null)
-            return;
-        Vector3d relativeVelocity = _velocity - FloatingWorldOrigin.Instance.scaledRigidbody.velocity;
-        if (relativeVelocity.sqrMagnitude > speedThreshold * speedThreshold)
-        {
-            active = true;
-        }
-        else if (!scaledTransform.inScaledSpace)
-        {
-            // Can only switch to rigidbody when below threshold and in world space
-            active = false;
-        }
+        prevPos = scaledTransform.realPosition;
     }
 
     public void AddForce(Vector3d force, ForceMode forceMode)
@@ -456,9 +426,7 @@ public class ScaledRigidbody : MonoBehaviour
 
     public void DestroyScaledColliders()
     {
-        if (scaledColliders.Count == 0)
-            return;
-        for(int i = scaledColliders.Count; i >= 0; i--)
+        for(int i = scaledColliders.Count - 1; i >= 0; i--)
         {
             Destroy(scaledColliders[i].gameObject);
         }
@@ -474,10 +442,15 @@ public class ScaledRigidbody : MonoBehaviour
 
     private void ResolveCollision(Vector3d contactPoint, Vector3d relativeVelocity, Vector3d normal, double invMassB, float restitutionB)
     {
+        Vector3 contactRenderPoint = FloatingWorldOrigin.Instance.scaledTransform.TransformRealPoint(contactPoint);
+
+        Debug.DrawRay(contactRenderPoint, normal.ToVector3() * 10, Color.purple);
+        Debug.DrawRay(contactRenderPoint, relativeVelocity.ToVector3(), Color.orange);
+
         double velocityAlongNormal = Vector3d.Dot(relativeVelocity, normal);
 
         // Don't resolve if velocities are separating
-        if (velocityAlongNormal > 0)
+        if (velocityAlongNormal >= 0.0)
             return;
 
         // Calculate impulse magnitude
@@ -488,49 +461,58 @@ public class ScaledRigidbody : MonoBehaviour
 
         // Apply impulses
         Vector3d impulse = normal * impulseMagnitude;
-        AddForceAtPosition(-impulse, contactPoint, ForceMode.Impulse);
+        Debug.Log($"Applying unity collision impulse of: {impulse} magnitude {impulseMagnitude}");
+        AddForceAtPosition(impulse, contactPoint, ForceMode.Impulse);
+        Debug.DrawRay(contactRenderPoint, impulse.ToVector3(), Color.cyan);
     }
 
-    private void OnCollisionStay(Collision collision)
+    private void OnCollisionEnter(Collision collision)
     {
         if (isKinematic || !_active)
             return;
 
         // Need to handle collisions between unity colliders and scaled rigidbodies
         ContactPoint contact = collision.GetContact(0);
-        Vector3d normal = -contact.normal.ToVector3d();
         Vector3d realContactPoint = scaledTransform.TransformRenderPoint(contact.point);
 
-        Rigidbody otherRB = collision.rigidbody;
+        // Rigidbody otherRB = collision.rigidbody;
 
-        Vector3d relativeVelocity;
-        double invMassB;
-        float restitutionB;
-        if (otherRB == null)
+        // Vector3d relativeVelocity;
+        // double massB;
+        // float restitutionB;
+        // if (otherRB == null)
+        // {
+        //     relativeVelocity = -_velocity;
+        //     massB = 1E6;
+        //     restitutionB = 0.5f;
+        // }
+        // else
+        // {
+        //     massB = otherRB.mass;
+        //     if (collision.transform.TryGetComponent<ScaledCollider>(out var otherScaledCollider))
+        //     {
+        //         relativeVelocity = otherScaledCollider.scaledRigidbody.velocity - _velocity;
+        //         restitutionB = otherScaledCollider.restitution;
+        //         massB = otherScaledCollider.scaledRigidbody.mass;
+        //     }
+        //     else if (FloatingWorldOrigin.Instance.scaledRigidbody.id == id)
+        //     {
+        //         relativeVelocity = otherRB.linearVelocity.ToVector3d();
+        //         restitutionB = 0.5f;
+        //     }
+        //     else
+        //     {
+        //         relativeVelocity = otherRB.linearVelocity.ToVector3d() + FloatingWorldOrigin.Instance.scaledRigidbody._velocity - _velocity;
+        //         restitutionB = 0.5f;
+        //     }
+        // }
+        if (contact.separation < 0)
         {
-            relativeVelocity = -_velocity;
-            invMassB = 0.0;
-            restitutionB = 0.5f;
+            Vector3d correctionDirection = scaledTransform.realPosition - realContactPoint;
+            scaledTransform.realPosition += correctionDirection.normalized * (-contact.separation * 2.0f);
         }
-        else
-        {
-            invMassB = 1.0 / otherRB.mass;
-            if (collision.transform.TryGetComponent<ScaledCollider>(out var otherScaledCollider))
-            {
-                relativeVelocity = otherScaledCollider.scaledRigidbody.velocity - _velocity;
-                restitutionB = otherScaledCollider.restitution;
-            }
-            else if (FloatingWorldOrigin.Instance.scaledRigidbody.id == id)
-            {
-                relativeVelocity = otherRB.linearVelocity.ToVector3d();
-                restitutionB = 0.5f;
-            }
-            else
-            {
-                relativeVelocity = otherRB.linearVelocity.ToVector3d() - _velocity;
-                restitutionB = 0.5f;
-            }
-        }
-        ResolveCollision(realContactPoint, relativeVelocity, normal, invMassB, restitutionB);
+
+        // AddForce(collision.impulse.ToVector3d() / mass, ForceMode.Impulse);
+        AddForceAtPosition(collision.impulse.ToVector3d() / mass, realContactPoint, ForceMode.Impulse);
     }
 }

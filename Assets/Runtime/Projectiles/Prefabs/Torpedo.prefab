@@ -175,7 +175,7 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 10
+  m_Radius: 15
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &4633688431431094526
 MonoBehaviour:
@@ -222,12 +222,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
   _mass: 300
   _isKinematic: 0
-  speedThreshold: 100
   _velocity:
     x: 0
     y: 0
     z: 0
   _angularVelocity:
+    x: 0
+    y: 0
+    z: 0
+  gravityAcceleration:
     x: 0
     y: 0
     z: 0
@@ -251,7 +254,7 @@ MonoBehaviour:
     x: 0
     y: 0
     z: -0.9
-  radius: 0.2
+  radius: 0.15
   isTrigger: 0
   restitution: 0
   listIndex: -1
@@ -272,7 +275,7 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0.9
-  radius: 0.2
+  radius: 0.15
   isTrigger: 0
   restitution: 0
   listIndex: -1
@@ -293,7 +296,7 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  radius: 0.2
+  radius: 0.15
   isTrigger: 0
   restitution: 0
   listIndex: -1
@@ -314,7 +317,7 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  radius: 10
+  radius: 15
   isTrigger: 1
   restitution: 0
   listIndex: -1
@@ -341,7 +344,7 @@ MonoBehaviour:
   proportionalGain: 5.118147
   integralGain: 0
   derivativeGain: 3.921913
-  rocketParticles: {fileID: 4901987813079629749}
+  rocketTrail: {fileID: 4901987813079629749}
   collideSpeedThreshold: 100
   explosionPrefab: {fileID: 3982350210874365306, guid: 38256d267e02f9045b36a61ca4903a4d, type: 3}
   explosionRadius: 30
@@ -391,6 +394,7 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 8624868431337818510}
   snapshotRate: 10
   interpolate: 1
+  interpolateSpeed: 1
   controlType: 1
   activeWhenOffline: 1
 --- !u!114 &8624868431337818510
@@ -451,7 +455,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584172532178725570
+  _initializedTimestamp: -8584170749796354092
 --- !u!1001 &4109854028599492452
 PrefabInstance:
   m_ObjectHideFlags: 0

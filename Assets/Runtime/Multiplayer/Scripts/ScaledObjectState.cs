@@ -14,13 +14,14 @@ public struct ScaledObjectState
     public float rotZ;
     public float rotW;
 
-    public double velX;
-    public double velY;
-    public double velZ;
+    // Use floats wherever we can to save bytes
+    public float velX;
+    public float velY;
+    public float velZ;
 
-    public double angVelX;
-    public double angVelY;
-    public double angVelZ;
+    public float angVelX;
+    public float angVelY;
+    public float angVelZ;
 
     public Vector3d Position => new Vector3d(posX, posY, posZ);
     public Quaternion Rotation => new Quaternion(rotX, rotY, rotZ, rotW);
@@ -38,12 +39,12 @@ public struct ScaledObjectState
             rotY = scaledRigidbody.transform.rotation.y,
             rotZ = scaledRigidbody.transform.rotation.z,
             rotW = scaledRigidbody.transform.rotation.w,
-            velX = scaledRigidbody.velocity.x,
-            velY = scaledRigidbody.velocity.y,
-            velZ = scaledRigidbody.velocity.z,
-            angVelX = scaledRigidbody.angularVelocity.x,
-            angVelY = scaledRigidbody.angularVelocity.y,
-            angVelZ = scaledRigidbody.angularVelocity.z,
+            velX = (float)scaledRigidbody.velocity.x,
+            velY = (float)scaledRigidbody.velocity.y,
+            velZ = (float)scaledRigidbody.velocity.z,
+            angVelX = (float)scaledRigidbody.angularVelocity.x,
+            angVelY = (float)scaledRigidbody.angularVelocity.y,
+            angVelZ = (float)scaledRigidbody.angularVelocity.z,
         };
     }
 

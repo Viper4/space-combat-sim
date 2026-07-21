@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using SpaceStuff;
 using UnityEngine;
 
@@ -154,7 +153,8 @@ public class HGrid
     {
         // Keep velocity inflation consistent with UpdatePosition
         double displacement = collider.scaledRigidbody.velocity.magnitude * Time.fixedDeltaTime;
-        int newLevel = GetLevel(collider.GetRadius() + displacement);
+        double effectiveRadius = collider.GetRadius() + displacement;
+        int newLevel = GetLevel(effectiveRadius);
         int prevLevel = collider.hGridCell.level;
 
         if (prevLevel == newLevel)
@@ -173,7 +173,8 @@ public class HGrid
         if (collider.listIndex == -1)
         {
             double displacement = collider.scaledRigidbody.velocity.magnitude * Time.fixedDeltaTime;
-            baseLevel = GetLevel(collider.GetRadius() + displacement);
+            double effectiveRadius = collider.GetRadius() + displacement;
+            baseLevel = GetLevel(effectiveRadius);
         }
 
         Vector3d pos = collider.GetRealCenter();
@@ -238,5 +239,183 @@ public class HGrid
                 }
             }
         }
+    }
+
+    private static bool RaycastSphere(Vector3d origin, Vector3d direction, Vector3d center, double radius, out double distance, out Vector3d point, out Vector3d normal)
+    {
+        distance = 0.0;
+        point = default;
+        normal = default;
+
+        Vector3d toSphere = center - origin;
+
+        double projection = Vector3d.Dot(toSphere, direction);
+
+        // Sphere is entirely behind the ray.
+        if (projection < 0.0)
+            return false;
+
+        double sqrDistanceToRay = toSphere.sqrMagnitude - projection * projection;
+
+        double radiusSq = radius * radius;
+
+        if (sqrDistanceToRay > radiusSq)
+            return false;
+
+        double offset = Math.Sqrt(radiusSq - sqrDistanceToRay);
+
+        double t = projection - offset;
+
+        // Ray origin is inside the sphere.
+        if (t < 0.0)
+            t = projection + offset;
+
+        distance = t;
+
+        point = origin + direction * distance;
+
+        normal = (point - center).normalized;
+
+        return true;
+    }
+
+    private void RaycastLevel(Vector3d origin, Vector3d direction, double maxDistance, int level, HashSet<uint> testedColliders, ref double closestDistance, ref ScaledCollider closestCollider, ref Vector3d closestPoint, ref Vector3d closestNormal)
+    {
+        double cellSize = levelCellSizes[level];
+
+        GridCell cell = GetCell(origin, level);
+
+        // Direction signs
+        int stepX = direction.x >= 0.0 ? 1 : -1;
+        int stepY = direction.y >= 0.0 ? 1 : -1;
+        int stepZ = direction.z >= 0.0 ? 1 : -1;
+
+        double nextBoundaryX = direction.x >= 0.0 ? (cell.x + 1) * cellSize : cell.x * cellSize;
+
+        double nextBoundaryY = direction.y >= 0.0 ? (cell.y + 1) * cellSize : cell.y * cellSize;
+
+        double nextBoundaryZ = direction.z >= 0.0 ? (cell.z + 1) * cellSize : cell.z * cellSize;
+
+        double tMaxX = Math.Abs(direction.x) > double.Epsilon ? (nextBoundaryX - origin.x) / direction.x : double.PositiveInfinity;
+
+        double tMaxY = Math.Abs(direction.y) > double.Epsilon ? (nextBoundaryY - origin.y) / direction.y : double.PositiveInfinity;
+
+        double tMaxZ = Math.Abs(direction.z) > double.Epsilon ? (nextBoundaryZ - origin.z) / direction.z : double.PositiveInfinity;
+
+        double tDeltaX = Math.Abs(direction.x) > double.Epsilon ? cellSize / Math.Abs(direction.x) : double.PositiveInfinity;
+
+        double tDeltaY = Math.Abs(direction.y) > double.Epsilon ? cellSize / Math.Abs(direction.y) : double.PositiveInfinity;
+
+        double tDeltaZ = Math.Abs(direction.z) > double.Epsilon ? cellSize / Math.Abs(direction.z) : double.PositiveInfinity;
+
+        while (true)
+        {
+            GridCell currentCell = new GridCell(level, cell.x, cell.y, cell.z);
+
+            if (grids.TryGetValue(currentCell, out List<ScaledCollider> list))
+            {
+                foreach (ScaledCollider collider in list)
+                {
+                    if (collider == null)
+                        continue;
+
+                    if (testedColliders.Contains(collider.id))
+                        continue;
+
+                    testedColliders.Add(collider.id);
+
+                    if (!RaycastSphere(
+                            origin,
+                            direction,
+                            collider.GetRealCenter(),
+                            collider.GetRadius(),
+                            out double distance,
+                            out Vector3d point,
+                            out Vector3d normal))
+                    {
+                        continue;
+                    }
+
+                    if (distance < 0.0 ||
+                        distance > maxDistance ||
+                        distance >= closestDistance)
+                    {
+                        continue;
+                    }
+
+                    closestDistance = distance;
+                    closestCollider = collider;
+                    closestPoint = point;
+                    closestNormal = normal;
+                }
+            }
+
+            // The closest hit already found is before the next cell.
+            double nextT =
+                Math.Min(tMaxX, Math.Min(tMaxY, tMaxZ));
+
+            if (nextT > maxDistance ||
+                nextT > closestDistance)
+            {
+                break;
+            }
+
+            if (tMaxX < tMaxY && tMaxX < tMaxZ)
+            {
+                cell.x += stepX;
+                tMaxX += tDeltaX;
+            }
+            else if (tMaxY < tMaxZ)
+            {
+                cell.y += stepY;
+                tMaxY += tDeltaY;
+            }
+            else
+            {
+                cell.z += stepZ;
+                tMaxZ += tDeltaZ;
+            }
+        }
+    }
+
+    public bool Raycast(Vector3d origin, Vector3d direction, double maxDistance, out ScaledRaycastHit hit)
+    {
+        hit = default;
+
+        if (direction.sqrMagnitude <= double.Epsilon)
+            return false;
+        
+        double closestDistance = maxDistance;
+        ScaledCollider closestCollider = null;
+        Vector3d closestPoint = default;
+        Vector3d closestNormal = default;
+
+        HashSet<uint> testedColliders = new HashSet<uint>();
+
+        for (int level = 0; level < maxLevels; level++)
+        {
+            RaycastLevel(origin, direction, maxDistance, level, testedColliders, ref closestDistance, ref closestCollider, ref closestPoint, ref closestNormal);
+        }
+
+        if (closestCollider == null)
+            return false;
+        
+        hit = new ScaledRaycastHit
+        {
+            collider = closestCollider,
+            point = closestPoint,
+            normal = closestNormal,
+            distance = closestDistance
+        };
+
+        return true;
+    }
+
+    public struct ScaledRaycastHit
+    {
+        public ScaledCollider collider;
+        public Vector3d point;
+        public Vector3d normal;
+        public double distance;
     }
 }

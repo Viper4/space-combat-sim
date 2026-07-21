@@ -16,8 +16,6 @@ public class ScaledSpacePhysics : MonoBehaviour
     
     public event Action<ScaledRigidbody> GravityStep;
 
-    public const double percent = 0.2;
-    public const double slop = 0.01;
     public const double restitutionThreshold = 1.0;
     [SerializeField] private int maxGridLevels;
     [SerializeField] private double baseGridCellSize;
@@ -94,7 +92,7 @@ public class ScaledSpacePhysics : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (FloatingWorldOrigin.Instance == null)
+        if (FloatingWorldOrigin.Instance == null || Camera.main == null)
             return;
         HashSet<Pair> currentCollisions = new HashSet<Pair>();
 
@@ -119,12 +117,22 @@ public class ScaledSpacePhysics : MonoBehaviour
                 if (candidate.scaledRigidbody == null)
                     continue;
                 Pair collisionKey = collider.id < candidate.id ? new Pair(collider.id, candidate.id) : new Pair(candidate.id, collider.id);
-                if ((!collider.scaledRigidbody.active && !candidate.scaledRigidbody.active) || currentCollisions.Contains(collisionKey))
+                if (currentCollisions.Contains(collisionKey))
                     continue;
-                bool usingUnity = !collider.overrideUnity && !candidate.overrideUnity && (!collider.scaledRigidbody.active || !candidate.scaledRigidbody.active);
-                bool bothInWorldSpace = !collider.scaledRigidbody.scaledTransform.inScaledSpace && !candidate.scaledRigidbody.scaledTransform.inScaledSpace;
-                if (usingUnity && bothInWorldSpace)
-                    continue; // If either collider is using Unity rigidbody and both are in world space, should defer to unity physics to handle collisions
+                // Neither are overriding Unity and are both in world space
+                bool deferToUnity = !collider.overrideUnity && !candidate.overrideUnity &&
+                !collider.scaledRigidbody.scaledTransform.inScaledSpace && !candidate.scaledRigidbody.scaledTransform.inScaledSpace;
+                if (deferToUnity)
+                {
+                    // Check if either can skip over the other in one fixed update
+                    Vector3d relativeVelocity = collider.scaledRigidbody.velocity - candidate.scaledRigidbody.velocity;
+                    double combinedRadius = collider.GetRadius() + candidate.GetRadius();
+                    double sqrTravelDistance = relativeVelocity.sqrMagnitude * Time.fixedDeltaTime * Time.fixedDeltaTime;
+                    deferToUnity &= sqrTravelDistance <= 4.0 * combinedRadius * combinedRadius;
+                }
+                
+                if (deferToUnity)
+                    continue; // Defer to Unity physics to handle collisions
 
                 stopwatch2.Reset();
                 stopwatch2.Start();
@@ -273,12 +281,9 @@ public class ScaledSpacePhysics : MonoBehaviour
         double sqrDistance = relativePosition.sqrMagnitude;
         double distance = minDistance;
 
-        bool collided;
-
         if (sqrDistance < minDistance * minDistance)
         {
             // Overlapping at end of frame — standard intersection
-            collided = true;
             distance = Math.Sqrt(sqrDistance);
             Debug.Log($"[ScaledSpacePhysics] Intersect Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
         }
@@ -315,16 +320,12 @@ public class ScaledSpacePhysics : MonoBehaviour
             if (t < 0.0 || t > 1.0)   // t > 1 = collision outside this frame
                 return false;
 
-            collided = true;
             posA = startPosA + dispA * t;
             posB = startPosB + dispB * t;
             relativePosition = posB - posA;
 
             Debug.Log($"[ScaledSpacePhysics] CCD Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
         }
-
-        if (!collided)
-            return false;
 
         Vector3d normal = distance > 0.0001 ? relativePosition / distance : Vector3d.up;
 
@@ -375,12 +376,7 @@ public class ScaledSpacePhysics : MonoBehaviour
         collision.colliderA.scaledRigidbody.AddForceAtPosition(-collision.impulse, collision.contactPoint, ForceMode.Impulse);
         collision.colliderB.scaledRigidbody.AddForceAtPosition(collision.impulse, collision.contactPoint, ForceMode.Impulse);
 
-        // Resolve intersection
-        /*double correctionMagnitude = Math.Max(collision.penetration - slop, 0.0) * percent / (invMassA + invMassB);
-        Vector3d correction = correctionMagnitude * collision.normal;
-        collision.colliderA.scaledRigidbody.scaledTransform.realPosition -= correction * invMassA;
-        collision.colliderB.scaledRigidbody.scaledTransform.realPosition += correction * invMassB;*/
-
+        // Pushing the less massive object to avoid things like bullets pushing giant objects around
         if (collision.colliderA.scaledRigidbody.mass < collision.colliderB.scaledRigidbody.mass)
         {
             collision.colliderA.scaledRigidbody.scaledTransform.realPosition -= collision.normal * collision.penetration;

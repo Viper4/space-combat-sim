@@ -1,8 +1,11 @@
 using System;
+using System.Collections;
+using FishNet;
 using FishNet.Object;
 using SpaceStuff;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 
 [RequireComponent(typeof(ScaledRigidbody), typeof(RadarTarget))]
 public class Ship : NetworkBehaviour
@@ -21,6 +24,9 @@ public class Ship : NetworkBehaviour
     [SerializeField, Tooltip("Collisions at the front of the ship multiply damage by this.")] private float minRamAttenuation = 0.5f;
     [SerializeField, Tooltip("Collisions at the back of the ship multiply damage by this.")] private float maxRamAttenuation = 1.0f;
     private TargetingSystem targetingSystem;
+    public bool isShutdown;
+    public UnityEvent OnStartup;
+    public UnityEvent OnShutdown;
 
     [Header("HUD stuff")]
     public GameObject hologramPrefab;
@@ -28,12 +34,23 @@ public class Ship : NetworkBehaviour
     [SerializeField] private TextMeshProUGUI speedText;
 
     [Header("Visual/Audio effects")]
+    [SerializeField] private Animator effectsAnimator;
+    [SerializeField] private AudioSource startAudioSource;
+    [SerializeField] private AudioClip startupClip;
+    [SerializeField] private AudioClip shutdownClip;
+    [SerializeField] private AudioSource[] ambientAudioSources;
+    [SerializeField] private float[] minAmbientVolumes;
+    [SerializeField] private float[] maxAmbientVolumes;
+    [SerializeField] private TextMeshProUGUI[] startupTexts;
+    private bool startingUp;
+    private bool shuttingDown;
+
     [SerializeField] private InertialEffects inertialEffects;
     [SerializeField] private AudioSource thrusterAudioSource;
     [SerializeField] private float thrusterVolumeScale = 1.0f;
     [SerializeField] private AudioSource engineAudioSource;
     [SerializeField] private float engineVolumeScale = 0.8f;
-    [SerializeField] private ParticleSystem rocketTrail;
+    [SerializeField] private GameObject rocketTrail;
     [SerializeField] private float engineTrailScale = 1.0f;
     [SerializeField] private AudioClip normalEngineClip;
     [SerializeField] private AudioClip launchEngineClip;
@@ -90,9 +107,10 @@ public class Ship : NetworkBehaviour
     [SerializeField, Tooltip("Fuel consumption rate while idling in kg/s.")] private float idleFuelConsumption = 0.1f;
     [SerializeField, Tooltip("Fuel consumption rate while at max thrust in kg/s.")] private float maxFuelConsumption = 10f;
     [SerializeField, Tooltip("Exponential factor in fuel consumption formula.")] private float fuelConsumptionFactor = 1.6f;
-    private float fuel = 100000f;
-    [SerializeField, Tooltip("Max fuel capacity in kg.")] private float maxFuel = 100000f;
+    private float fuel;
+    [SerializeField, Tooltip("Max fuel capacity in kg.")] private float maxFuel = 5000f;
     [SerializeField] private SliderIndicator fuelIndicator;
+    private double baseMass;
 
     private bool IsOwnerOrOffline => IsOwner || IsOffline;
 
@@ -120,6 +138,8 @@ public class Ship : NetworkBehaviour
         fuel = maxFuel;
         fuelIndicator.UpdateUI(fuel, maxFuel);
 
+        baseMass = scaledRigidbody.mass;
+
         if (TryGetComponent(out targetingSystem))
         {
             targetingSystem.OnTargetChange += SetTargetMatchDistance;
@@ -127,6 +147,11 @@ public class Ship : NetworkBehaviour
 
         if (PlayerInfoRelay.Instance != null)
             PlayerInfoRelay.Instance.OnPlayerInfoChanged += UpdateShipName;
+
+        if (InstanceFinder.IsOffline)
+        {
+            Startup();
+        }
     }
 
     public override void OnStartServer()
@@ -141,6 +166,10 @@ public class Ship : NetworkBehaviour
         base.OnStartClient();
 
         UpdateShipName();
+        if (IsOwner)
+        {
+            Startup();
+        }
     }
 
     private void OnDestroy()
@@ -212,8 +241,18 @@ public class Ship : NetworkBehaviour
         if (!IsOwnerOrOffline && !IsServerInitialized)
             return;
 
-        if (fuel <= 0f)
+        if (isShutdown)
+        {
+            if (IsOwnerOrOffline)
+            {
+                UpdateOwnerEffects(Vector3d.zero, Vector3d.zero, Vector3d.zero);
+            }
+            else
+            {
+                UpdateServerEffects(Vector3d.zero);
+            }
             return;
+        }
 
         // Calculate local force to apply
         Vector3 desiredMove = Vector3.ClampMagnitude(currentInput.move, 1f); // Prevent from moving faster than max force allows
@@ -294,6 +333,7 @@ public class Ship : NetworkBehaviour
 
         if (finalForce.sqrMagnitude > 0.0001)
             scaledRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
+
         fuel -= (CalculateFuelBurn(finalForce.x, engineCombatForce) 
                 + CalculateFuelBurn(finalForce.y, engineCombatForce) 
                 + CalculateFuelBurn(finalForce.z, engineCombatForce)) * Time.fixedDeltaTime;
@@ -355,6 +395,12 @@ public class Ship : NetworkBehaviour
         
         // Idling fuel consumption
         fuel -= idleFuelConsumption * Time.fixedDeltaTime;
+        if (fuel <= 0f)
+        {
+            fuel = 0f;
+            Shutdown(true);
+        }
+        scaledRigidbody.mass = baseMass + fuel;
 
         if (IsOwnerOrOffline)
         {
@@ -364,6 +410,21 @@ public class Ship : NetworkBehaviour
         {
             UpdateServerEffects(finalForce);
         }
+    }
+    
+    [ObserversRpc(ExcludeServer = true, ExcludeOwner = true, BufferLast = true)]
+    private void SetRocketTrailActiveObserversRpc(bool active)
+    {
+        if (rocketTrail.activeSelf != active)
+        {
+            rocketTrail.SetActive(active);
+        }
+    }
+
+    [ObserversRpc(ExcludeServer = true, ExcludeOwner = true)]
+    private void SetRocketTrailScaleObserversRpc(float scale)
+    {
+        rocketTrail.transform.localScale = scale * Vector3.one;
     }
 
     private void UpdateServerEffects(Vector3d finalForce)
@@ -375,15 +436,19 @@ public class Ship : NetworkBehaviour
         {
             // Main engine effects
             float t = (float)finalForce.z / engineCombatForce;
-            if (!rocketTrail.gameObject.activeSelf)
+            if (!rocketTrail.activeSelf)
             {
-                rocketTrail.gameObject.SetActive(true);
+                rocketTrail.SetActive(true);
+                SetRocketTrailActiveObserversRpc(true);
             }
-            rocketTrail.transform.localScale = t * engineTrailScale * Vector3.one;
+            float scale = t * engineTrailScale;
+            rocketTrail.transform.localScale = scale * Vector3.one;
+            SetRocketTrailScaleObserversRpc(scale);
         }
-        else if (rocketTrail.gameObject.activeSelf)
+        else if (rocketTrail.activeSelf)
         {
-            rocketTrail.gameObject.SetActive(false);
+            rocketTrail.SetActive(false);
+            SetRocketTrailActiveObserversRpc(false);
         }
     }
 
@@ -392,7 +457,20 @@ public class Ship : NetworkBehaviour
         fuelIndicator.UpdateUI(fuel, maxFuel);
         if (alertSystem != null)
         {
-            alertSystem.ToggleLowFuelAlert(fuel / maxFuel < 0.25f);
+            float fuelPercent = fuel / maxFuel;
+            if (fuelPercent < 0.05f)
+            {
+                alertSystem.SetAlert("Bingo Fuel", true);
+            }
+            else if (fuelPercent < 0.25f)
+            {
+                alertSystem.SetAlert("Low Fuel", true);
+            }
+            else
+            {
+                alertSystem.SetAlert("Low Fuel", false);
+                alertSystem.SetAlert("Bingo Fuel", false);
+            }
         }
         // Visual effects for force
         bool hasForce = finalForce.sqrMagnitude > 0.0001;
@@ -421,9 +499,9 @@ public class Ship : NetworkBehaviour
             if (usingMainEngine)
             {
                 float t = (float)finalForce.z / engineCombatForce;
-                if (!rocketTrail.gameObject.activeSelf)
+                if (!rocketTrail.activeSelf)
                 {
-                    rocketTrail.gameObject.SetActive(true);
+                    rocketTrail.SetActive(true);
                 }
                 rocketTrail.transform.localScale = t * engineTrailScale * Vector3.one;
                 engineAudioSource.clip = combatMode ? launchEngineClip : normalEngineClip;
@@ -431,16 +509,16 @@ public class Ship : NetworkBehaviour
                 if (!engineAudioSource.isPlaying)
                     engineAudioSource.Play();
             }
-            else if (rocketTrail.gameObject.activeSelf)
+            else if (rocketTrail.activeSelf)
             {
                 engineAudioSource.volume = 0f;
-                rocketTrail.gameObject.SetActive(false);
+                rocketTrail.SetActive(false);
             }
         }
-        else if (rocketTrail.gameObject.activeSelf)
+        else if (rocketTrail.activeSelf)
         {
             engineAudioSource.volume = 0f;
-            rocketTrail.gameObject.SetActive(false);
+            rocketTrail.SetActive(false);
         }
         
         // Audio effects for torque
@@ -522,7 +600,6 @@ public class Ship : NetworkBehaviour
         Vector3d relativeCollisionPoint = collisionInfo.contactPoint - scaledRigidbody.scaledTransform.realPosition;
         float t = Mathf.Clamp01((-(float)relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
         float attenuation = Mathf.Lerp(minRamAttenuation, maxRamAttenuation, t);
-        Debug.Log($"Attenuation: {attenuation}");
         float damage = (float)(attenuation * sqrImpulse);
 
         Vector3 renderContactPoint = (collisionInfo.contactPoint - FloatingWorldOrigin.Instance.scaledTransform.realPosition).ToVector3();
@@ -533,7 +610,8 @@ public class Ship : NetworkBehaviour
         Debug.Log(
             $"Impulse: {collisionInfo.impulse:F1}, " +
             $"Normalized impulse: {sqrImpulse:F1}, " + 
-            $"damage: {damage:F1}");
+            $"damage: {damage:F1}, " + 
+            $"attenuation: {attenuation}");
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -560,7 +638,6 @@ public class Ship : NetworkBehaviour
         Vector3 relativeCollisionPoint = contact.point - transform.position;
         float t = Mathf.Clamp01((-relativeCollisionPoint.z + maxLocalZ) / (2f * maxLocalZ));
         float attenuation = Mathf.Lerp(minRamAttenuation, maxRamAttenuation, t);
-        Debug.Log($"Attenuation: {attenuation}");
         float damage = (float)(attenuation * Math.Sqrt(sqrImpulse));
         if (!IsOffline)
             ApplyCollideDamageToObservers(damage, contact.point);
@@ -570,7 +647,8 @@ public class Ship : NetworkBehaviour
         Debug.Log(
             $"Impulse: {impulse:F1}, " +
             $"Normalized impulse: {sqrImpulse:F1}, " + 
-            $"damage: {damage:F1}, " +
+            $"damage: {damage:F1}, " + 
+            $"attenuation: {attenuation}, " +
             $"Seperation: {contact.separation}");
     }
 
@@ -737,5 +815,96 @@ public class Ship : NetworkBehaviour
             matchDistance = 0;
             SetTargetMatchDistance();
         }
+    }
+
+    private IEnumerator WaitToStartup()
+    {
+        startingUp = true;
+        yield return new WaitForEndOfFrame();
+        AnimatorStateInfo animatorStateInfo = effectsAnimator.GetCurrentAnimatorStateInfo(0);
+        float t = animatorStateInfo.normalizedTime;
+        while (animatorStateInfo.IsName("Startup") && t < 1f)
+        {
+            for (int i = 0; i < ambientAudioSources.Length; i++)
+            {
+                ambientAudioSources[i].volume = Mathf.Lerp(minAmbientVolumes[i], maxAmbientVolumes[i], t);
+            }
+            yield return new WaitForEndOfFrame();
+            animatorStateInfo = effectsAnimator.GetCurrentAnimatorStateInfo(0);
+            t = animatorStateInfo.normalizedTime;
+        }
+        for (int i = 0; i < ambientAudioSources.Length; i++)
+        {
+            ambientAudioSources[i].volume = maxAmbientVolumes[i];
+        }
+        Debug.Log($"[Ship] {name} finished startup.");
+        isShutdown = false;
+        startingUp = false;
+    }
+
+    private void Startup()
+    {
+        if (!isShutdown || startingUp)
+            return;
+        Debug.Log($"[Ship] {name} starting up.");
+        OnStartup?.Invoke();
+        startAudioSource.clip = startupClip;
+        startAudioSource.Play();
+        effectsAnimator.SetTrigger("Startup");
+        for(int i = 0; i < startupTexts.Length; i++)
+        {
+            startupTexts[i].text = "INITIALIZING...";
+        }
+        StartCoroutine(WaitToStartup());
+    }
+
+    private IEnumerator WaitToShutdown()
+    {
+        shuttingDown = true;
+        yield return new WaitForEndOfFrame();
+        AnimatorStateInfo animatorStateInfo = effectsAnimator.GetCurrentAnimatorStateInfo(0);
+        float t = animatorStateInfo.normalizedTime;
+        while (animatorStateInfo.IsName("Shutdown") && t < 1f)
+        {
+            for (int i = 0; i < ambientAudioSources.Length; i++)
+            {
+                ambientAudioSources[i].volume = Mathf.Lerp(maxAmbientVolumes[i], minAmbientVolumes[i], t);
+            }
+            yield return new WaitForEndOfFrame();
+            animatorStateInfo = effectsAnimator.GetCurrentAnimatorStateInfo(0);
+            t = animatorStateInfo.normalizedTime;
+        }
+        for (int i = 0; i < ambientAudioSources.Length; i++)
+        {
+            ambientAudioSources[i].volume = 0;
+        }
+        Debug.Log($"[Ship] {name} finished shutdown.");
+        isShutdown = true;
+        shuttingDown = false;
+    }
+
+    private void Shutdown(bool instant)
+    {
+        if (isShutdown || shuttingDown)
+            return;
+        Debug.Log($"[Ship] {name} shutting down.");
+        OnShutdown?.Invoke();
+        startAudioSource.clip = shutdownClip;
+        startAudioSource.Play();
+        if (instant)
+        {
+            isShutdown = true;
+            for (int i = 0; i < ambientAudioSources.Length; i++)
+            {
+                ambientAudioSources[i].volume = 0;
+            }
+            return;
+        }
+        effectsAnimator.SetTrigger("Shutdown");
+        for(int i = 0; i < startupTexts.Length; i++)
+        {
+            startupTexts[i].text = "SHUTTING DOWN...";
+        }
+        StartCoroutine(WaitToShutdown());
     }
 }

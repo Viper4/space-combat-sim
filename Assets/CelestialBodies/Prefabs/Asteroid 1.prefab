@@ -14,7 +14,6 @@ GameObject:
   - component: {fileID: 1673852074928851070}
   - component: {fileID: 6356004437463594846}
   - component: {fileID: 6170339221104728975}
-  - component: {fileID: 4194929419073694645}
   - component: {fileID: 824532636656329706}
   - component: {fileID: 3432351637793023832}
   - component: {fileID: 1847065452805617377}
@@ -162,7 +161,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _mass: 0.0000001
   _isKinematic: 0
-  speedThreshold: 100
   _velocity:
     x: 0
     y: 0
@@ -171,24 +169,14 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
+  gravityAcceleration:
+    x: 0
+    y: 0
+    z: 0
   prevPos:
     x: 0
     y: 0
     z: 0
---- !u!114 &4194929419073694645
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4028611689432565048}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 76ec2b68975954c45b1d10e424648641, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TransformChange
-  trackPosition: 1
-  trackRotation: 0
 --- !u!114 &824532636656329706
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -289,7 +277,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584172532178725570
+  _initializedTimestamp: -8584170746978610102
 --- !u!114 &-467688900442111250
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -306,7 +294,8 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 1847065452805617377}
   _networkObjectCache: {fileID: 1847065452805617377}
   snapshotRate: 15
-  interpolate: 1
+  interpolate: 0
+  interpolateSpeed: 1
   controlType: 1
   activeWhenOffline: 1
 --- !u!114 &7898235769844472124

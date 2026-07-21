@@ -33,7 +33,6 @@ public class HoverInteractable : MonoBehaviour
         if (interactAction != null)
         {
             interactAction.action.performed -= Interact;
-            interactAction.action.Disable();
         }
     }
 

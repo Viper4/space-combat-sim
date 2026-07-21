@@ -113,10 +113,11 @@ public class DebugUI : MonoBehaviour
         {
             return ColonRegex.Match(message).Value;
         }
-        else
-        {
-            return NumberRegex.Match(message).Value;
-        }
+        // else
+        // {
+        //     return NumberRegex.Match(message).Value;
+        // }
+        return message;
     }
 
     private void RefreshLog()

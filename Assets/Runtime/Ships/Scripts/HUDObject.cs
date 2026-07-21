@@ -15,6 +15,7 @@ public class HUDObject : MonoBehaviour
     [SerializeField] private RectTransform bottomRightCorner;
     [SerializeField] private RectTransform centerOfMass;
     [SerializeField] private RectTransform predictedCenter;
+    [SerializeField] private LineRenderer predictedLineRenderer;
 
     [SerializeField] private TextMeshProUGUI detailsText;
     [SerializeField] private TextMeshProUGUI targetText;
@@ -71,6 +72,8 @@ public class HUDObject : MonoBehaviour
         bottomRightImage.color = color;
         centerOfMassImage.color = color;
         predictedCenterImage.color = color;
+        predictedLineRenderer.startColor = color;
+        predictedLineRenderer.endColor = color;
         detailsText.color = color;
         targetText.color = color;
     }
@@ -120,6 +123,8 @@ public class HUDObject : MonoBehaviour
         centerOfMass.position = position;
         // predictedCenter.position = predictedPosition;
         predictedCenter.SetPositionAndRotation(predictedPosition, Quaternion.LookRotation(predictedPosition - Camera.main.transform.position, Camera.main.transform.up));
+        predictedLineRenderer.SetPosition(0, position);
+        predictedLineRenderer.SetPosition(1, predictedPosition);
     }
 
     public void UpdateObject(Vector3 position, Quadrilateral quad, string details, bool detailsActive, Vector3 predictedPosition)
@@ -182,6 +187,8 @@ public class HUDObject : MonoBehaviour
         bottomRightCorner.position = bottomRightPos;
         centerOfMass.position = position;
         predictedCenter.SetPositionAndRotation(predictedPosition, Quaternion.LookRotation(predictedPosition - Camera.main.transform.position, Camera.main.transform.up));
+        predictedLineRenderer.SetPosition(0, position);
+        predictedLineRenderer.SetPosition(1, predictedPosition);
 
         // If corners are too close together, scale them down
         float dx = Mathf.Abs(bottomLeftCorner.localPosition.x - bottomRightCorner.localPosition.x);

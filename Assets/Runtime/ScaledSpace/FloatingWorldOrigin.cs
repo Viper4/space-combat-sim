@@ -21,6 +21,9 @@ public class FloatingWorldOrigin : NetworkBehaviour
             if (Instance == null)
             {
                 Instance = this;
+                scaledTransform.inScaledSpace = false;
+                scaledRigidbody.active = true;
+                transform.position = Vector3.zero;
             }
             else
             {
@@ -37,6 +40,10 @@ public class FloatingWorldOrigin : NetworkBehaviour
         {
             Debug.Log($"[FloatingWorldOrigin] Set Instance to {name}.");
             Instance = this;
+            // Things could have set this object's realPosition to something before Instance was set, so set its position to zero and force world space
+            transform.position = Vector3.zero;
+            scaledTransform.inScaledSpace = false;
+            scaledRigidbody.active = true;
             ScaledSpaceVisuals.Instance.UpdateScaleFactors();
         }
         else

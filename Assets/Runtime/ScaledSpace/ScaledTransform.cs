@@ -2,6 +2,7 @@ using SpaceStuff;
 using UnityEngine;
 using System.Collections.Generic;
 using System;
+using System.Collections;
 
 public class ScaledTransform : MonoBehaviour
 {
@@ -17,9 +18,16 @@ public class ScaledTransform : MonoBehaviour
         set
         {
             _realPosition = value;
-            if (!inScaledSpace && FloatingWorldOrigin.Instance != null)
+            if (!inScaledSpace)
             {
-                UpdateInWorldSpace(FloatingWorldOrigin.Instance.scaledTransform.realPosition, true);
+                if (FloatingWorldOrigin.Instance == null)
+                {
+                    StartCoroutine(WaitToUpdateRenderPos());
+                }
+                else
+                {
+                    UpdateInWorldSpace(FloatingWorldOrigin.Instance.scaledTransform.realPosition, true);
+                }
             }
         }
     }
@@ -97,6 +105,13 @@ public class ScaledTransform : MonoBehaviour
             GetVisualComponents();
         if (Camera.main != null)
             UpdateTransformEditor();
+    }
+
+    private IEnumerator WaitToUpdateRenderPos()
+    {
+        yield return new WaitUntil(() => FloatingWorldOrigin.Instance != null);
+        if (!inScaledSpace)
+            UpdateInWorldSpace(FloatingWorldOrigin.Instance.scaledTransform.realPosition, true);
     }
 
     private void GetVisualComponents()

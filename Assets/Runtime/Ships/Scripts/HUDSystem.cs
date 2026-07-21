@@ -37,7 +37,6 @@ public class HUDSystem : NetworkBehaviour
             Destroy(Instance.gameObject);
         }
         Instance = this;
-        Debug.Log("Set HUDSYSTEM Instance Offline");
     }
 
     public override void OnStartClient()

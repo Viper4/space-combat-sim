@@ -234,7 +234,7 @@ public class InertialEffects : MonoBehaviour
         // Pushing forward and backward (both blackout)
         fadeSpeed += Mathf.Max(0f, fadeSpeedSlopes.z * (g.z - minimumPositiveGForces.z));
         fadeSpeed += Mathf.Max(0f, -fadeSpeedSlopes.z * (g.z + minimumPositiveGForces.z));
-        alertSystem.ToggleOverGAlert((g.sqrMagnitude > 36f && fadeTimer > 0.05f) || (g.sqrMagnitude > 14.7f && fadeTimer < -0.025f));
+        alertSystem.SetAlert("Over G", (g.sqrMagnitude > 36f && fadeTimer > 0.05f) || (g.sqrMagnitude > 14.7f && fadeTimer < -0.025f));
     }
 
     private void OnFOVUpdated()

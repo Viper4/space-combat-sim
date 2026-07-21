@@ -9820,7 +9820,7 @@ AudioSource:
   Priority: 128
   DopplerLevel: 1
   MinDistance: 1
-  MaxDistance: 500
+  MaxDistance: 100
   Pan2D: 0
   rolloffMode: 2
   BypassEffects: 0
@@ -10025,8 +10025,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbody
+  _active: 0
+  _mass: 0.0000001
   _isKinematic: 0
-  speedThreshold: -1
   _velocity:
     x: 0
     y: 0
@@ -10036,10 +10037,6 @@ MonoBehaviour:
     y: 0
     z: 0
   prevPos:
-    x: 0
-    y: 0
-    z: 0
-  inverseInertiaTensor:
     x: 0
     y: 0
     z: 0

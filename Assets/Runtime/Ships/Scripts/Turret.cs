@@ -14,6 +14,7 @@ public class Turret : NetworkBehaviour
     public bool active = true;
     public StatSystem statSystem;
     [SerializeField] private TurretSystem turretSystem;
+    [SerializeField] private Ship ship;
     [SerializeField] private Transform origin;
     public Transform platform;
     public Transform barrel;
@@ -100,7 +101,7 @@ public class Turret : NetworkBehaviour
     {
         if (!active)
             return;
-        if (!IsOffline && !IsOwner)
+        if (!IsOwnerOrOffline)
             return;
         
         if (test && currentTarget != null && predictions.Count > 0)
@@ -131,7 +132,7 @@ public class Turret : NetworkBehaviour
         if (currentTarget != null)
         {
             // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
-            Vector3d realFirePoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+            Vector3d realFirePoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
             Vector3d realTargetPos = currentTarget.scaledRigidbody.scaledTransform.realPosition;
             Vector3d relativePosition = realTargetPos - realFirePoint;
 
@@ -142,10 +143,10 @@ public class Turret : NetworkBehaviour
             }
 
             Vector3d targetVelocity = currentTarget.scaledRigidbody.velocity;
-            Vector3d relativeVelocity = targetVelocity - turretSystem.ship.scaledRigidbody.velocity;
+            Vector3d relativeVelocity = targetVelocity - ship.scaledRigidbody.velocity;
             
             // Assume the bullet's acceleration after getting fired is only from gravity
-            Vector3d projectileAcceleration = turretSystem.ship.scaledRigidbody.GetGravity();
+            Vector3d projectileAcceleration = ship.scaledRigidbody.GetGravity();
             Vector3d relativeAcceleration = currentTarget.acceleration - projectileAcceleration;
 
             // Maybe add noise or something to bulletTime
@@ -154,7 +155,7 @@ public class Turret : NetworkBehaviour
                     + (relativeVelocity * bulletTime)
                     + (0.5 * bulletTime * bulletTime * relativeAcceleration);
             Vector3d direction = predictedRelativePos.normalized;
-            Vector3d simulatedVelocity = turretSystem.ship.scaledRigidbody.velocity + direction * projectileSpeed;
+            Vector3d simulatedVelocity = ship.scaledRigidbody.velocity + direction * projectileSpeed;
             Vector3d simulatedPos = realFirePoint + simulatedVelocity * bulletTime + 0.5 * bulletTime * bulletTime * projectileAcceleration;
             aimDirection = direction.ToVector3();
 
@@ -242,9 +243,9 @@ public class Turret : NetworkBehaviour
 
     private void CheckTarget(RadarTarget target, bool inKillRadius)
     {
-        if (!IsOffline && !IsOwner)
+        if (!IsOwnerOrOffline)
             return;
-        Vector3d realFirePoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        Vector3d realFirePoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
         Vector3d relativePosition = target.scaledRigidbody.scaledTransform.realPosition - realFirePoint;
         if (turretSystem.IsOffensive(target))
         {
@@ -356,7 +357,7 @@ public class Turret : NetworkBehaviour
     /// </summary>
     private void FireVisualBullet()
     {
-        Vector3d realBulletPoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        Vector3d realBulletPoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
         // Retarded hack needed to prevent ScaledTransform from running Awake() and overriding transform.position with a zero Vector realPosition
         firePoint.gameObject.SetActive(false);
         ScaledRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation, firePoint).GetComponent<ScaledRigidbody>();
@@ -366,7 +367,7 @@ public class Turret : NetworkBehaviour
         firePoint.gameObject.SetActive(true);
         projectileRB.transform.SetParent(null);
         // These methods need ScaledRigidbody to be initialized, so we call Awake() by setting it active before calling these
-        projectileRB.velocity = turretSystem.ship.scaledRigidbody.velocity + (firePoint.forward * projectileSpeed).ToVector3d();
+        projectileRB.velocity = ship.scaledRigidbody.velocity + (firePoint.forward * projectileSpeed).ToVector3d();
         projectileRB.DestroyScaledColliders(); // Server takes authority over simulating physics
 
         Collider projectileCollider = projectileRB.GetComponent<Collider>();
@@ -393,7 +394,7 @@ public class Turret : NetworkBehaviour
     private void FireRealBullet()
     {
         turretSystem.OnTurretFire();
-        Vector3d realBulletPoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+        Vector3d realBulletPoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
         // Retarded hack needed to prevent ScaledTransform from running Awake() and overriding transform.position with a zero Vector realPosition
         firePoint.gameObject.SetActive(false);
         ScaledRigidbody projectileRB = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation, firePoint).GetComponent<ScaledRigidbody>();
@@ -403,8 +404,8 @@ public class Turret : NetworkBehaviour
         firePoint.gameObject.SetActive(true);
         projectileRB.transform.SetParent(null);
         // These methods need ScaledRigidbody to be initialized, so we call Awake() by setting it active before calling these
-        projectileRB.velocity = turretSystem.ship.scaledRigidbody.velocity + (firePoint.forward * projectileSpeed).ToVector3d();
-        projectileRB.IgnoreScaledRigidbody(turretSystem.ship.scaledRigidbody, true);
+        projectileRB.velocity = ship.scaledRigidbody.velocity + (firePoint.forward * projectileSpeed).ToVector3d();
+        projectileRB.IgnoreScaledRigidbody(ship.scaledRigidbody, true);
 
         Collider projectileCollider = projectileRB.GetComponent<Collider>();
         foreach(Collider collider in ignoreColliders)
@@ -426,18 +427,18 @@ public class Turret : NetworkBehaviour
             }
         }
 
-        if (turretSystem.ship.scaledRigidbody.scaledTransform.visible && shootParticles != null)
+        if (ship.scaledRigidbody.scaledTransform.visible && shootParticles != null)
         {
             Instantiate(shootParticles, firePoint.position, firePoint.rotation, transform).GetComponent<ScaledRigidbody>();
         }
 
         if (casingPoint != null && casingPrefab != null)
         {
-            Vector3d realCasingPoint = turretSystem.ship.scaledRigidbody.scaledTransform.TransformRenderPoint(casingPoint.position);
+            Vector3d realCasingPoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(casingPoint.position);
             ScaledRigidbody casingRigidbody = Instantiate(casingPrefab, casingPoint.position, casingPoint.rotation).GetComponent<ScaledRigidbody>();
             casingRigidbody.scaledTransform.realPosition = realCasingPoint;
             casingRigidbody.angularVelocity = (Random.insideUnitSphere * casingRandomness).ToVector3d();
-            casingRigidbody.velocity = turretSystem.ship.scaledRigidbody.velocity + ((casingPoint.up + Random.insideUnitSphere * casingRandomness) * casingSpeed).ToVector3d();
+            casingRigidbody.velocity = ship.scaledRigidbody.velocity + ((casingPoint.up + Random.insideUnitSphere * casingRandomness) * casingSpeed).ToVector3d();
         }
     }
 
@@ -450,7 +451,7 @@ public class Turret : NetworkBehaviour
     public bool GetRaycastHit(out RaycastHit hit)
     {
         bool gotHit = Physics.Raycast(origin.position, origin.forward, out hit, Mathf.Infinity, ~ignoreLayers, QueryTriggerInteraction.Ignore);
-        obstructed = gotHit && hit.transform == turretSystem.ship.transform;
+        obstructed = gotHit && hit.transform == ship.transform;
         return gotHit;
     }
 

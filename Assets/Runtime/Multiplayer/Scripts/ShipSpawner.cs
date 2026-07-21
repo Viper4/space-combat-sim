@@ -55,17 +55,6 @@ public class ShipSpawner : MonoBehaviour
         playerShips.Clear();
     }
 
-    private void OnClientLoadedStartScenes(NetworkConnection connection, bool asServer)
-    {
-        SpawnPlayerShip(connection);
-    }
-
-    private IEnumerator WaitToSpawnShip(NetworkConnection connection, Scene mainScene)
-    {
-        yield return new WaitUntil(() => mainScene.isLoaded);
-        SpawnPlayerShip(connection);
-    }
-
     private void OnClientPresenceChangeEnd(ClientPresenceChangeEventArgs args)
     {
         if (args.Scene.name != "MainScene")
@@ -153,10 +142,6 @@ public class ShipSpawner : MonoBehaviour
         }
 
         playerShips.Add(conn.ClientId, ship);
-        if (shipObject.TryGetComponent<NetworkObjectDestroyer>(out var networkObjectDestroyer))
-        {
-            networkObjectDestroyer.HideCriticalObjects();
-        }
     }
 
     private void RemovePlayerShip(NetworkConnection conn)

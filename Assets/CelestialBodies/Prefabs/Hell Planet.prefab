@@ -160,12 +160,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _mass: 0.0000001
   _isKinematic: 0
-  speedThreshold: -1
   _velocity:
     x: 0
     y: 0
     z: 0
   _angularVelocity:
+    x: 0
+    y: 0
+    z: 0
+  affectedByGravity: 1
+  gravityAcceleration:
     x: 0
     y: 0
     z: 0
@@ -272,7 +276,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584172423546112069
+  _initializedTimestamp: -8584169821424183920
 --- !u!114 &3616553670080556561
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -289,6 +293,8 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 5936781585265924629}
   _networkObjectCache: {fileID: 5936781585265924629}
   snapshotRate: 10
-  interpolate: 1
+  interpolate: 0
+  interpolateSpeed: 1
   controlType: 1
   activeWhenOffline: 1
+  syncMass: 0

@@ -62,6 +62,7 @@ public class Radar : MonoBehaviour
             RadarIcon newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
             newIcon.Init(iconParent.transform.position, transform.rotation, friendlyShipColor, friendlyShipEmission, "", true);
             ship.radarTarget.radarIcon = newIcon;
+            ship.OnShutdown.AddListener(OnShipShutdown);
         }
         for(int i = 0; i < detectInits.Length; i++)
         {
@@ -77,6 +78,14 @@ public class Radar : MonoBehaviour
         {
             string tag = killInits[i].tag;
             killConfigs.Add(tag, killInits[i]);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (ship != null)
+        {
+            ship.OnShutdown.RemoveListener(OnShipShutdown);
         }
     }
 
@@ -296,22 +305,34 @@ public class Radar : MonoBehaviour
         }
     }
 
+    private void OnShipShutdown()
+    {
+        hologramActive = false;
+        iconParent.SetActive(false);
+        active = false;
+    }
+
     public void ToggleScale(int state)
     {
         rangeIndex = state;
+        if (ship.isShutdown)
+        {
+            hologramActive = false;
+            iconParent.SetActive(false);
+            active = false;
+            return;
+        }
         switch (state)
         {
             case 0:
                 hologramActive = false;
                 iconParent.SetActive(false);
                 active = false;
-                shipGUI.ToggleRadarActive(false);
                 break;
             case 1:
                 hologramActive = true;
                 iconParent.SetActive(true);
                 active = true;
-                shipGUI.ToggleRadarActive(true);
                 break;
         }
         triggerCollider.radius = radarRanges[rangeIndex];
