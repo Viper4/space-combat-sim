@@ -25,6 +25,9 @@ public class ScaledSpacePhysics : MonoBehaviour
     private List<ScaledCollider> scaledColliders = new List<ScaledCollider>();
     private HashSet<Pair> previousCollisions = new HashSet<Pair>();
 
+    [SerializeField] private bool logCollisions = false;
+    [SerializeField] private bool logTimings = false;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -65,8 +68,14 @@ public class ScaledSpacePhysics : MonoBehaviour
     {
         if (this == null || !colliderIndexMap.ContainsKey(collider.id))
             return;
-
         StartCoroutine(WaitToRemoveCollider(collider));
+    }
+
+    public ScaledCollider GetScaledCollider(uint id)
+    {
+        if (!colliderIndexMap.TryGetValue(id, out int index))
+            return null;
+        return scaledColliders[index];
     }
 
     public void UpdateGridSize(ScaledRigidbody rb)
@@ -145,8 +154,8 @@ public class ScaledSpacePhysics : MonoBehaviour
 
                         if (!previousCollisions.Contains(collisionKey))
                         {
-                            collider.scaledRigidbody.RaiseTriggerEnter(candidate);
-                            candidate.scaledRigidbody.RaiseTriggerEnter(collider);
+                            collider.scaledRigidbody.RaiseTriggerEnter(collider, candidate);
+                            candidate.scaledRigidbody.RaiseTriggerEnter(candidate, collider);
                         }
                     }
                 }
@@ -182,7 +191,8 @@ public class ScaledSpacePhysics : MonoBehaviour
         }
         stopwatch.Stop();
         fullLoopTicks = stopwatch.ElapsedTicks;
-        // Debug.Log($"Full loop ticks: {fullLoopTicks}, Get candidates loop ticks: {getCandidatesTicks - collisionCheckTicks}, Check Collision ticks: {collisionCheckTicks}");
+        if (logTimings)
+            Debug.Log($"Full loop ticks: {fullLoopTicks}, Get candidates loop ticks: {getCandidatesTicks - collisionCheckTicks}, Check Collision ticks: {collisionCheckTicks}");
         
         // Detect collision exits
         foreach (Pair collision in previousCollisions)
@@ -195,24 +205,59 @@ public class ScaledSpacePhysics : MonoBehaviour
                 ScaledCollider colliderB = scaledColliders[indexB];
                 if (colliderA.isTrigger)
                 {
-                    colliderA.scaledRigidbody.RaiseTriggerExit(colliderB);
+                    colliderA.scaledRigidbody.RaiseTriggerExit(colliderA, colliderB);
                 }
                 else
                 {
-                    colliderA.scaledRigidbody.RaiseCollisionExit(colliderB);
+                    colliderA.scaledRigidbody.RaiseCollisionExit(colliderB, colliderA);
                 }
                 if (colliderB.isTrigger)
                 {
-                    colliderB.scaledRigidbody.RaiseTriggerExit(colliderA);
+                    colliderB.scaledRigidbody.RaiseTriggerExit(colliderB, colliderA);
                 }
                 else
                 {
-                    colliderB.scaledRigidbody.RaiseCollisionExit(colliderA);
+                    colliderB.scaledRigidbody.RaiseCollisionExit(colliderB, colliderA);
                 }
             }
         }
 
         previousCollisions = currentCollisions;
+    }
+
+    private double SweepCCD(Vector3d dispA, Vector3d dispB, Vector3d relPos0, double minDistance)
+    {
+        // CCD: sweep from start to end
+        // displacement = endPos - startPos
+        // relPos0 = startPosB - startPosA
+        Vector3d relDisp = dispB - dispA;
+
+        double aCoeff   = relDisp.sqrMagnitude;
+
+        // Reject: a and b didn't move closer to each other
+        if (aCoeff <= double.Epsilon)
+            return -1.0;
+        
+        double r0Sq     = relPos0.sqrMagnitude;
+        double minDistSq = minDistance * minDistance;
+        double cCoeff   = r0Sq - minDistSq;
+
+        // Reject: already overlapping — let discrete solver handle it
+        if (cCoeff < 0.0)
+            return -1.0;
+
+        double halfB    = Vector3d.Dot(relPos0, relDisp);   // bCoeff/2
+        double bCoeff   = 2.0 * halfB;
+        // Reject: closest approach along sweep exceeds minDistance
+        // |relPos0 × relDisp|² = |relPos0|²|relDisp|² - (relPos0·relDisp)²
+        double crossSq = aCoeff * r0Sq - halfB * halfB;
+        if (crossSq > minDistSq * aCoeff)
+            return -1.0;
+
+        double t = SpaceMath.SolveQuadratic(aCoeff, bCoeff, cCoeff);
+        if (t > 1.0)   // t > 1 = collision outside this frame
+            return -1.0;
+        return t;
     }
 
     private bool CheckTrigger(ScaledCollider a, ScaledCollider b)
@@ -233,36 +278,13 @@ public class ScaledSpacePhysics : MonoBehaviour
             return true;
         }
 
-        // CCD: sweep from prevPos to realPos (retroactive)
-        // displacement = realPos - prevPos = what PhysicsStep just added
-        Vector3d startPosA = a.scaledRigidbody.prevPos + a.GetLocalCenter();
-        Vector3d startPosB = b.scaledRigidbody.prevPos + b.GetLocalCenter();
-        Vector3d dispA = posA - startPosA;
-        Vector3d dispB = posB - startPosB;
-
-        // Use start-of-frame positions as the sweep origin
-        Vector3d relPos0 = startPosB - startPosA;  // relative pos at frame start
-        Vector3d relDisp = dispB - dispA;          // relative displacement over frame
-        
-        // Cant do reject with objects moving apart at frame start, since massive acceleration could still cause intersect
-        double bCoeff = 2.0 * Vector3d.Dot(relPos0, relDisp);
-
-        // Only need CCD if relative displacement exceeds the gap
-        double gap = Math.Sqrt(relPos0.sqrMagnitude) - minDistance;
-        if (gap < 0)
-            gap = 0; // prevPos already overlapping — handled next frame
-        double sqrRelDisp = relDisp.sqrMagnitude;
-        if (sqrRelDisp <= gap * gap)
+        if (a.scaledRigidbody.collisionDetection == CollisionDetectionMode.Discrete && b.scaledRigidbody.collisionDetection == CollisionDetectionMode.Discrete)
             return false;
 
-        // Quadratic: |relPos0 + relDisp*t|² = minDistance²,  t ∈ [0,1]
-        double aCoeff = Vector3d.Dot(relDisp, relDisp);
-        double cCoeff = Vector3d.Dot(relPos0, relPos0) - minDistance * minDistance;
-
-        double t = SpaceMath.SolveQuadratic(aCoeff, bCoeff, cCoeff);
+        // Retroactive sweep CCD
+        double t = SweepCCD(posA - a.prevCenterPos, posB - b.prevCenterPos, b.prevCenterPos - a.prevCenterPos, minDistance);
         if (t < 0.0)
             return false;
-
         return true;
     }
 
@@ -279,52 +301,32 @@ public class ScaledSpacePhysics : MonoBehaviour
         Vector3d posB = b.GetRealCenter();
         Vector3d relativePosition = posB - posA;
         double sqrDistance = relativePosition.sqrMagnitude;
-        double distance = minDistance;
+        double distance;
 
         if (sqrDistance < minDistance * minDistance)
         {
             // Overlapping at end of frame — standard intersection
             distance = Math.Sqrt(sqrDistance);
-            Debug.Log($"[ScaledSpacePhysics] Intersect Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
+            if (logCollisions)
+                Debug.Log($"[ScaledSpacePhysics] Intersect Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
         }
         else
         {
-            // CCD: sweep from prevPos to realPos (retroactive)
-            // displacement = realPos - prevPos = what ScaledRigidbody.FixedUpdate just added
-            Vector3d startPosA = a.scaledRigidbody.prevPos + a.GetLocalCenter();
-            Vector3d startPosB = b.scaledRigidbody.prevPos + b.GetLocalCenter();
-            Vector3d dispA = posA - startPosA;
-            Vector3d dispB = posB - startPosB;
-
-            Vector3d relPos0 = startPosB - startPosA;
-            Vector3d relDisp = dispB - dispA;
-
-            double aCoeff   = Vector3d.Dot(relDisp, relDisp);
-            double halfB    = Vector3d.Dot(relPos0, relDisp);   // bCoeff/2
-            double bCoeff   = 2.0 * halfB;
-            double r0Sq     = Vector3d.Dot(relPos0, relPos0);
-            double minDistSq = minDistance * minDistance;
-            double cCoeff   = r0Sq - minDistSq;
-
-            // Reject: already overlapping — let discrete solver handle it
-            if (cCoeff < 0.0)
+            if (a.scaledRigidbody.collisionDetection == CollisionDetectionMode.Discrete && b.scaledRigidbody.collisionDetection == CollisionDetectionMode.Discrete)
                 return false;
 
-            // Reject: closest approach along sweep exceeds minDistance (no sqrt needed)
-            // |relPos0 × relDisp|² = |relPos0|²|relDisp|² - (relPos0·relDisp)²
-            double crossSq = aCoeff * r0Sq - halfB * halfB;
-            if (crossSq > minDistSq * aCoeff)
+            Vector3d dispA = posA - a.prevCenterPos;
+            Vector3d dispB = posB - b.prevCenterPos;
+            // Retroactive sweep CCD
+            double t = SweepCCD(dispA, dispB, b.prevCenterPos - a.prevCenterPos, minDistance);
+            if (t < 0.0)
                 return false;
-
-            double t = SpaceMath.SolveQuadratic(aCoeff, bCoeff, cCoeff);
-            if (t < 0.0 || t > 1.0)   // t > 1 = collision outside this frame
-                return false;
-
-            posA = startPosA + dispA * t;
-            posB = startPosB + dispB * t;
+            posA = a.prevCenterPos + dispA * t;
+            posB = b.prevCenterPos + dispB * t;
             relativePosition = posB - posA;
-
-            Debug.Log($"[ScaledSpacePhysics] CCD Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
+            distance = minDistance; // Should be safe to assume the collision is once the spheres begin touching
+            if (logCollisions)
+                Debug.Log($"[ScaledSpacePhysics] CCD Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
         }
 
         Vector3d normal = distance > 0.0001 ? relativePosition / distance : Vector3d.up;

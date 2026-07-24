@@ -52,8 +52,7 @@ public class TargetingSystem : MonoBehaviour
 
         if (lockedTarget != null)
         {
-            float radarRange = radar.GetCurrentRange();
-            if ((lockedTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition).sqrMagnitude > radarRange * radarRange)
+            if (!lockedTarget.passivelyDetected && !lockedTarget.activelyDetected)
             {
                 RemoveTarget();
                 return;
@@ -76,8 +75,8 @@ public class TargetingSystem : MonoBehaviour
         HUDSystem.Instance.SetTargetDirectionMarkerActive(false);
         if (lockedTarget != null)
         {
-            if (lockedTarget.alertSystem != null)
-                lockedTarget.alertSystem.IncrementRadarLock(-1);
+            if (lockedTarget.attachedRadar != null)
+                lockedTarget.attachedRadar.IncrementRadarLock(-1);
             lockedTarget = null;
         }
         if (targetModel != null)
@@ -101,10 +100,12 @@ public class TargetingSystem : MonoBehaviour
             OnTargetChange?.Invoke();
             return;
         }
+        if (!newTarget.passivelyDetected && !newTarget.activelyDetected)
+            return;
         RemoveTarget();
         lockedTarget = newTarget;
-        if (lockedTarget.alertSystem != null)
-            lockedTarget.alertSystem.IncrementRadarLock(1);
+        if (lockedTarget.attachedRadar != null)
+            lockedTarget.attachedRadar.IncrementRadarLock(1);
         targetModelParent.gameObject.SetActive(lockedTarget != null);
 
         GameObject newTargetModel;

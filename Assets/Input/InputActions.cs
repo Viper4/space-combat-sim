@@ -201,7 +201,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""TurretControlToggle"",
+                    ""name"": ""GunControlToggle"",
                     ""type"": ""Button"",
                     ""id"": ""657ff7ea-c7af-4dea-ae28-f2529e8b289a"",
                     ""expectedControlType"": """",
@@ -237,7 +237,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""CombatModeToggle"",
+                    ""name"": ""HighGToggle"",
                     ""type"": ""Button"",
                     ""id"": ""26676464-9fd1-441a-8773-49ff3925f524"",
                     ""expectedControlType"": """",
@@ -276,6 +276,42 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""name"": ""MaintainTargetDistance"",
                     ""type"": ""Button"",
                     ""id"": ""74698e4f-7cbc-4ce0-8ff1-aee50b6e329a"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""ShutdownToggle"",
+                    ""type"": ""Button"",
+                    ""id"": ""96a167e9-07be-4d06-83e8-f4177801f26e"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""BatteryToggle"",
+                    ""type"": ""Button"",
+                    ""id"": ""6ef939fd-8aa6-42c8-b25b-d7e0c154878a"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""APUToggle"",
+                    ""type"": ""Button"",
+                    ""id"": ""107cf997-b38e-45bf-8095-4d7aa23a773f"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""EngineToggle"",
+                    ""type"": ""Button"",
+                    ""id"": ""c4909fbe-040e-40ce-b681-78248aa58653"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
@@ -576,7 +612,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""CombatModeToggle"",
+                    ""action"": ""HighGToggle"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -598,7 +634,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""TurretControlToggle"",
+                    ""action"": ""GunControlToggle"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -654,6 +690,50 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""MaintainTargetDistance"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""4f8485b3-3792-4749-8985-ae79563d056b"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""ShutdownToggle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""ceb3d326-21a9-40bb-843a-5a4c3499d844"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""BatteryToggle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""3b8c9331-8e9f-45ab-825f-1e452774e697"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""APUToggle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f24276d2-9c72-43d8-88e1-bedd88274289"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""EngineToggle"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -1313,15 +1393,19 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         m_Player_RadarHUDToggle = m_Player.FindAction("RadarHUDToggle", throwIfNotFound: true);
         m_Player_RadarToggle = m_Player.FindAction("RadarToggle", throwIfNotFound: true);
         m_Player_CombatHUDToggle = m_Player.FindAction("CombatHUDToggle", throwIfNotFound: true);
-        m_Player_TurretControlToggle = m_Player.FindAction("TurretControlToggle", throwIfNotFound: true);
+        m_Player_GunControlToggle = m_Player.FindAction("GunControlToggle", throwIfNotFound: true);
         m_Player_TorpedoBayToggle = m_Player.FindAction("TorpedoBayToggle", throwIfNotFound: true);
         m_Player_ShieldToggle = m_Player.FindAction("ShieldToggle", throwIfNotFound: true);
         m_Player_RollYawToggle = m_Player.FindAction("RollYawToggle", throwIfNotFound: true);
-        m_Player_CombatModeToggle = m_Player.FindAction("CombatModeToggle", throwIfNotFound: true);
+        m_Player_HighGToggle = m_Player.FindAction("HighGToggle", throwIfNotFound: true);
         m_Player_LockTarget = m_Player.FindAction("LockTarget", throwIfNotFound: true);
         m_Player_MatchTargetLinearVelocity = m_Player.FindAction("MatchTargetLinearVelocity", throwIfNotFound: true);
         m_Player_MatchTargetAngularVelocity = m_Player.FindAction("MatchTargetAngularVelocity", throwIfNotFound: true);
         m_Player_MaintainTargetDistance = m_Player.FindAction("MaintainTargetDistance", throwIfNotFound: true);
+        m_Player_ShutdownToggle = m_Player.FindAction("ShutdownToggle", throwIfNotFound: true);
+        m_Player_BatteryToggle = m_Player.FindAction("BatteryToggle", throwIfNotFound: true);
+        m_Player_APUToggle = m_Player.FindAction("APUToggle", throwIfNotFound: true);
+        m_Player_EngineToggle = m_Player.FindAction("EngineToggle", throwIfNotFound: true);
         // UI
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
@@ -1430,15 +1514,19 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_RadarHUDToggle;
     private readonly InputAction m_Player_RadarToggle;
     private readonly InputAction m_Player_CombatHUDToggle;
-    private readonly InputAction m_Player_TurretControlToggle;
+    private readonly InputAction m_Player_GunControlToggle;
     private readonly InputAction m_Player_TorpedoBayToggle;
     private readonly InputAction m_Player_ShieldToggle;
     private readonly InputAction m_Player_RollYawToggle;
-    private readonly InputAction m_Player_CombatModeToggle;
+    private readonly InputAction m_Player_HighGToggle;
     private readonly InputAction m_Player_LockTarget;
     private readonly InputAction m_Player_MatchTargetLinearVelocity;
     private readonly InputAction m_Player_MatchTargetAngularVelocity;
     private readonly InputAction m_Player_MaintainTargetDistance;
+    private readonly InputAction m_Player_ShutdownToggle;
+    private readonly InputAction m_Player_BatteryToggle;
+    private readonly InputAction m_Player_APUToggle;
+    private readonly InputAction m_Player_EngineToggle;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -1499,9 +1587,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @CombatHUDToggle => m_Wrapper.m_Player_CombatHUDToggle;
         /// <summary>
-        /// Provides access to the underlying input action "Player/TurretControlToggle".
+        /// Provides access to the underlying input action "Player/GunControlToggle".
         /// </summary>
-        public InputAction @TurretControlToggle => m_Wrapper.m_Player_TurretControlToggle;
+        public InputAction @GunControlToggle => m_Wrapper.m_Player_GunControlToggle;
         /// <summary>
         /// Provides access to the underlying input action "Player/TorpedoBayToggle".
         /// </summary>
@@ -1515,9 +1603,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @RollYawToggle => m_Wrapper.m_Player_RollYawToggle;
         /// <summary>
-        /// Provides access to the underlying input action "Player/CombatModeToggle".
+        /// Provides access to the underlying input action "Player/HighGToggle".
         /// </summary>
-        public InputAction @CombatModeToggle => m_Wrapper.m_Player_CombatModeToggle;
+        public InputAction @HighGToggle => m_Wrapper.m_Player_HighGToggle;
         /// <summary>
         /// Provides access to the underlying input action "Player/LockTarget".
         /// </summary>
@@ -1534,6 +1622,22 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/MaintainTargetDistance".
         /// </summary>
         public InputAction @MaintainTargetDistance => m_Wrapper.m_Player_MaintainTargetDistance;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/ShutdownToggle".
+        /// </summary>
+        public InputAction @ShutdownToggle => m_Wrapper.m_Player_ShutdownToggle;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/BatteryToggle".
+        /// </summary>
+        public InputAction @BatteryToggle => m_Wrapper.m_Player_BatteryToggle;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/APUToggle".
+        /// </summary>
+        public InputAction @APUToggle => m_Wrapper.m_Player_APUToggle;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/EngineToggle".
+        /// </summary>
+        public InputAction @EngineToggle => m_Wrapper.m_Player_EngineToggle;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1596,9 +1700,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @CombatHUDToggle.started += instance.OnCombatHUDToggle;
             @CombatHUDToggle.performed += instance.OnCombatHUDToggle;
             @CombatHUDToggle.canceled += instance.OnCombatHUDToggle;
-            @TurretControlToggle.started += instance.OnTurretControlToggle;
-            @TurretControlToggle.performed += instance.OnTurretControlToggle;
-            @TurretControlToggle.canceled += instance.OnTurretControlToggle;
+            @GunControlToggle.started += instance.OnGunControlToggle;
+            @GunControlToggle.performed += instance.OnGunControlToggle;
+            @GunControlToggle.canceled += instance.OnGunControlToggle;
             @TorpedoBayToggle.started += instance.OnTorpedoBayToggle;
             @TorpedoBayToggle.performed += instance.OnTorpedoBayToggle;
             @TorpedoBayToggle.canceled += instance.OnTorpedoBayToggle;
@@ -1608,9 +1712,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @RollYawToggle.started += instance.OnRollYawToggle;
             @RollYawToggle.performed += instance.OnRollYawToggle;
             @RollYawToggle.canceled += instance.OnRollYawToggle;
-            @CombatModeToggle.started += instance.OnCombatModeToggle;
-            @CombatModeToggle.performed += instance.OnCombatModeToggle;
-            @CombatModeToggle.canceled += instance.OnCombatModeToggle;
+            @HighGToggle.started += instance.OnHighGToggle;
+            @HighGToggle.performed += instance.OnHighGToggle;
+            @HighGToggle.canceled += instance.OnHighGToggle;
             @LockTarget.started += instance.OnLockTarget;
             @LockTarget.performed += instance.OnLockTarget;
             @LockTarget.canceled += instance.OnLockTarget;
@@ -1623,6 +1727,18 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @MaintainTargetDistance.started += instance.OnMaintainTargetDistance;
             @MaintainTargetDistance.performed += instance.OnMaintainTargetDistance;
             @MaintainTargetDistance.canceled += instance.OnMaintainTargetDistance;
+            @ShutdownToggle.started += instance.OnShutdownToggle;
+            @ShutdownToggle.performed += instance.OnShutdownToggle;
+            @ShutdownToggle.canceled += instance.OnShutdownToggle;
+            @BatteryToggle.started += instance.OnBatteryToggle;
+            @BatteryToggle.performed += instance.OnBatteryToggle;
+            @BatteryToggle.canceled += instance.OnBatteryToggle;
+            @APUToggle.started += instance.OnAPUToggle;
+            @APUToggle.performed += instance.OnAPUToggle;
+            @APUToggle.canceled += instance.OnAPUToggle;
+            @EngineToggle.started += instance.OnEngineToggle;
+            @EngineToggle.performed += instance.OnEngineToggle;
+            @EngineToggle.canceled += instance.OnEngineToggle;
         }
 
         /// <summary>
@@ -1670,9 +1786,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @CombatHUDToggle.started -= instance.OnCombatHUDToggle;
             @CombatHUDToggle.performed -= instance.OnCombatHUDToggle;
             @CombatHUDToggle.canceled -= instance.OnCombatHUDToggle;
-            @TurretControlToggle.started -= instance.OnTurretControlToggle;
-            @TurretControlToggle.performed -= instance.OnTurretControlToggle;
-            @TurretControlToggle.canceled -= instance.OnTurretControlToggle;
+            @GunControlToggle.started -= instance.OnGunControlToggle;
+            @GunControlToggle.performed -= instance.OnGunControlToggle;
+            @GunControlToggle.canceled -= instance.OnGunControlToggle;
             @TorpedoBayToggle.started -= instance.OnTorpedoBayToggle;
             @TorpedoBayToggle.performed -= instance.OnTorpedoBayToggle;
             @TorpedoBayToggle.canceled -= instance.OnTorpedoBayToggle;
@@ -1682,9 +1798,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @RollYawToggle.started -= instance.OnRollYawToggle;
             @RollYawToggle.performed -= instance.OnRollYawToggle;
             @RollYawToggle.canceled -= instance.OnRollYawToggle;
-            @CombatModeToggle.started -= instance.OnCombatModeToggle;
-            @CombatModeToggle.performed -= instance.OnCombatModeToggle;
-            @CombatModeToggle.canceled -= instance.OnCombatModeToggle;
+            @HighGToggle.started -= instance.OnHighGToggle;
+            @HighGToggle.performed -= instance.OnHighGToggle;
+            @HighGToggle.canceled -= instance.OnHighGToggle;
             @LockTarget.started -= instance.OnLockTarget;
             @LockTarget.performed -= instance.OnLockTarget;
             @LockTarget.canceled -= instance.OnLockTarget;
@@ -1697,6 +1813,18 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @MaintainTargetDistance.started -= instance.OnMaintainTargetDistance;
             @MaintainTargetDistance.performed -= instance.OnMaintainTargetDistance;
             @MaintainTargetDistance.canceled -= instance.OnMaintainTargetDistance;
+            @ShutdownToggle.started -= instance.OnShutdownToggle;
+            @ShutdownToggle.performed -= instance.OnShutdownToggle;
+            @ShutdownToggle.canceled -= instance.OnShutdownToggle;
+            @BatteryToggle.started -= instance.OnBatteryToggle;
+            @BatteryToggle.performed -= instance.OnBatteryToggle;
+            @BatteryToggle.canceled -= instance.OnBatteryToggle;
+            @APUToggle.started -= instance.OnAPUToggle;
+            @APUToggle.performed -= instance.OnAPUToggle;
+            @APUToggle.canceled -= instance.OnAPUToggle;
+            @EngineToggle.started -= instance.OnEngineToggle;
+            @EngineToggle.performed -= instance.OnEngineToggle;
+            @EngineToggle.canceled -= instance.OnEngineToggle;
         }
 
         /// <summary>
@@ -2115,12 +2243,12 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnCombatHUDToggle(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "TurretControlToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "GunControlToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnTurretControlToggle(InputAction.CallbackContext context);
+        void OnGunControlToggle(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "TorpedoBayToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
@@ -2143,12 +2271,12 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnRollYawToggle(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "CombatModeToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "HighGToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnCombatModeToggle(InputAction.CallbackContext context);
+        void OnHighGToggle(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "LockTarget" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
@@ -2177,6 +2305,34 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnMaintainTargetDistance(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "ShutdownToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnShutdownToggle(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "BatteryToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnBatteryToggle(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "APUToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnAPUToggle(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "EngineToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnEngineToggle(InputAction.CallbackContext context);
     }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "UI" which allows adding and removing callbacks.

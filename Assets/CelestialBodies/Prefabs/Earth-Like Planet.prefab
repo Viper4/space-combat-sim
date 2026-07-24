@@ -159,6 +159,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  overrideUnity: 0
   _mass: 0.0000001
   _isKinematic: 0
   _velocity:
@@ -169,14 +170,12 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
+  affectedByGravity: 1
   gravityAcceleration:
     x: 0
     y: 0
     z: 0
-  prevPos:
-    x: 0
-    y: 0
-    z: 0
+  collisionDetection: 0
 --- !u!114 &5997540040479759170
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -190,11 +189,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   team: 
-  alertSystem: {fileID: 0}
+  radar: {fileID: 0}
   alertWhenTargeting: 1
+  passiveRadarIndex: -1
+  activeRadarIndex: -1
   radarIcon: {fileID: 0}
   turretsTargeting: 0
+  emissionStrength: 0
   stealthDistance: -1
+  collidersInRadarRange: 0
   useScaleForBounds: 1
   boundsRenderers: []
 --- !u!114 &5668315382189292086
@@ -216,8 +219,17 @@ MonoBehaviour:
   radius: -1
   isTrigger: 0
   restitution: 0
+  hGridCell:
+    level: 0
+    x: 0
+    y: 0
+    z: 0
   listIndex: -1
   overrideUnity: 0
+  prevCenterPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &6971362235971961917
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -276,7 +288,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584170749796354092
+  _initializedTimestamp: -8584168085050900702
 --- !u!114 &8848782723156057265
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -297,6 +309,7 @@ MonoBehaviour:
   interpolateSpeed: 1
   controlType: 1
   activeWhenOffline: 1
+  syncMass: 0
 --- !u!1001 &6213586387416295118
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -305,6 +318,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 5661668052468481612}
     m_Modifications:
+    - target: {fileID: 639484182738553864, guid: 7d90a6f345e94814897e10cb69bf2905, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 3625234357283199520, guid: 7d90a6f345e94814897e10cb69bf2905, type: 3}
       propertyPath: m_LocalScale.x
       value: 2.5

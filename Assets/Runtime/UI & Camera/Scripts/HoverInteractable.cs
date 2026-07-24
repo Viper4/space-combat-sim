@@ -8,8 +8,10 @@ public class HoverInteractable : MonoBehaviour
 
     [SerializeField] private bool clickable = true;
     private bool hovered = false;
-    [SerializeField, Tooltip("0 to maxState states inclusive")] private int maxState = 1;
-    private int state = 0;
+    [SerializeField, Tooltip("0-maxState states inclusive")] private int maxState = 1;
+    [SerializeField] private int state = 0;
+    [SerializeField, Tooltip("State wraps around to the opposite end once it goes over either end.")] private bool wrapState;
+    [SerializeField, Tooltip("Whether state will decrement on the next toggle.")] private bool decrement = false;
     [SerializeField] private Vector3[] statePositions;
     [SerializeField] private Vector3[] stateEulerAngles;
 
@@ -69,6 +71,8 @@ public class HoverInteractable : MonoBehaviour
         {
             Debug.LogWarning($"{transform.name} HoverInteractable: number of state positions ({stateEulerAngles.Length}) does not match max state ({maxState})");
         }
+
+        OnInteract(true); // Update with current initialized state
     }
 
     // Update is called once per frame
@@ -79,15 +83,37 @@ public class HoverInteractable : MonoBehaviour
             Interact(default);
         }
     }
+    
+    private void OnInteract(bool silent)
+    {
+        meshTransform.localPosition = statePositions[state];
+        meshTransform.localEulerAngles = stateEulerAngles[state];
+        if (!silent)
+            onInteract?.Invoke(state);
+    }
 
     private void Interact(InputAction.CallbackContext context)
     {
         if (GameManager.Instance.IsPaused)
             return;
-        state = (state + 1) % (maxState + 1);
-        meshTransform.localPosition = statePositions[state];
-        meshTransform.localEulerAngles = stateEulerAngles[state];
-        onInteract?.Invoke(state);
+        int add = decrement ? -1 : 1;
+        if (wrapState)
+        {
+            state = (state + add) % (maxState + 1);
+        }
+        else
+        {
+            if (state + add < 0 || state + add > maxState)
+            {
+                decrement = !decrement;
+                state -= add;
+            }
+            else
+            {
+                state += add;
+            }
+        }
+        OnInteract(false);
     }
 
     public void OnHoverEnter()
@@ -105,5 +131,18 @@ public class HoverInteractable : MonoBehaviour
     public void ToggleGameObjectActive(GameObject target)
     {
         target.SetActive(!target.activeSelf);
+    }
+
+    public void SetState(int newState)
+    {
+        if (newState < 0 || newState > maxState)
+            return;
+        state = newState;
+        OnInteract(false);
+    }
+
+    public void SetDecrement(bool value)
+    {
+        decrement = value;
     }
 }

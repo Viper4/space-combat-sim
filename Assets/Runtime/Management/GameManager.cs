@@ -18,6 +18,7 @@ public class GameManager : MonoBehaviour
     public Volume globalVolume;
     public Vignette vignette;
     public ColorAdjustments colorAdjustments;
+    public ScreenBlur screenBlur;
     public float volumeMultiplier = 1f;
 
     private Dictionary<string, int> rangedSettingMap = new Dictionary<string, int>();
@@ -48,6 +49,7 @@ public class GameManager : MonoBehaviour
             {
                 globalVolume.profile.TryGet(out vignette);
                 globalVolume.profile.TryGet(out colorAdjustments);
+                globalVolume.profile.TryGet(out screenBlur);
             }
         }
         else
@@ -82,6 +84,7 @@ public class GameManager : MonoBehaviour
         }
 
         AudioListener.volume = GetRangedSettingValue("Master Volume") * volumeMultiplier;
+        Application.targetFrameRate = (int)GetRangedSettingValue("Target Frame Rate");
     }
 
     private void ClearActions()

@@ -87,20 +87,21 @@ public class InertialEffects : MonoBehaviour
 
     private void Update()
     {
+        if (GameManager.Instance.IsPaused)
+            return;
         // ── Cursor lock toggle ──────────────────────────────────────────────────
-        if (!GameManager.Instance.IsPaused && GameManager.Instance.inputActions.Player.GUIToggle.WasPressedThisFrame())
+        if (GameManager.Instance.inputActions.Player.GUIToggle.WasPressedThisFrame())
         {
-            if (!guiMode)
+            guiMode = !guiMode;
+            if (guiMode)
             {
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible   = true;
-                guiMode = true;
             }
             else
             {
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible   = false;
-                guiMode = false;
             }
         }
     }
@@ -171,6 +172,7 @@ public class InertialEffects : MonoBehaviour
             GameManager.Instance.vignette.intensity.value = fadeTimer;
             GameManager.Instance.colorAdjustments.colorFilter.value = Color.Lerp(Color.white, Color.black, fadeTimer - 0.75f);
             GameManager.Instance.colorAdjustments.saturation.value = Mathf.Lerp(0f, -100f, fadeTimer);
+            GameManager.Instance.screenBlur.strength.value = fadeTimer;
             GameManager.Instance.volumeMultiplier = Mathf.Max(0f, 1f - fadeTimer);
 
             if (fadeSpeed <= 0f)
@@ -182,6 +184,7 @@ public class InertialEffects : MonoBehaviour
             GameManager.Instance.vignette.intensity.value = 0f;
             GameManager.Instance.colorAdjustments.colorFilter.value = Color.Lerp(Color.white, Color.red, -fadeTimer);
             GameManager.Instance.colorAdjustments.saturation.value = 0f;
+            GameManager.Instance.screenBlur.strength.value = -fadeTimer * 1.2f;
             GameManager.Instance.volumeMultiplier = 1f;
 
             if (fadeSpeed >= 0f)
@@ -234,7 +237,7 @@ public class InertialEffects : MonoBehaviour
         // Pushing forward and backward (both blackout)
         fadeSpeed += Mathf.Max(0f, fadeSpeedSlopes.z * (g.z - minimumPositiveGForces.z));
         fadeSpeed += Mathf.Max(0f, -fadeSpeedSlopes.z * (g.z + minimumPositiveGForces.z));
-        alertSystem.SetAlert("Over G", (g.sqrMagnitude > 36f && fadeTimer > 0.05f) || (g.sqrMagnitude > 14.7f && fadeTimer < -0.025f));
+        alertSystem.SetAlert("Over G", (fadeSpeed > 0f && fadeTimer > 0.05f) || (fadeSpeed < 0f && fadeTimer < -0.025f));
     }
 
     private void OnFOVUpdated()

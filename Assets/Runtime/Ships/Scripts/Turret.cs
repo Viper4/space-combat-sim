@@ -81,25 +81,33 @@ public class Turret : NetworkBehaviour
     private void Start()
     {
         statSystem = GetComponent<StatSystem>();
+        if (IsOffline)
+        {
+            turretSystem.StartTargetSearch += ResetTargetSearch;
+            turretSystem.CheckTarget += CheckTarget;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (!IsOwnerOrOffline)
+            return;
+        turretSystem.StartTargetSearch -= ResetTargetSearch;
+        turretSystem.CheckTarget -= CheckTarget;
     }
 
     public override void OnStartClient()
     {
         base.OnStartClient();
+        if (!IsOwner)
+            return;
         turretSystem.StartTargetSearch += ResetTargetSearch;
         turretSystem.CheckTarget += CheckTarget;
     }
 
-    public override void OnStopClient()
-    {
-        base.OnStopClient();
-        turretSystem.StartTargetSearch -= ResetTargetSearch;
-        turretSystem.CheckTarget -= CheckTarget;
-    }
-
     private void Update()
     {
-        if (!active)
+        if (!active || !ship.isStarted)
             return;
         if (!IsOwnerOrOffline)
             return;
@@ -123,24 +131,24 @@ public class Turret : NetworkBehaviour
 
     private void FixedUpdate()
     {
-        if (!active)
+        if (!active || !ship.isStarted)
             return;
 
         if (!IsOwnerOrOffline)
             return;
-    
+
         if (currentTarget != null)
         {
-            // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
-            Vector3d realFirePoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
-            Vector3d realTargetPos = currentTarget.scaledRigidbody.scaledTransform.realPosition;
-            Vector3d relativePosition = realTargetPos - realFirePoint;
-
-            if (relativePosition.sqrMagnitude > turretSystem.detectRadius * turretSystem.detectRadius)
+            if (!currentTarget.passivelyDetected && !currentTarget.activelyDetected)
             {
                 currentTarget = null;
                 return;
             }
+
+            // Calculate aim direction needed to get a bullet fired at projectileSpeed to reach target's future position
+            Vector3d realFirePoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
+            Vector3d realTargetPos = currentTarget.scaledRigidbody.scaledTransform.realPosition;
+            Vector3d relativePosition = realTargetPos - realFirePoint;
 
             Vector3d targetVelocity = currentTarget.scaledRigidbody.velocity;
             Vector3d relativeVelocity = targetVelocity - ship.scaledRigidbody.velocity;
@@ -166,7 +174,8 @@ public class Turret : NetworkBehaviour
                 shoot = true;
         }
 
-        if (aimDirection.sqrMagnitude > 0.0001f)
+        bool hasAimDirection = aimDirection.sqrMagnitude > 0.0001f;
+        if (hasAimDirection)
         {
             Vector3 localDir = platform.parent.InverseTransformDirection(aimDirection);
             float targetYaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
@@ -182,32 +191,22 @@ public class Turret : NetworkBehaviour
 
             platform.localRotation = Quaternion.Euler(0f, currentYaw, 0f);
             barrel.localRotation = Quaternion.Euler(currentPitch, 0f, 0f);
-
-            Debug.DrawRay(origin.position, aimDirection * 1000f, Color.red, Time.fixedDeltaTime);
-            Debug.DrawRay(origin.position, origin.forward * 1000f, Color.yellow, Time.fixedDeltaTime);
-
-            if (!turretSystem.manualControl && currentTarget != null)
-            {
-                if ((aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
-                {
-                    if (!shoot)
-                    {
-                        SetShoot(true);
-                    }
-                }
-                else
-                {
-                    if (shoot)
-                    {
-                        SetShoot(false);
-                    }
-                }
-            }
         }
 
         if (overrideShoot)
         {
             SetShoot(true);
+        }
+        else if (!turretSystem.manualControl)
+        {
+            if (currentTarget != null && hasAimDirection && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
+            {
+                SetShoot(true);
+            }
+            else
+            {
+                SetShoot(false);
+            }
         }
 
         if (Time.fixedTime >= nextFireTime)
@@ -220,7 +219,7 @@ public class Turret : NetworkBehaviour
                 }
                 else if (IsServerInitialized)
                 {
-                    NonOwnerFire();
+                    FireVisualBulletObserversRpc();
                     FireRealBullet();
                 }
                 else if (IsOwner)
@@ -245,8 +244,17 @@ public class Turret : NetworkBehaviour
     {
         if (!IsOwnerOrOffline)
             return;
+        if (!target.passivelyDetected && !target.activelyDetected)
+            return;
         Vector3d realFirePoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
         Vector3d relativePosition = target.scaledRigidbody.scaledTransform.realPosition - realFirePoint;
+        double distance = relativePosition.magnitude;
+        Vector3d direction = relativePosition / distance;
+        if (Physics.Raycast(origin.position, direction.ToVector3(), out RaycastHit hit, (float)distance, ~ignoreLayers, QueryTriggerInteraction.Ignore) && hit.transform != target.transform)
+        {
+            // Obstructed view
+            return;
+        }
         if (turretSystem.IsOffensive(target))
         {
             // Use offensive strategy against target
@@ -260,14 +268,6 @@ public class Turret : NetworkBehaviour
         else if (turretSystem.IsDefensive(target))
         {
             // Use defensive strategy against target
-            double distance = relativePosition.magnitude;
-            Vector3d direction = relativePosition / distance;
-            if (Physics.Raycast(origin.position, direction.ToVector3(), out RaycastHit hit, (float)distance, ~ignoreLayers, QueryTriggerInteraction.Ignore) && hit.transform != target.transform)
-            {
-                // Obstructed view
-                return;
-            }
-
             // Dont want to use closingVelocity and closingAcceleration since we only want to consider the intention of the target, not if the ship is moving towards it
             double incomingVelocity = -Vector3d.Dot(target.scaledRigidbody.velocity, direction);
             double incomingAcceleration = -Vector3d.Dot(target.acceleration, direction);
@@ -306,18 +306,12 @@ public class Turret : NetworkBehaviour
             if (prevTarget != null)
             {
                 prevTarget.turretsTargeting--;
-                if (IsOffline)
-                    HUDSystem.Instance.SetTurretsTargetingOffline(prevTarget.GetID(), prevTarget.turretsTargeting);
-                else
-                    HUDSystem.Instance.SetTurretsTargetingTargetRpc(Owner, prevTarget.GetID(), prevTarget.turretsTargeting);
+                HUDSystem.Instance.SetTurretsTargeting(prevTarget.GetID(), prevTarget.turretsTargeting);
             }
             if (currentTarget != null)
             {
                 currentTarget.turretsTargeting++;
-                if (IsOffline)
-                    HUDSystem.Instance.SetTurretsTargetingOffline(prevTarget.GetID(), prevTarget.turretsTargeting);
-                else
-                    HUDSystem.Instance.SetTurretsTargetingTargetRpc(Owner, currentTarget.GetID(), currentTarget.turretsTargeting);
+                HUDSystem.Instance.SetTurretsTargeting(currentTarget.GetID(), currentTarget.turretsTargeting);
             }
         }
     }
@@ -331,8 +325,6 @@ public class Turret : NetworkBehaviour
             // Need to update obstructed bool on server
             GetRaycastHit(out _);
         }
-        // Periodically synchronize ammo count with owner
-        SetOwnerAmmoCountTargetRpc(Owner, turretSystem.currentAmmo);
     }
 
     [TargetRpc]
@@ -343,12 +335,14 @@ public class Turret : NetworkBehaviour
 
     public void SetShoot(bool shoot)
     {
+        if (!IsOwnerOrOffline)
+            return;
         if (this.shoot == shoot)
             return;
         this.shoot = shoot;
         if (shoot)
             GetRaycastHit(out _); // Update obstructed
-        if (!IsOffline)
+        if (IsOwner)
             SetShootServerRpc(shoot);
     }
 
@@ -440,10 +434,16 @@ public class Turret : NetworkBehaviour
             casingRigidbody.angularVelocity = (Random.insideUnitSphere * casingRandomness).ToVector3d();
             casingRigidbody.velocity = ship.scaledRigidbody.velocity + ((casingPoint.up + Random.insideUnitSphere * casingRandomness) * casingSpeed).ToVector3d();
         }
+
+        if (IsServerInitialized && !IsOwner)
+        {
+            // Periodically synchronize ammo count with owner
+            SetOwnerAmmoCountTargetRpc(Owner, turretSystem.currentAmmo);
+        }
     }
 
-    [ObserversRpc(ExcludeOwner = true)]
-    private void NonOwnerFire()
+    [ObserversRpc(ExcludeServer = true)]
+    private void FireVisualBulletObserversRpc()
     {
         FireVisualBullet();
     }

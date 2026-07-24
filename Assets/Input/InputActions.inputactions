@@ -115,7 +115,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "TurretControlToggle",
+                    "name": "GunControlToggle",
                     "type": "Button",
                     "id": "657ff7ea-c7af-4dea-ae28-f2529e8b289a",
                     "expectedControlType": "",
@@ -151,7 +151,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "CombatModeToggle",
+                    "name": "HighGToggle",
                     "type": "Button",
                     "id": "26676464-9fd1-441a-8773-49ff3925f524",
                     "expectedControlType": "",
@@ -190,6 +190,42 @@
                     "name": "MaintainTargetDistance",
                     "type": "Button",
                     "id": "74698e4f-7cbc-4ce0-8ff1-aee50b6e329a",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "ShutdownToggle",
+                    "type": "Button",
+                    "id": "96a167e9-07be-4d06-83e8-f4177801f26e",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "BatteryToggle",
+                    "type": "Button",
+                    "id": "6ef939fd-8aa6-42c8-b25b-d7e0c154878a",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "APUToggle",
+                    "type": "Button",
+                    "id": "107cf997-b38e-45bf-8095-4d7aa23a773f",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "EngineToggle",
+                    "type": "Button",
+                    "id": "c4909fbe-040e-40ce-b681-78248aa58653",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -490,7 +526,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "CombatModeToggle",
+                    "action": "HighGToggle",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -512,7 +548,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "TurretControlToggle",
+                    "action": "GunControlToggle",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -568,6 +604,50 @@
                     "processors": "",
                     "groups": "",
                     "action": "MaintainTargetDistance",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "4f8485b3-3792-4749-8985-ae79563d056b",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ShutdownToggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ceb3d326-21a9-40bb-843a-5a4c3499d844",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "BatteryToggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3b8c9331-8e9f-45ab-825f-1e452774e697",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "APUToggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f24276d2-9c72-43d8-88e1-bedd88274289",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "EngineToggle",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

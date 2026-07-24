@@ -22,7 +22,7 @@ public class NetworkObjectDestroyer : NetworkBehaviour
     public override void OnStartClient()
     {
         base.OnStartClient();
-        DestroyAndDisable();
+        Initialize();
     }
 
     public void HideCriticalObjects()
@@ -50,6 +50,7 @@ public class NetworkObjectDestroyer : NetworkBehaviour
 
     private void ShowOwnerObjects()
     {
+        Debug.Log($"[NetworkObjectDestroyer] Showing Owner objects on {name}.");
         for(int i = 0; i < nonOwnerGOsToDestroy.Length; i++)
         {
             nonOwnerGOsToDestroy[i].SetActive(true);
@@ -62,6 +63,7 @@ public class NetworkObjectDestroyer : NetworkBehaviour
 
     private void ShowServerObjects()
     {
+        Debug.Log($"[NetworkObjectDestroyer] Showing Server objects on {name}.");
         for(int i = 0; i < nonServerGOsToDestroy.Length; i++)
         {
             nonServerGOsToDestroy[i].SetActive(true);
@@ -72,7 +74,7 @@ public class NetworkObjectDestroyer : NetworkBehaviour
         }
     }
 
-    public void DestroyAndDisable()
+    public void Initialize()
     {
         if (IsOffline)
         {

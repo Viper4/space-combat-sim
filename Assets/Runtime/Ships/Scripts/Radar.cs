@@ -3,404 +3,493 @@ using System.Collections.Generic;
 using UnityEngine;
 using SpaceStuff;
 using System;
+using FishNet.Object;
+using FishNet.Connection;
+using UnityEngine.UI;
+using TMPro;
 
-public class Radar : MonoBehaviour
+public class Radar : NetworkBehaviour
 {
-    private bool active = false;
-    private bool hologramActive = false;
+    public bool IsEnabled {get; private set;} = false;
+    public bool IsActive => emitLevel > 0;
 
     [SerializeField] private Ship ship;
-    [SerializeField] private ShipGUI shipGUI;
     [SerializeField] private AlertSystem alertSystem;
+    [SerializeField] private RadarUI radarUI;
 
-    [SerializeField] private float[] radarRanges;
-    private int rangeIndex = 0;
-    [SerializeField] private float[] iconRadii;
-    private List<uint> targetsInTrigger = new List<uint>();
-    [SerializeField] private SphereCollider triggerCollider;
-
-    [SerializeField] private GameObject iconParent;
-    [SerializeField] private Vector3 hologramScale;
-
-    [SerializeField] private GameObject shipIcon;
-    [SerializeField] private Color friendlyShipColor;
-    [SerializeField] private Color friendlyShipEmission;
-    [SerializeField] private Color hostileShipColor;
-    [SerializeField] private Color hostileShipEmission;
-
-    [SerializeField] private GameObject pointIcon;
-
-    [SerializeField] private Color friendlyProjectileColor;
-    [SerializeField] private Color friendlyProjectileEmission;
-    [SerializeField] private Color hostileProjectileColor;
-    [SerializeField] private Color hostileProjectileEmission;
-
-    [SerializeField] private GameObject realScaleIcon;
-    [SerializeField] private Color celestialBodyColor;
-    [SerializeField] private Color celestialBodyEmission;
+    [SerializeField, Tooltip("Maximum detection range of active radar at each emission level.")] private float[] radarRanges;
+    [SerializeField, Tooltip("The smallest radius active radar can detect at the current emission level's maximum range.")] private float[] minDetectRadii;
+    public int emitLevel {get; private set;} = 0;
+    private List<uint> validTargets = new List<uint>();
+    [SerializeField] private ScaledCollider activeRadarTrigger;
 
     [Serializable]
     public struct ConfigSetting
     {
         public string tag;
-        public bool on;
-        public double radius;
+        public Toggle detectToggle;
+        public bool detectOn;
+        
+        public Toggle alertToggle;
+        public bool alertOn;
+
+        public Toggle killToggle;
+        public bool killOn;
+
+        public TMP_InputField killRadiusInput;
+        public double killRadius;
     }
 
-    [SerializeField] private ConfigSetting[] detectInits;
-    [SerializeField] private ConfigSetting[] alertInits;
-    [SerializeField] private ConfigSetting[] killInits;
+    [SerializeField, Tooltip("Initial settings for radar configurations.")] private ConfigSetting[] configInits;
+    private Dictionary<string, ConfigSetting> radarConfigs = new Dictionary<string, ConfigSetting>();
+    [SerializeField] private Color onColor = Color.green;
+    [SerializeField] private Color offColor = Color.red;
 
-    private Dictionary<string, ConfigSetting> detectConfigs = new Dictionary<string, ConfigSetting>();
-    private Dictionary<string, ConfigSetting> alertConfigs = new Dictionary<string, ConfigSetting>();
-    private Dictionary<string, ConfigSetting> killConfigs = new Dictionary<string, ConfigSetting>();
+    public int radarLocks {get; private set;} = 0;
+    public int missileLocks {get; private set;} = 0;
+
+    private bool IsOwnerOrOffline => IsOwner || IsOffline;
+    public Action OnRadarLockChange;
+    public Action OnMissileLockChange;
+    
+    private void Init()
+    {
+        if (ship != null)
+        {
+            ship.scaledRigidbody.OnScaledTriggerEnter += OnScaledTriggerEnter;
+            ship.scaledRigidbody.OnScaledTriggerExit += OnScaledTriggerExit;
+            ship.OnStartupEnd.AddListener(EnableRadar);
+            ship.OnShutdownStart.AddListener(DisableRadar);
+        }
+        for(int i = 0; i < configInits.Length; i++)
+        {
+            string tag = configInits[i].tag;
+            radarConfigs.Add(tag, configInits[i]);
+
+            configInits[i].alertToggle.onValueChanged.AddListener((x) => ToggleAlert(tag, x));
+            configInits[i].alertToggle.SetIsOnWithoutNotify(configInits[i].detectOn && configInits[i].alertOn);
+            ToggleAlert(tag, configInits[i].alertOn);
+
+            configInits[i].killToggle.onValueChanged.AddListener((x) => ToggleKill(tag, x));
+            configInits[i].killToggle.SetIsOnWithoutNotify(configInits[i].detectOn && configInits[i].killOn);
+            ToggleKill(tag, configInits[i].killOn);
+
+            configInits[i].detectToggle.onValueChanged.AddListener((x) => ToggleDetect(tag, x));
+            configInits[i].detectToggle.SetIsOnWithoutNotify(configInits[i].detectOn);
+            ToggleDetect(tag, configInits[i].detectOn);
+
+            configInits[i].killRadiusInput.onEndEdit.AddListener((x) =>
+            {
+                if (double.TryParse(x, out double newRadius))
+                {
+                    SetKillRadius(tag, newRadius);
+                }
+            });
+            configInits[i].killRadiusInput.gameObject.SetActive(configInits[i].detectOn && configInits[i].killOn);
+            configInits[i].killRadiusInput.SetTextWithoutNotify(configInits[i].killRadius.ToString());
+        }
+    }
 
     private void Start()
     {
-        if(ship != null)
-        {
-            RadarIcon newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
-            newIcon.Init(iconParent.transform.position, transform.rotation, friendlyShipColor, friendlyShipEmission, "", true);
-            ship.radarTarget.radarIcon = newIcon;
-            ship.OnShutdown.AddListener(OnShipShutdown);
-        }
-        for(int i = 0; i < detectInits.Length; i++)
-        {
-            string tag = detectInits[i].tag;
-            detectConfigs.Add(tag, detectInits[i]);
-        }
-        for(int i = 0; i < alertInits.Length; i++)
-        {
-            string tag = alertInits[i].tag;
-            alertConfigs.Add(tag, alertInits[i]);
-        }
-        for(int i = 0; i < killInits.Length; i++)
-        {
-            string tag = killInits[i].tag;
-            killConfigs.Add(tag, killInits[i]);
-        }
+        if (!IsOffline)
+            return;
+        Init();
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+        if (!IsOwner)
+            return;
+        Init();
     }
 
     private void OnDestroy()
     {
         if (ship != null)
         {
-            ship.OnShutdown.RemoveListener(OnShipShutdown);
-        }
-    }
-
-    private void FixedUpdate()
-    {
-        if (active)
-        {
-            for (int i = targetsInTrigger.Count - 1; i >= 0; i--)
+            ship.OnStartupEnd.RemoveListener(EnableRadar);
+            ship.OnShutdownStart.RemoveListener(DisableRadar);
+            for (int i = 0; i < configInits.Length; i++)
             {
-                uint targetID = targetsInTrigger[i];
-                if (targetID == ship.radarTarget.GetID())
-                {
-                    targetsInTrigger.RemoveAt(i);
-                    continue;
-                }
-                if (!RadarRegistry.TryGet(targetID, out var radarTarget))
-                {
-                    targetsInTrigger.RemoveAt(i);
-                    continue;
-                }
-                Vector3d relativePosition = radarTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition;
-                double sqrDistance = relativePosition.sqrMagnitude;
+                // Not good to remove all listeners, but we can probably assume radar being destroyed means the radar config UI gets destroyed too
+                configInits[i].detectToggle.onValueChanged.RemoveAllListeners();
 
-                if (sqrDistance > (radarRanges[rangeIndex] * radarRanges[rangeIndex])
-                || (radarTarget.stealthDistance >= 0f && sqrDistance > radarTarget.stealthDistance * radarTarget.stealthDistance))
-                    continue;
+                configInits[i].alertToggle.onValueChanged.RemoveAllListeners();
 
-                if (detectConfigs.TryGetValue(radarTarget.tag, out var detectConfig) && !detectConfig.on)
-                    continue;
-
-                double distance = Math.Sqrt(sqrDistance);
-                Vector3d direction = relativePosition / distance;
-
-                if (hologramActive)
-                {
-                    // Display on radar hologram
-                    Vector3 offset = direction.ToVector3() * (float)(distance / radarRanges[rangeIndex] * 0.5);
-                    offset.x *= hologramScale.x;
-                    offset.y *= hologramScale.y;
-                    offset.z *= hologramScale.z;
-                    Vector3 iconScale = 2 * iconRadii[rangeIndex] * Vector3.one;
-
-                    if (radarTarget.radarIcon != null)
-                    {
-                        radarTarget.radarIcon.UpdateIcon(
-                            iconParent.transform.position + offset, 
-                            radarTarget.transform.rotation, 
-                            radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, "F2"));
-                        if (radarTarget.CompareTag("CelestialBody"))
-                        {
-                            Vector3d realScale = radarTarget.scaledRigidbody.scaledTransform.realScale;
-                            iconScale = new Vector3(
-                                (float)(realScale.x / radarRanges[rangeIndex] * hologramScale.x),
-                                (float)(realScale.y / radarRanges[rangeIndex] * hologramScale.y),
-                                (float)(realScale.z / radarRanges[rangeIndex] * hologramScale.z)
-                            );
-                        }
-                        radarTarget.radarIcon.model.localScale = iconScale;
-                    }
-                    else
-                    {
-                        RadarIcon newIcon;
-                        Color iconColor;
-                        Color iconEmission;
-                        if (alertConfigs.TryGetValue(radarTarget.tag, out var alertConfig) && alertConfig.on)
-                        {
-                            if (radarTarget.alertWhenTargeting)
-                            {
-                                alertSystem.NewContact();
-                            }
-                            else
-                            {
-                                alertSystem.NewSpecialContact();
-                            }
-                        }
-                        switch (radarTarget.tag)
-                        {
-                            case "Ship":
-                                newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                if (radarTarget.team == ship.radarTarget.team)
-                                {
-                                    iconColor = friendlyShipColor;
-                                    iconEmission = friendlyShipEmission;
-                                }
-                                else
-                                {
-                                    iconColor = hostileShipColor;
-                                    iconEmission = hostileShipEmission;
-                                }
-                                break;
-                            case "Projectile":
-                                newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                if (radarTarget.team == ship.radarTarget.team)
-                                {
-                                    iconColor = friendlyProjectileColor;
-                                    iconEmission = friendlyProjectileEmission;
-                                }
-                                else
-                                {
-                                    iconColor = hostileProjectileColor;
-                                    iconEmission = hostileProjectileEmission;
-                                }
-                                break;
-                            case "Torpedo":
-                                newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                if (radarTarget.team == ship.radarTarget.team)
-                                {
-                                    iconColor = friendlyProjectileColor;
-                                    iconEmission = friendlyProjectileEmission;
-                                }
-                                else
-                                {
-                                    iconColor = hostileProjectileColor;
-                                    iconEmission = hostileProjectileEmission;
-                                }
-                                break;
-                            case "CelestialBody":
-                                newIcon = Instantiate(realScaleIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                iconColor = celestialBodyColor;
-                                iconEmission = celestialBodyEmission;
-                                Vector3d realScale = radarTarget.scaledRigidbody.scaledTransform.realScale;
-                                iconScale = new Vector3(
-                                    (float)(realScale.x / radarRanges[rangeIndex] * hologramScale.x),
-                                    (float)(realScale.y / radarRanges[rangeIndex] * hologramScale.y),
-                                    (float)(realScale.z / radarRanges[rangeIndex] * hologramScale.z)
-                                );
-                                break;
-                            default:
-                                if (radarTarget.alertWhenTargeting)
-                                    alertSystem.NewContact();
-                                else
-                                    alertSystem.NewSpecialContact();
-                                newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                                iconColor = Color.white;
-                                iconEmission = Color.white;
-                                break;
-                        }
-                        newIcon.model.localScale = iconScale;
-
-                        newIcon.Init(
-                            iconParent.transform.position + offset, 
-                            radarTarget.transform.rotation, 
-                            iconColor, 
-                            iconEmission, 
-                            radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, "F2"),
-                            false
-                        );
-                        radarTarget.radarIcon = newIcon;
-                    }
-                }
-
-                if (HUDSystem.Instance.radarHudActive)
-                {
-                    Vector3d relativeAcceleration = radarTarget.acceleration - ship.radarTarget.acceleration;
-                    Vector3d relativeVelocity = radarTarget.scaledRigidbody.velocity - ship.scaledRigidbody.velocity;
-                    // Negative closing => moving away, Positive closing => coming closer
-                    double closingVelocity = -Vector3d.Dot(relativeVelocity, direction);
-                    double closingAcceleration = -Vector3d.Dot(relativeAcceleration, direction);
-
-                    double arrivalTime = SpaceMath.CalculateArrivalTime(distance, closingVelocity, closingAcceleration);
-
-                    string ETA = arrivalTime < 0.0 ? "Never" : SpaceMath.SecondsToFormattedString(arrivalTime, "F2");
-                    string details = "<b>" + radarTarget.name + "</b>" +
-                        "\nDST " + SpaceMath.DistanceToFormattedString(distance, "F2") +
-                        "\nSPD " + SpaceMath.SpeedToFormattedString((float)radarTarget.scaledRigidbody.velocity.magnitude, "F2") +
-                        "\nCLS " + SpaceMath.SpeedToFormattedString(closingVelocity, "F2") +
-                        "\nETA " + ETA;
-
-                    double predictTime = arrivalTime < 0.0 ? distance * 0.0025f : arrivalTime;
-                    Vector3d predictedPosition = radarTarget.scaledRigidbody.scaledTransform.realPosition + radarTarget.scaledRigidbody.velocity * predictTime + 0.5 * predictTime * predictTime * radarTarget.acceleration;
-
-                    if (!HUDSystem.Instance.UpdateObject(radarTarget, details, predictedPosition))
-                    {
-                        HUDObject newHUDObject = HUDSystem.Instance.CreateObject(radarTarget, details, predictedPosition);
-                        switch (radarTarget.transform.tag)
-                        {
-                            case "Ship":
-                                if (radarTarget.team == ship.radarTarget.team)
-                                {
-                                    newHUDObject.SetColor(friendlyShipColor);
-                                }
-                                else
-                                {
-                                    newHUDObject.SetColor(hostileShipColor);
-                                }
-                                break;
-                            case "Projectile":
-                                if (radarTarget.team == ship.radarTarget.team)
-                                {
-                                    newHUDObject.SetColor(friendlyProjectileColor);
-                                }
-                                else
-                                {
-                                    newHUDObject.SetColor(hostileProjectileColor);
-                                }
-                                break;
-                            case "Torpedo":
-                                if (radarTarget.team == ship.radarTarget.team)
-                                {
-                                    newHUDObject.SetColor(friendlyProjectileColor);
-                                }
-                                else
-                                {
-                                    newHUDObject.SetColor(hostileProjectileColor);
-                                }
-                                break;
-                            case "CelestialBody":
-                                newHUDObject.SetColor(celestialBodyColor);
-                                break;
-                            default:
-                                newHUDObject.SetColor(Color.white);
-                                break;
-                        }
-                    }
-                }
+                configInits[i].killToggle.onValueChanged.RemoveAllListeners();
+                configInits[i].killRadiusInput.onEndEdit.RemoveAllListeners();
             }
         }
     }
 
-    private void OnShipShutdown()
+    private void EnableRadar()
     {
-        hologramActive = false;
-        iconParent.SetActive(false);
-        active = false;
+        IsEnabled = true;
+        if(radarUI != null)
+            radarUI.SetActive(true);
+        activeRadarTrigger.enabled = true;
+        SetActiveEmissionLevel(emitLevel);
     }
 
-    public void ToggleScale(int state)
+    private void DisableRadar()
     {
-        rangeIndex = state;
-        if (ship.isShutdown)
+        IsEnabled = false;
+        if (radarUI != null)
+            radarUI.SetActive(false);
+        activeRadarTrigger.enabled = false;
+        foreach(uint targetId in validTargets)
         {
-            hologramActive = false;
-            iconParent.SetActive(false);
-            active = false;
-            return;
+            if (!RadarRegistry.TryGet(targetId, out var radarTarget))
+                continue;
+            radarTarget.radarIndex = -1;
+            radarTarget.collidersInActiveRadar = 0;
+            radarTarget.passivelyDetected = false;
+            radarTarget.activelyDetected = false;
         }
-        switch (state)
-        {
-            case 0:
-                hologramActive = false;
-                iconParent.SetActive(false);
-                active = false;
-                break;
-            case 1:
-                hologramActive = true;
-                iconParent.SetActive(true);
-                active = true;
-                break;
-        }
-        triggerCollider.radius = radarRanges[rangeIndex];
-        ship.radarTarget.radarIcon.model.localScale = 2 * iconRadii[rangeIndex] * Vector3.one;
+        validTargets.Clear();
     }
 
-    private void OnTriggerEnter(Collider other)
+    public void SetActiveEmissionLevel(int state)
     {
-        if (other.attachedRigidbody == null)
+        if (!IsOwnerOrOffline)
             return;
-        if (other.attachedRigidbody.TryGetComponent(out RadarTarget otherRadarTarget) && !targetsInTrigger.Contains(otherRadarTarget.GetID()))
-        {
-            targetsInTrigger.Add(otherRadarTarget.GetID());
-        }
+        emitLevel = state;
+        activeRadarTrigger.SetRadius(radarRanges[emitLevel]);
+        if (radarUI != null)
+            radarUI.SetRange();
     }
 
-    private void OnTriggerExit(Collider other)
+    private void TryContactAlert(RadarTarget radarTarget)
     {
-        if (other.attachedRigidbody == null)
-            return;
-        if (other.attachedRigidbody.TryGetComponent(out RadarTarget otherRadarTarget))
+        if (alertSystem != null && radarConfigs.TryGetValue(radarTarget.tag, out var config) && config.alertOn)
         {
-            targetsInTrigger.Remove(otherRadarTarget.GetID());
+            if (radarTarget.alertWhenTargeting)
+            {
+                alertSystem.NewContact();
+            }
+            else
+            {
+                alertSystem.NewSpecialContact();
+            }
         }
     }
 
-    public void SetDetectOn(string tag)
+    private void AddValidTarget(RadarTarget radarTarget)
     {
-        if (!detectConfigs.TryGetValue(tag, out var config))
+        if (radarTarget.GetID() == ship.attachedRadarTarget.GetID() || radarTarget.radarIndex >= 0)
             return;
-        config.on = true;
-        detectConfigs[tag] = config;
+        radarTarget.radarIndex = validTargets.Count;
+        validTargets.Add(radarTarget.GetID());
     }
 
-    public void SetDetectOff(string tag)
+    private void SwapRemoveValidTargetAt(int index)
     {
-        if (!detectConfigs.TryGetValue(tag, out var config))
-            return;
-        config.on = false;
-        detectConfigs[tag] = config;
+        // Swap item at index with item and end of list then pop the list for fast removal
+        int lastIndex = validTargets.Count - 1;
+        if (index != lastIndex)
+        {
+            uint lastId = validTargets[lastIndex];
+            validTargets[index] = lastId;
+            
+            if (RadarRegistry.TryGet(lastId, out var lastRadarTarget))
+            {
+                lastRadarTarget.radarIndex = index;
+            }
+            else
+            {
+                Debug.LogWarning($"[Radar] Could not find RadarTarget associated with ID: {lastId}.");
+            }
+        }
+        validTargets.RemoveAt(lastIndex);
     }
 
-    public void SetDetectRadius(string tag, double radius)
+    private void RemoveValidTarget(RadarTarget radarTarget)
     {
-        if (!detectConfigs.TryGetValue(tag, out var config))
+        int index = radarTarget.radarIndex;
+        if (index < 0 || index >= validTargets.Count)
+        {
+            Debug.LogWarning(
+                $"[Radar] Invalid radarIndex {index} for " +
+                $"{radarTarget.name}. Searching validTargets for removal. List count: {validTargets.Count}");
+            if (!validTargets.Remove(radarTarget.GetID()))
+                Debug.LogWarning($"[Radar] Failed to remove {radarTarget.name} with radar ID: {radarTarget.GetID()}.");
+            radarTarget.radarIndex = -1;
+            radarTarget.passivelyDetected = false;
+            radarTarget.activelyDetected = false;
+            radarTarget.collidersInActiveRadar = 0;
             return;
-        config.radius = radius;
-        detectConfigs[tag] = config;
+        }
+        SwapRemoveValidTargetAt(index);
+        radarTarget.radarIndex = -1;
+        radarTarget.passivelyDetected = false;
+        radarTarget.activelyDetected = false;
+        radarTarget.collidersInActiveRadar = 0;
     }
 
-    public void SetAlertOn(string tag)
+    public void AddPassiveTarget(RadarTarget radarTarget)
     {
-        if (!alertConfigs.TryGetValue(tag, out var config))
-            return;
-        config.on = true;
-        alertConfigs[tag] = config;
+        Debug.Log($"[Radar] Adding {radarTarget.name} as passively detected target.");
+        if (!radarTarget.passivelyDetected)
+        {
+            radarTarget.passivelyDetected = true;
+            TryContactAlert(radarTarget);
+        }
+        AddValidTarget(radarTarget);
     }
 
-    public void SetAlertOff(string tag)
+    public void RemovePassiveTarget(RadarTarget radarTarget)
     {
-        if (!alertConfigs.TryGetValue(tag, out var config))
+        Debug.Log($"[Radar] Removing {radarTarget.name} as passively detected target.");
+        radarTarget.passivelyDetected = false;
+        if (radarTarget.collidersInActiveRadar > 0)
+            return; // Still being actively detected, dont remove it
+        RemoveValidTarget(radarTarget);
+    }
+
+    [TargetRpc]
+    private void AddPassiveTargetRpc(NetworkConnection conn, int objectId)
+    {
+        if (!ClientManager.Objects.Spawned.TryGetValue(objectId, out var networkObject))
             return;
-        config.on = false;
-        alertConfigs[tag] = config;
+        if (!networkObject.TryGetComponent<RadarTarget>(out var radarTarget))
+            return;
+        AddPassiveTarget(radarTarget);
+    }
+
+    [TargetRpc]
+    private void RemovePassiveTargetRpc(NetworkConnection conn, int objectId)
+    {
+        if (!ClientManager.Objects.Spawned.TryGetValue(objectId, out var networkObject))
+            return;
+        if (!networkObject.TryGetComponent<RadarTarget>(out var radarTarget))
+            return;
+        RemovePassiveTarget(radarTarget);
+    }
+
+    public void StartPing(int sourceObjectId)
+    {
+        AddPassiveTargetRpc(Owner, sourceObjectId);
+    }
+
+    public void StopPing(int sourceObjectId)
+    {
+        RemovePassiveTargetRpc(Owner, sourceObjectId);
+    }
+
+    private void OnScaledTriggerEnter(ScaledCollider source, ScaledCollider other)
+    {
+        if (!IsOwnerOrOffline || source.id != activeRadarTrigger.id)
+            return;
+        if (!other.scaledRigidbody.TryGetComponent(out RadarTarget otherRadarTarget))
+            return;
+
+        otherRadarTarget.collidersInActiveRadar++;
+
+        AddValidTarget(otherRadarTarget);
+
+        // Add to the other radar's passive list
+        if (otherRadarTarget.attachedRadar != null)
+            otherRadarTarget.attachedRadar.StartPing(NetworkObject.ObjectId);
+    }
+
+    private void OnScaledTriggerExit(ScaledCollider source, ScaledCollider other)
+    {
+        if (!IsOwnerOrOffline || source.id != activeRadarTrigger.id)
+            return;
+        if (!other.scaledRigidbody.TryGetComponent(out RadarTarget otherRadarTarget))
+            return;
+        
+        otherRadarTarget.collidersInActiveRadar--;
+        if (otherRadarTarget.collidersInActiveRadar > 0)
+            return;
+        otherRadarTarget.collidersInActiveRadar = 0;
+        
+        RemoveValidTarget(otherRadarTarget);
+
+        // Remove from the other radar's passive detections
+        if (otherRadarTarget.attachedRadar != null)
+            otherRadarTarget.attachedRadar.StopPing(NetworkObject.ObjectId);
+    }
+
+    public bool IsDetectOn(string tag)
+    {
+        if (!radarConfigs.TryGetValue(tag, out var config))
+            return false;
+        return config.detectOn;
+    }
+
+    private void ToggleDetect(string tag, bool value)
+    {
+        if (!radarConfigs.TryGetValue(tag, out var config))
+            return;
+        config.detectOn = value;
+        Transform frontElement = config.detectToggle.transform.GetChild(2);
+        frontElement.GetComponent<Image>().color = value ? onColor : offColor;
+        frontElement.GetChild(0).GetComponent<TextMeshProUGUI>().text = value ? "ON" : "OFF";
+        radarConfigs[tag] = config;
+
+        config.alertToggle.gameObject.SetActive(value);
+        config.killToggle.gameObject.SetActive(value);
+        config.killRadiusInput.gameObject.SetActive(value && config.killOn);
+    }
+
+    public bool IsAlertOn(string tag)
+    {
+        if (!radarConfigs.TryGetValue(tag, out var config))
+            return false;
+        return config.alertOn;
+    }
+
+    private void ToggleAlert(string tag, bool value)
+    {
+        if (!radarConfigs.TryGetValue(tag, out var config))
+            return;
+        config.alertOn = value;
+        Transform frontElement = config.alertToggle.transform.GetChild(2);
+        frontElement.GetComponent<Image>().color = value ? onColor : offColor;
+        frontElement.GetChild(0).GetComponent<TextMeshProUGUI>().text = value ? "ON" : "OFF";
+        radarConfigs[tag] = config;
+    }
+
+    public bool IsKillOn(string tag)
+    {
+        if (!radarConfigs.TryGetValue(tag, out var config))
+            return false;
+        return config.killOn;
+    }
+
+    private void ToggleKill(string tag, bool value)
+    {
+        if (!radarConfigs.TryGetValue(tag, out var config))
+            return;
+        config.killOn = value;
+        Transform frontElement = config.killToggle.transform.GetChild(2);
+        frontElement.GetComponent<Image>().color = value ? onColor : offColor;
+        frontElement.GetChild(0).GetComponent<TextMeshProUGUI>().text = value ? "ON" : "OFF";
+        radarConfigs[tag] = config;
+        config.killRadiusInput.gameObject.SetActive(value);
+    }
+
+    public double GetKillRadius(string tag, double defaultValue = -1.0)
+    {
+        if (!radarConfigs.TryGetValue(tag, out var config))
+            return defaultValue;
+        return config.killRadius;
+    }
+
+    public void SetKillRadius(string tag, double radius)
+    {
+        if (!radarConfigs.TryGetValue(tag, out var config))
+            return;
+        config.killRadius = radius;
+        radarConfigs[tag] = config;
     }
 
     public float GetCurrentRange()
     {
-        return radarRanges[rangeIndex];
+        return radarRanges[emitLevel];
+    }
+
+    [TargetRpc]
+    private void SetRadarLockTargetRpc(NetworkConnection conn, int amount)
+    {
+        this.radarLocks += amount;
+        OnRadarLockChange?.Invoke();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void TrySendRadarLockServerRpc(NetworkConnection target, int amount)
+    {
+        // TODO: Validate request
+        SetRadarLockTargetRpc(target, amount);
+    }
+
+    public void IncrementRadarLock(int amount)
+    {
+        radarLocks += amount;
+        if (IsOwnerOrOffline)
+        {
+            OnRadarLockChange?.Invoke();
+        }
+        else
+        {
+            TrySendRadarLockServerRpc(Owner, amount);
+        }
+    }
+
+    [TargetRpc]
+    private void SetMissileLockTargetRpc(NetworkConnection conn, int amount)
+    {
+        this.missileLocks += amount;
+        OnMissileLockChange?.Invoke();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void TrySendMissileLockServerRpc(NetworkConnection target, int amount)
+    {
+        // TODO: Validate request
+        SetMissileLockTargetRpc(target, amount);
+    }
+
+    public void IncrementMissileLock(int amount)
+    {
+        missileLocks += amount;
+        if (IsOwnerOrOffline)
+        {
+            OnMissileLockChange?.Invoke();
+        }
+        else
+        {
+            TrySendMissileLockServerRpc(Owner, amount);
+        }
+    }
+
+    private bool CanDetectTarget(RadarTarget radarTarget)
+    {
+        if (radarTarget.passivelyDetected)
+            return true;
+        if (!IsActive || radarTarget.collidersInActiveRadar <= 0)
+            return false;
+        Vector3d relativePosition = radarTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition;
+        double sqrDistance = relativePosition.sqrMagnitude;
+
+        double maxRange = radarRanges[emitLevel];
+        double minRadiusAtMaxRange = minDetectRadii[emitLevel];
+
+        // Inverse square law falloff
+        double minimumDetectableRadius = minRadiusAtMaxRange * sqrDistance / (maxRange * maxRange);
+        double effectiveRadius = radarTarget.GetEffectiveRadarRadius();
+        if (effectiveRadius < minimumDetectableRadius)
+        {
+            radarTarget.activelyDetected = false;
+            return false;
+        }
+        if (!radarTarget.activelyDetected)
+        {
+            radarTarget.activelyDetected = true;
+            TryContactAlert(radarTarget);
+        }
+        return true;
+    }
+
+    public IEnumerable<RadarTarget> GetAllDetectedTargets()
+    {
+        for (int i = validTargets.Count - 1; i >= 0; i--)
+        {
+            uint targetId = validTargets[i];
+            if (!RadarRegistry.TryGet(targetId, out var radarTarget))
+            {
+                SwapRemoveValidTargetAt(i);
+                continue;
+            }
+            if (radarConfigs.TryGetValue(radarTarget.tag, out var config) && !config.detectOn)
+                continue;
+
+            if (!CanDetectTarget(radarTarget))
+                continue;
+            yield return radarTarget;
+        }
     }
 }

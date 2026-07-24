@@ -71,9 +71,9 @@ public class ConditionalHidePropertyDrawer : PropertyDrawer
         switch (sourcePropertyValue.propertyType)
         {
             case SerializedPropertyType.Boolean:
-                return sourcePropertyValue.boolValue;
+                return sourcePropertyValue.boolValue ^ condHAtt.not;
             case SerializedPropertyType.Enum:
-                return sourcePropertyValue.enumValueIndex == condHAtt.enumIndex;
+                return (sourcePropertyValue.enumValueIndex == condHAtt.enumIndex) ^ condHAtt.not;
             default:
                 Debug.LogError("Data type of the property used for conditional hiding [" + sourcePropertyValue.propertyType + "] is currently not supported");
                 return true;

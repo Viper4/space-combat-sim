@@ -5,6 +5,7 @@ using UnityEngine;
 
 public class HGrid
 {
+    [Serializable]
     public struct GridCell : IEquatable<GridCell>
     {
         public int level;

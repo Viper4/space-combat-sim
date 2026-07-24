@@ -86,7 +86,6 @@ public class ScaledTransform : MonoBehaviour
         }
 
         SetTrackedComponentsActive(visible);
-        UpdateRealRadius();
     }
 
     private void OnEnable()
@@ -258,9 +257,9 @@ public class ScaledTransform : MonoBehaviour
 
         if (!visible)
         {
+            SetTrackedComponentsActive(true);
             if (ScaledSpaceVisuals.Instance != null)
                 ScaledSpaceVisuals.Instance.UpdateScaleFactors();
-            SetTrackedComponentsActive(true);
         }
     }
 
@@ -381,7 +380,7 @@ public class ScaledTransform : MonoBehaviour
             Bounds combinedBounds = new Bounds();
             for(int i = 0; i < trackedRenderers.Length; i++)
             {
-                if (trackedRenderers[i] == null)
+                if (trackedRenderers[i] == null || !trackedRenderers[i].enabled)
                     continue;
                 
                 // Update realRadius

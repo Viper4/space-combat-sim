@@ -1,18 +1,18 @@
 using System;
 using System.Collections;
-using FishNet;
 using FishNet.Object;
 using SpaceStuff;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using Random = UnityEngine.Random;
 
 [RequireComponent(typeof(ScaledRigidbody), typeof(RadarTarget))]
 public class Ship : NetworkBehaviour
 {
     [Header("Ship")]
     public ScaledRigidbody scaledRigidbody;
-    public RadarTarget radarTarget;
+    public RadarTarget attachedRadarTarget;
     public StatSystem statSystem;
     public Shields shields;
     [SerializeField] private AlertSystem alertSystem;
@@ -24,11 +24,44 @@ public class Ship : NetworkBehaviour
     [SerializeField, Tooltip("Collisions at the front of the ship multiply damage by this.")] private float minRamAttenuation = 0.5f;
     [SerializeField, Tooltip("Collisions at the back of the ship multiply damage by this.")] private float maxRamAttenuation = 1.0f;
     private TargetingSystem targetingSystem;
-    public bool isShutdown;
-    public UnityEvent OnStartup;
-    public UnityEvent OnShutdown;
 
-    [Header("HUD stuff")]
+    [Header("Startup")]
+    [SerializeField] private AudioClip batteryStartClip;
+    [SerializeField] private GameObject batteryOnIndicator;
+    [SerializeField] private GameObject batteryOffIndicator;
+    [SerializeField] private AudioClip beepClip;
+    [SerializeField] private AudioClip APUStartClip;
+    [SerializeField] private AudioClip shutdownClip;
+    [SerializeField] private AudioClip engineOnClip;
+    [SerializeField] private AudioClip engineStartClip;
+    [SerializeField] private Vector2 APUOnTimeRange;
+    [SerializeField, Tooltip("Radius to add to this RadarTarget's passive emission while battery is on.")] private float batteryOnEmission = 50f;
+    [SerializeField, Tooltip("Radius to add to this RadarTarget's passive emission while APU is started.")] private float APUStartedEmission = 500f;
+    [SerializeField, Tooltip("Radius to add to this RadarTarget's passive emission while engine is started and in cruise.")] private float engineCruiseEmission = 750f;
+    [SerializeField, Tooltip("Radius to add to this RadarTarget's passive emission while engine is started and in high-g.")] private float engineHighGEmission = 1500f;
+    [SerializeField, Tooltip("Radius to add to this RadarTarget's passive emission while shields are active.")] private float shieldsEmission = 2000f;
+
+    [HideInInspector] public bool isStarted = false;
+    private bool isBatteryOn;
+    private Coroutine batteryStartupRoutine;
+    private bool isAPUOn;
+    private Coroutine APUOnRoutine;
+    private Coroutine APUStartupRoutine;
+    private Coroutine APUShutdownRoutine;
+    private bool isEngineOn;
+    private bool engineStarted;
+    private Coroutine engineOnRoutine;
+    private Coroutine engineStartupRoutine;
+    public UnityEvent OnAPUOn;
+    public UnityEvent OnAPUOff;
+    public UnityEvent OnStartupStart;
+    public UnityEvent OnStartupEnd;
+    public UnityEvent OnShutdownStart;
+    public UnityEvent OnShutdownEnd;
+    public UnityEvent OnEngineStart;
+    public UnityEvent OnEngineStop;
+
+    [Header("HUD/UI")]
     public GameObject hologramPrefab;
     [SerializeField] private Transform velocityDirectionPivot;
     [SerializeField] private TextMeshProUGUI speedText;
@@ -36,14 +69,10 @@ public class Ship : NetworkBehaviour
     [Header("Visual/Audio effects")]
     [SerializeField] private Animator effectsAnimator;
     [SerializeField] private AudioSource startAudioSource;
-    [SerializeField] private AudioClip startupClip;
-    [SerializeField] private AudioClip shutdownClip;
     [SerializeField] private AudioSource[] ambientAudioSources;
     [SerializeField] private float[] minAmbientVolumes;
     [SerializeField] private float[] maxAmbientVolumes;
     [SerializeField] private TextMeshProUGUI[] startupTexts;
-    private bool startingUp;
-    private bool shuttingDown;
 
     [SerializeField] private InertialEffects inertialEffects;
     [SerializeField] private AudioSource thrusterAudioSource;
@@ -56,17 +85,17 @@ public class Ship : NetworkBehaviour
     [SerializeField] private AudioClip launchEngineClip;
 
     [Header("Ship controls")]
-    [SerializeField] private float engineCruiseForce = 50f;
-    [SerializeField] private float engineCombatForce = 50f;
-    [SerializeField] private float thrusterCruiseForce = 10f;
-    [SerializeField] private float thrusterCombatForce = 10f;
-    [SerializeField, Tooltip("Thruster distance from ship's x axis (Pitch)")] private float thrusterRadiusX = 5f;
-    [SerializeField, Tooltip("Thruster distance from ship's y axis (Yaw)")] private float thrusterRadiusY = 5f;
-    [SerializeField, Tooltip("Thruster distance from ship's z axis (Roll)")] private float thrusterRadiusZ = 1f;
+    [SerializeField] private float engineCruiseForce = 980000f;
+    [SerializeField] private float engineHighGForce = 3675000f;
+    [SerializeField] private float thrusterCruiseForce = 245000f;
+    [SerializeField] private float thrusterHighGForce = 980000f;
+    [SerializeField, Tooltip("Thruster distance from ship's x axis (Pitch)")] private float thrusterRadiusX = 6f;
+    [SerializeField, Tooltip("Thruster distance from ship's y axis (Yaw)")] private float thrusterRadiusY = 6f;
+    [SerializeField, Tooltip("Thruster distance from ship's z axis (Roll)")] private float thrusterRadiusZ = 1.5f;
     private Vector3 thrusterCruiseTorque;
     private Vector3 thrusterCombatTorque;
     private bool rollMode = true;
-    private bool combatMode = false;
+    private bool highGMode = false;
 
     private bool autoStabilizeRot = false;
     private bool autoStabilizePos = false;
@@ -117,10 +146,10 @@ public class Ship : NetworkBehaviour
     private void Awake()
     {
         scaledRigidbody = GetComponent<ScaledRigidbody>();
-        radarTarget = GetComponent<RadarTarget>();
+        attachedRadarTarget = GetComponent<RadarTarget>();
 
         thrusterCruiseTorque = new Vector3(thrusterCruiseForce * thrusterRadiusX, thrusterCruiseForce * thrusterRadiusY, thrusterCruiseForce * thrusterRadiusZ);
-        thrusterCombatTorque = new Vector3(thrusterCombatForce * thrusterRadiusX, thrusterCombatForce * thrusterRadiusY, thrusterCombatForce * thrusterRadiusZ);
+        thrusterCombatTorque = new Vector3(thrusterHighGForce * thrusterRadiusX, thrusterHighGForce * thrusterRadiusY, thrusterHighGForce * thrusterRadiusZ);
 
         xRotatePID = new PIDController(autoP, autoI, autoD);
         yRotatePID = new PIDController(autoP, autoI, autoD);
@@ -148,9 +177,9 @@ public class Ship : NetworkBehaviour
         if (PlayerInfoRelay.Instance != null)
             PlayerInfoRelay.Instance.OnPlayerInfoChanged += UpdateShipName;
 
-        if (InstanceFinder.IsOffline)
+        if (IsOffline)
         {
-            Startup();
+            OnShutdownEnd?.Invoke(); // Update UI elements active state
         }
     }
 
@@ -168,7 +197,7 @@ public class Ship : NetworkBehaviour
         UpdateShipName();
         if (IsOwner)
         {
-            Startup();
+            OnShutdownEnd?.Invoke(); // Update UI elements active state
         }
     }
 
@@ -229,31 +258,8 @@ public class Ship : NetworkBehaviour
         return Mathf.Lerp(0.0f, maxFuelConsumption, t);
     }
 
-    private void FixedUpdate()
+    private void ApplyForceAndTorque()
     {
-        if (IsOwnerOrOffline)
-        {
-            ReadLocalInput();
-            if (!IsOffline)
-                SendInputToServer();
-        }
-
-        if (!IsOwnerOrOffline && !IsServerInitialized)
-            return;
-
-        if (isShutdown)
-        {
-            if (IsOwnerOrOffline)
-            {
-                UpdateOwnerEffects(Vector3d.zero, Vector3d.zero, Vector3d.zero);
-            }
-            else
-            {
-                UpdateServerEffects(Vector3d.zero);
-            }
-            return;
-        }
-
         // Calculate local force to apply
         Vector3 desiredMove = Vector3.ClampMagnitude(currentInput.move, 1f); // Prevent from moving faster than max force allows
         moving = desiredMove.x != 0 || desiredMove.y != 0 || desiredMove.z != 0;
@@ -314,12 +320,12 @@ public class Ship : NetworkBehaviour
 
         // Engine can only move ship forward so use engine for +z and thrusters for -z
         Vector3d finalForce;
-        if (combatMode)
+        if (highGMode)
         {
             finalForce = new Vector3d(
-                desiredMove.x * thrusterCombatForce,
-                desiredMove.y * thrusterCombatForce,
-                desiredMove.z > 0 ? desiredMove.z * engineCombatForce : desiredMove.z * thrusterCombatForce
+                desiredMove.x * thrusterHighGForce,
+                desiredMove.y * thrusterHighGForce,
+                desiredMove.z > 0 ? desiredMove.z * engineHighGForce : desiredMove.z * thrusterHighGForce
             );
         }
         else
@@ -334,9 +340,9 @@ public class Ship : NetworkBehaviour
         if (finalForce.sqrMagnitude > 0.0001)
             scaledRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
 
-        fuel -= (CalculateFuelBurn(finalForce.x, engineCombatForce) 
-                + CalculateFuelBurn(finalForce.y, engineCombatForce) 
-                + CalculateFuelBurn(finalForce.z, engineCombatForce)) * Time.fixedDeltaTime;
+        fuel -= (CalculateFuelBurn(finalForce.x, engineHighGForce) 
+                + CalculateFuelBurn(finalForce.y, engineHighGForce) 
+                + CalculateFuelBurn(finalForce.z, engineHighGForce)) * Time.fixedDeltaTime;
 
         // Calculate local torque to apply
         Vector3d desiredRotate;
@@ -368,7 +374,7 @@ public class Ship : NetworkBehaviour
         }
 
         Vector3d finalTorque;
-        if (combatMode)
+        if (highGMode)
         {
             finalTorque = new Vector3d(
                 desiredRotate.x * thrusterCombatTorque.x,
@@ -392,15 +398,6 @@ public class Ship : NetworkBehaviour
         fuel -= (CalculateFuelBurn(finalTorque.x, thrusterCombatTorque.x) 
                 + CalculateFuelBurn(finalTorque.y, thrusterCombatTorque.y) 
                 + CalculateFuelBurn(finalTorque.z, thrusterCombatTorque.z)) * Time.fixedDeltaTime;
-        
-        // Idling fuel consumption
-        fuel -= idleFuelConsumption * Time.fixedDeltaTime;
-        if (fuel <= 0f)
-        {
-            fuel = 0f;
-            Shutdown(true);
-        }
-        scaledRigidbody.mass = baseMass + fuel;
 
         if (IsOwnerOrOffline)
         {
@@ -410,6 +407,57 @@ public class Ship : NetworkBehaviour
         {
             UpdateServerEffects(finalForce);
         }
+    }
+
+    private void FixedUpdate()
+    {
+        if (IsOwnerOrOffline)
+        {
+            ReadLocalInput();
+            if (!IsOffline)
+                SendInputToServer();
+        }
+
+        if (!IsOwnerOrOffline && !IsServerInitialized)
+            return;
+
+        if (!isStarted)
+        {
+            if (IsOwnerOrOffline)
+            {
+                UpdateOwnerEffects(Vector3d.zero, Vector3d.zero, Vector3d.zero);
+            }
+            else
+            {
+                UpdateServerEffects(Vector3d.zero);
+            }
+            return;
+        }
+
+        if (engineStarted)
+        {
+            ApplyForceAndTorque();
+            fuel -= idleFuelConsumption * Time.fixedDeltaTime * 2f;
+        }
+        else
+        {
+            fuel -= idleFuelConsumption * Time.fixedDeltaTime;
+            if (IsOwnerOrOffline)
+            {
+                UpdateOwnerEffects(Vector3d.zero, Vector3d.zero, Vector3d.zero);
+            }
+            else
+            {
+                UpdateServerEffects(Vector3d.zero);
+            }
+        }
+        
+        if (fuel <= 0f)
+        {
+            fuel = 0f;
+            Shutdown(true);
+        }
+        scaledRigidbody.mass = baseMass + fuel;
     }
     
     [ObserversRpc(ExcludeServer = true, ExcludeOwner = true, BufferLast = true)]
@@ -435,7 +483,7 @@ public class Ship : NetworkBehaviour
         if (hasForce && finalForce.z > 0.0)
         {
             // Main engine effects
-            float t = (float)finalForce.z / engineCombatForce;
+            float t = (float)finalForce.z / engineHighGForce;
             if (!rocketTrail.activeSelf)
             {
                 rocketTrail.SetActive(true);
@@ -492,19 +540,19 @@ public class Ship : NetworkBehaviour
                     -(float)(finalForce.y / magnitude) * thrusterRadiusY,
                     -(float)(finalForce.z / magnitude) * thrusterRadiusZ
                 );
-                thrusterAudioSource.volume = (float)magnitude / thrusterCombatForce * thrusterVolumeScale;
+                thrusterAudioSource.volume = (float)magnitude / thrusterHighGForce * thrusterVolumeScale;
             }
 
             // Main engine effects
             if (usingMainEngine)
             {
-                float t = (float)finalForce.z / engineCombatForce;
+                float t = (float)finalForce.z / engineHighGForce;
                 if (!rocketTrail.activeSelf)
                 {
                     rocketTrail.SetActive(true);
                 }
                 rocketTrail.transform.localScale = t * engineTrailScale * Vector3.one;
-                engineAudioSource.clip = combatMode ? launchEngineClip : normalEngineClip;
+                engineAudioSource.clip = highGMode ? launchEngineClip : normalEngineClip;
                 engineAudioSource.volume = t * engineVolumeScale;
                 if (!engineAudioSource.isPlaying)
                     engineAudioSource.Play();
@@ -737,18 +785,20 @@ public class Ship : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void SetCombatModeServerRpc(bool combatMode)
+    private void SetHighGModeServerRpc(bool highGMode)
     {
-        this.combatMode = combatMode;
+        this.highGMode = highGMode;
+        UpdatePassiveEmission();
     }
 
-    public void ToggleCombatMode(int state)
+    public void ToggleHighGMode(int state)
     {
         if (!IsOwnerOrOffline)
             return;
-        combatMode = state == 1;
+        highGMode = state == 1;
         if (IsOwner)
-            SetCombatModeServerRpc(combatMode);
+            SetHighGModeServerRpc(highGMode);
+        UpdatePassiveEmission();
     }
 
     [ServerRpc]
@@ -756,7 +806,6 @@ public class Ship : NetworkBehaviour
     {
         this.matchTargetLinearVelocity = value;
     }
-
 
     public void ToggleMatchTargetAngularVelocity(int state)
     {
@@ -817,9 +866,215 @@ public class Ship : NetworkBehaviour
         }
     }
 
-    private IEnumerator WaitToStartup()
+    public void ToggleBattery(int state)
     {
-        startingUp = true;
+        if (!IsOwnerOrOffline)
+            return;
+        if (state == 0)
+        {
+            if (batteryStartupRoutine != null)
+            {
+                StopCoroutine(batteryStartupRoutine);
+                batteryStartupRoutine = null;
+            }
+            if (isStarted)
+            {
+                Shutdown(true);
+            }
+            SetBatteryOn(false);
+        }
+        else
+        {
+            if (batteryStartupRoutine != null)
+                return;
+            StartCoroutine(BatteryStartup());
+        }
+    }
+
+    public void ToggleAPU(int state)
+    {
+        if (!IsOwnerOrOffline)
+            return;
+        switch (state)
+        {
+            case 0:
+                if (isStarted)
+                {
+                    Shutdown(false);
+                }
+                else
+                {
+                    if (APUOnRoutine != null)
+                    {
+                        StopCoroutine(APUOnRoutine);
+                        APUOnRoutine = null;
+                    }
+                    if (APUStartupRoutine != null)
+                    {
+                        StopCoroutine(APUStartupRoutine);
+                        APUStartupRoutine = null;
+                    }
+                    isAPUOn = false;
+                    OnAPUOff?.Invoke();
+                }
+                break;
+            case 1:
+                if (!isBatteryOn || isStarted || APUStartupRoutine != null)
+                    return;
+                APUOnRoutine ??= StartCoroutine(TurnAPUOn());
+                break;
+            case 2:
+                StartAPU();
+                break;
+        }
+    }
+
+    public void ToggleEngine(int state)
+    {
+        if (!IsOwnerOrOffline)
+            return;
+        switch (state)
+        {
+            case 0:
+                if (engineStarted)
+                {
+                    ShutdownEngine();
+                }
+                else
+                {
+                    if (engineOnRoutine != null)
+                    {
+                        StopCoroutine(engineOnRoutine);
+                        engineOnRoutine = null;
+                    }
+                    if (engineStartupRoutine != null)
+                    {
+                        StopCoroutine(engineStartupRoutine);
+                        engineStartupRoutine = null;
+                    }
+                    isEngineOn = false;
+                }
+                break;
+            case 1:
+                if (engineStarted || !isStarted)
+                    return;
+                engineOnRoutine ??= StartCoroutine(EngineOnRoutine());
+                break;
+            case 2:
+                StartEngine();
+                break;
+        }
+    }
+
+    public void UpdatePassiveEmission()
+    {
+        float emissionRadius = 0f;
+        if (isBatteryOn)
+            emissionRadius += batteryOnEmission;
+        if (isStarted)
+            emissionRadius += APUStartedEmission;
+        if (engineStarted)
+            emissionRadius += highGMode ? engineHighGEmission : engineCruiseEmission;
+        if (shields.IsActive)
+            emissionRadius += shieldsEmission;
+        if (emissionRadius <= 0)
+        {
+            attachedRadarTarget.SetEmissionActive(false);
+        }
+        else
+        {
+            attachedRadarTarget.SetEmissionActive(true);
+            attachedRadarTarget.SetEmissionTriggerRadius(emissionRadius);
+        }
+    }
+
+    [ServerRpc]
+    private void UpdateBatteryServerRpc(bool value)
+    {
+        isBatteryOn = value;
+        UpdatePassiveEmission();
+    }
+
+    [ServerRpc]
+    private void UpdateAPUServerRpc(bool value)
+    {
+        isStarted = value;
+        UpdatePassiveEmission();
+    }
+
+    [ServerRpc]
+    private void UpdateEngineServerRpc(bool value)
+    {
+        engineStarted = value;
+        UpdatePassiveEmission();
+    }
+
+    private void SetBatteryOn(bool value)
+    {
+        isBatteryOn = value;
+        batteryOnIndicator.SetActive(value);
+        batteryOffIndicator.SetActive(!value);
+        UpdatePassiveEmission();
+        if (IsOwner)
+            UpdateBatteryServerRpc(value);
+    }
+
+    private void SetAPUStarted(bool value)
+    {
+        isStarted = value;
+        if (!value)
+            isAPUOn = false;
+        UpdatePassiveEmission();
+        if (IsOwner)
+            UpdateAPUServerRpc(value);
+    }
+
+    private void SetEngineStarted(bool value)
+    {
+        engineStarted = value;
+        if (!value)
+            isEngineOn = false;
+        UpdatePassiveEmission();
+        if (IsOwner)
+            UpdateEngineServerRpc(value);
+    }
+
+    private IEnumerator BatteryStartup()
+    {
+        Debug.Log($"[Ship] {name} battery starting.");
+        startAudioSource.clip = batteryStartClip;
+        startAudioSource.Play();
+        yield return new WaitWhile(() => startAudioSource.isPlaying);
+        batteryStartupRoutine = null;
+        SetBatteryOn(true);
+        Debug.Log($"[Ship] {name} battery started.");
+    }
+
+    private IEnumerator TurnAPUOn()
+    {
+        Debug.Log($"[Ship] {name} APU turning on.");
+        startAudioSource.clip = beepClip;
+        startAudioSource.Play();
+        yield return new WaitForSeconds(Random.Range(APUOnTimeRange.x, APUOnTimeRange.y));
+        startAudioSource.PlayOneShot(beepClip);
+        isAPUOn = true;
+        APUOnRoutine = null;
+        OnAPUOn?.Invoke();
+        Debug.Log($"[Ship] {name} APU on.");
+    }
+
+    private IEnumerator APUStartup()
+    {
+        yield return new WaitUntil(() => isAPUOn);
+        Debug.Log($"[Ship] {name} APU starting.");
+        OnStartupStart?.Invoke();
+        startAudioSource.clip = APUStartClip;
+        startAudioSource.Play();
+        effectsAnimator.SetTrigger("Startup");
+        for(int i = 0; i < startupTexts.Length; i++)
+        {
+            startupTexts[i].text = "INITIALIZING...";
+        }
         yield return new WaitForEndOfFrame();
         AnimatorStateInfo animatorStateInfo = effectsAnimator.GetCurrentAnimatorStateInfo(0);
         float t = animatorStateInfo.normalizedTime;
@@ -837,30 +1092,37 @@ public class Ship : NetworkBehaviour
         {
             ambientAudioSources[i].volume = maxAmbientVolumes[i];
         }
-        Debug.Log($"[Ship] {name} finished startup.");
-        isShutdown = false;
-        startingUp = false;
+        Debug.Log($"[Ship] {name} APU started.");
+        SetAPUStarted(true);
+        APUStartupRoutine = null;
+        OnStartupEnd?.Invoke();
     }
 
-    private void Startup()
+    private IEnumerator ShutdownAPURoutine(bool instant)
     {
-        if (!isShutdown || startingUp)
-            return;
-        Debug.Log($"[Ship] {name} starting up.");
-        OnStartup?.Invoke();
-        startAudioSource.clip = startupClip;
+        Debug.Log($"[Ship] {name} APU shutting down.");
+        OnShutdownStart?.Invoke();
+        startAudioSource.clip = shutdownClip;
         startAudioSource.Play();
-        effectsAnimator.SetTrigger("Startup");
+        ShutdownEngine();
+        if (instant)
+        {
+            for (int i = 0; i < ambientAudioSources.Length; i++)
+            {
+                ambientAudioSources[i].volume = 0;
+            }
+            SetAPUStarted(false);
+            APUShutdownRoutine = null;
+            OnShutdownEnd?.Invoke();
+            OnAPUOff?.Invoke();
+            Debug.Log($"[Ship] {name} APU shutdown instantly.");
+            yield break;
+        }
         for(int i = 0; i < startupTexts.Length; i++)
         {
-            startupTexts[i].text = "INITIALIZING...";
+            startupTexts[i].text = "SHUTTING DOWN...";
         }
-        StartCoroutine(WaitToStartup());
-    }
-
-    private IEnumerator WaitToShutdown()
-    {
-        shuttingDown = true;
+        effectsAnimator.SetTrigger("Shutdown");
         yield return new WaitForEndOfFrame();
         AnimatorStateInfo animatorStateInfo = effectsAnimator.GetCurrentAnimatorStateInfo(0);
         float t = animatorStateInfo.normalizedTime;
@@ -878,33 +1140,81 @@ public class Ship : NetworkBehaviour
         {
             ambientAudioSources[i].volume = 0;
         }
-        Debug.Log($"[Ship] {name} finished shutdown.");
-        isShutdown = true;
-        shuttingDown = false;
+        SetAPUStarted(false);
+        APUShutdownRoutine = null;
+        OnShutdownEnd?.Invoke();
+        OnAPUOff?.Invoke();
+        Debug.Log($"[Ship] {name} APU shutdown normally.");
     }
 
-    private void Shutdown(bool instant)
+    public void StartAPU()
     {
-        if (isShutdown || shuttingDown)
+        if (!IsOwnerOrOffline || !isBatteryOn || isStarted || APUStartupRoutine != null)
             return;
-        Debug.Log($"[Ship] {name} shutting down.");
-        OnShutdown?.Invoke();
-        startAudioSource.clip = shutdownClip;
+        APUStartupRoutine = StartCoroutine(APUStartup());
+    }
+
+    private void ResetAllCoroutines()
+    {
+        StopAllCoroutines();
+        batteryStartupRoutine = null;
+        APUOnRoutine = null;
+        APUStartupRoutine = null;
+        engineOnRoutine = null;
+        engineStartupRoutine = null;
+    }
+
+    public void Shutdown(bool instant)
+    {
+        if (!IsOwnerOrOffline || !isStarted || APUShutdownRoutine != null)
+            return;
+        ResetAllCoroutines();
+        APUShutdownRoutine = StartCoroutine(ShutdownAPURoutine(instant));
+    }
+
+    private IEnumerator EngineOnRoutine()
+    {
+        Debug.Log($"[Ship] {name} turning engine on.");
+        startAudioSource.PlayOneShot(beepClip);
+        startAudioSource.clip = engineOnClip;
         startAudioSource.Play();
-        if (instant)
-        {
-            isShutdown = true;
-            for (int i = 0; i < ambientAudioSources.Length; i++)
-            {
-                ambientAudioSources[i].volume = 0;
-            }
+        yield return new WaitWhile(() => startAudioSource.isPlaying);
+        startAudioSource.PlayOneShot(beepClip);
+        isEngineOn = true;
+        engineOnRoutine = null;
+        Debug.Log($"[Ship] {name} engine on.");
+    }
+
+    private IEnumerator EngineStartRoutine()
+    {
+        yield return new WaitUntil(() => isEngineOn);
+        Debug.Log($"[Ship] {name} starting engine.");
+        startAudioSource.clip = engineStartClip;
+        startAudioSource.Play();
+        yield return new WaitWhile(() => startAudioSource.isPlaying);
+        SetEngineStarted(true);
+        engineStartupRoutine = null;
+        OnEngineStart?.Invoke();
+        Debug.Log($"[Ship] {name} started engine.");
+    }
+
+    private void StartEngine()
+    {
+        if (!IsOwnerOrOffline || !isStarted || engineStarted || engineStartupRoutine != null)
             return;
-        }
-        effectsAnimator.SetTrigger("Shutdown");
-        for(int i = 0; i < startupTexts.Length; i++)
+        StartCoroutine(EngineStartRoutine());
+    }
+
+    private void ShutdownEngine()
+    {
+        if (!IsOwnerOrOffline || !engineStarted)
+            return;
+        if (engineStartupRoutine != null)
         {
-            startupTexts[i].text = "SHUTTING DOWN...";
+            StopCoroutine(engineStartupRoutine);
+            engineStartupRoutine = null;
         }
-        StartCoroutine(WaitToShutdown());
+        SetEngineStarted(false);
+        OnEngineStop?.Invoke();
     }
 }

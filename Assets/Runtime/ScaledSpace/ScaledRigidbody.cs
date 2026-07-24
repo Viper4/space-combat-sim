@@ -12,6 +12,8 @@ public class ScaledRigidbody : MonoBehaviour
     public uint id {get; private set;}
     public ScaledTransform scaledTransform {get; private set;}
 
+    [SerializeField, Tooltip("Always use ScaledRigidbody if true.")] private bool overrideUnity;
+
     private bool _active;
     public bool active
     {
@@ -24,7 +26,7 @@ public class ScaledRigidbody : MonoBehaviour
             if (attachedRigidbody == null)
                 attachedRigidbody = GetComponent<Rigidbody>();
 
-            if (FloatingWorldOrigin.Instance != null && FloatingWorldOrigin.Instance.scaledRigidbody == this)
+            if (overrideUnity || (FloatingWorldOrigin.Instance != null && FloatingWorldOrigin.Instance.scaledRigidbody == this))
             {
                 _active = true;
                 attachedRigidbody.isKinematic = true;
@@ -93,7 +95,15 @@ public class ScaledRigidbody : MonoBehaviour
         set
         {
             if (value.sqrMagnitude > speedLimit * speedLimit)
+            {
+                _velocity = Vector3d.ClampMagnitude(value, speedLimit);
+                if (!_active && FloatingWorldOrigin.Instance != null)
+                {
+                    Vector3 relativeVelocity = (_velocity - FloatingWorldOrigin.Instance.scaledRigidbody.velocity).ToVector3();
+                    attachedRigidbody.linearVelocity = relativeVelocity;
+                }
                 return;
+            }
 
             _velocity = value;
             if (!_active && FloatingWorldOrigin.Instance != null)
@@ -133,35 +143,35 @@ public class ScaledRigidbody : MonoBehaviour
     public bool affectedByGravity = true;
     [SerializeField] private Vector3d gravityAcceleration;
 
+    public CollisionDetectionMode collisionDetection = CollisionDetectionMode.Discrete;
+
     /// <summary>
-    /// Event fired when this RB enters collision with another RB in scaled space
+    /// Event fired when any ScaledCollider of this RB begins colliding with another RB in scaled space
     /// </summary>
     public event Action<ScaledSpacePhysics.CollisionInfo> OnScaledCollisionEnter;
     
     /// <summary>
-    /// Event fired when this RB exits collision with another RB in scaled space
+    /// Event fired when any ScaledCollider of this RB stops colliding with another RB in scaled space
     /// </summary>
-    public event Action<ScaledCollider> OnScaledCollisionExit;
+    public event Action<ScaledCollider, ScaledCollider> OnScaledCollisionExit;
 
     /// <summary>
-    /// Event fired when other RB enters this RB's trigger
+    /// Event fired when another RB enters any trigger ScaledCollider under this RB
     /// </summary>
-    public event Action<ScaledCollider> OnScaledTriggerEnter;
+    public event Action<ScaledCollider, ScaledCollider> OnScaledTriggerEnter;
     
     /// <summary>
-    /// Event fired when other RB exits this RB's trigger
+    /// Event fired when another RB exits any trigger ScaledCollider under this RB
     /// </summary>
-    public event Action<ScaledCollider> OnScaledTriggerExit;
+    public event Action<ScaledCollider, ScaledCollider> OnScaledTriggerExit;
 
     public List<ScaledCollider> scaledColliders {get; private set;}
-    public Vector3d prevPos;
 
     private void Awake()
     {
         scaledTransform = GetComponent<ScaledTransform>();
         attachedRigidbody = GetComponent<Rigidbody>();
         scaledColliders = new List<ScaledCollider>();
-        prevPos = scaledTransform.realPosition;
         id = nextId++;
 
         if (_mass < 0.0000001)
@@ -207,6 +217,12 @@ public class ScaledRigidbody : MonoBehaviour
         if (_isKinematic || ScaledSpacePhysics.Instance == null)
             return;
 
+        // Save collider positions before this frame's update to prepare for CCD checks
+        foreach (ScaledCollider scaledCollider in scaledColliders)
+        {
+            scaledCollider.prevCenterPos = scaledCollider.GetRealCenter();
+        }
+
         gravityAcceleration = Vector3d.zero;
         if (affectedByGravity)
         {
@@ -215,7 +231,7 @@ public class ScaledRigidbody : MonoBehaviour
         }
 
         double sqrAngularSpeed = _angularVelocity.sqrMagnitude;
-        if (_active)
+        if (_active || overrideUnity)
         {
             scaledTransform.realPosition += _velocity * Time.fixedDeltaTime;
 
@@ -233,7 +249,6 @@ public class ScaledRigidbody : MonoBehaviour
         {
             ScaledSpacePhysics.Instance.UpdateGridPos(this);
         }
-        prevPos = scaledTransform.realPosition;
     }
 
     public void AddForce(Vector3d force, ForceMode forceMode)
@@ -392,25 +407,25 @@ public class ScaledRigidbody : MonoBehaviour
     /// <summary>
     /// Internal method called by ScaledSpacePhysics to raise collision exit event
     /// </summary>
-    internal void RaiseCollisionExit(ScaledCollider other)
+    internal void RaiseCollisionExit(ScaledCollider source, ScaledCollider other)
     {
-        OnScaledCollisionExit?.Invoke(other);
+        OnScaledCollisionExit?.Invoke(source, other);
     }
 
     /// <summary>
     /// Internal method called by ScaledSpacePhysics to raise collision enter event
     /// </summary>
-    internal void RaiseTriggerEnter(ScaledCollider other)
+    internal void RaiseTriggerEnter(ScaledCollider source, ScaledCollider other)
     {
-        OnScaledTriggerEnter?.Invoke(other);
+        OnScaledTriggerEnter?.Invoke(source, other);
     }
 
     /// <summary>
     /// Internal method called by ScaledSpacePhysics to raise collision exit event
     /// </summary>
-    internal void RaiseTriggerExit(ScaledCollider other)
+    internal void RaiseTriggerExit(ScaledCollider source, ScaledCollider other)
     {
-        OnScaledTriggerExit?.Invoke(other);
+        OnScaledTriggerExit?.Invoke(source, other);
     }
 
     public void IgnoreScaledRigidbody(ScaledRigidbody other, bool ignore)
@@ -440,32 +455,6 @@ public class ScaledRigidbody : MonoBehaviour
         }
     }
 
-    private void ResolveCollision(Vector3d contactPoint, Vector3d relativeVelocity, Vector3d normal, double invMassB, float restitutionB)
-    {
-        Vector3 contactRenderPoint = FloatingWorldOrigin.Instance.scaledTransform.TransformRealPoint(contactPoint);
-
-        Debug.DrawRay(contactRenderPoint, normal.ToVector3() * 10, Color.purple);
-        Debug.DrawRay(contactRenderPoint, relativeVelocity.ToVector3(), Color.orange);
-
-        double velocityAlongNormal = Vector3d.Dot(relativeVelocity, normal);
-
-        // Don't resolve if velocities are separating
-        if (velocityAlongNormal >= 0.0)
-            return;
-
-        // Calculate impulse magnitude
-        double invMassA = isKinematic ? 0.0 : 1.0 / _mass;
-
-        float avgRestitution = Math.Abs(velocityAlongNormal) < ScaledSpacePhysics.restitutionThreshold ? 0f : scaledColliders.Count > 0 ? (scaledColliders[0].restitution + restitutionB) * 0.5f : restitutionB;
-        double impulseMagnitude = -(1.0 + avgRestitution) * velocityAlongNormal / (invMassA + invMassB);
-
-        // Apply impulses
-        Vector3d impulse = normal * impulseMagnitude;
-        Debug.Log($"Applying unity collision impulse of: {impulse} magnitude {impulseMagnitude}");
-        AddForceAtPosition(impulse, contactPoint, ForceMode.Impulse);
-        Debug.DrawRay(contactRenderPoint, impulse.ToVector3(), Color.cyan);
-    }
-
     private void OnCollisionEnter(Collision collision)
     {
         if (isKinematic || !_active)
@@ -475,37 +464,6 @@ public class ScaledRigidbody : MonoBehaviour
         ContactPoint contact = collision.GetContact(0);
         Vector3d realContactPoint = scaledTransform.TransformRenderPoint(contact.point);
 
-        // Rigidbody otherRB = collision.rigidbody;
-
-        // Vector3d relativeVelocity;
-        // double massB;
-        // float restitutionB;
-        // if (otherRB == null)
-        // {
-        //     relativeVelocity = -_velocity;
-        //     massB = 1E6;
-        //     restitutionB = 0.5f;
-        // }
-        // else
-        // {
-        //     massB = otherRB.mass;
-        //     if (collision.transform.TryGetComponent<ScaledCollider>(out var otherScaledCollider))
-        //     {
-        //         relativeVelocity = otherScaledCollider.scaledRigidbody.velocity - _velocity;
-        //         restitutionB = otherScaledCollider.restitution;
-        //         massB = otherScaledCollider.scaledRigidbody.mass;
-        //     }
-        //     else if (FloatingWorldOrigin.Instance.scaledRigidbody.id == id)
-        //     {
-        //         relativeVelocity = otherRB.linearVelocity.ToVector3d();
-        //         restitutionB = 0.5f;
-        //     }
-        //     else
-        //     {
-        //         relativeVelocity = otherRB.linearVelocity.ToVector3d() + FloatingWorldOrigin.Instance.scaledRigidbody._velocity - _velocity;
-        //         restitutionB = 0.5f;
-        //     }
-        // }
         if (contact.separation < 0)
         {
             Vector3d correctionDirection = scaledTransform.realPosition - realContactPoint;

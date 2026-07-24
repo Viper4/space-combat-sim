@@ -16,7 +16,7 @@ MonoBehaviour:
   autoGenerate: 1
   sphere: 1
   initialAngularVelocityRange:
-  - {x: 0, y: -0.0000266, z: 0}
+  - {x: 0, y: 0.00002, z: 0}
   - {x: 0, y: 0.0000266, z: 0}
   bodyType: 0
   scaleRange:

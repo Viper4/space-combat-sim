@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using SpaceStuff;
 using UnityEngine;
-using System.Collections;
 
-[RequireComponent(typeof(ScaledRigidbody))]
 public class ScaledCollider : MonoBehaviour
 {
     private static uint nextId;
@@ -12,8 +10,10 @@ public class ScaledCollider : MonoBehaviour
     public uint id {get; private set;}
     public ScaledRigidbody scaledRigidbody {get; private set;}
 
-    [SerializeField, Tooltip("Local offset from realPosition. RealCenter = realPosition+center*realScale")] private Vector3d center;
-    [SerializeField, Tooltip("Radius of simulated sphere collider in scaled space physics. Use -1 to calculate as Max(scale.x, scale.y, scale.z)")] private double radius = -1f;
+    [SerializeField, Tooltip("Local offset from realPosition. RealCenter = realPosition+center*realScale")]
+    private Vector3d center;
+    [SerializeField, Tooltip("Radius of simulated sphere collider in scaled space physics. Use -1 to calculate as Max(scale.x, scale.y, scale.z)")]
+    private double radius = -1f;
 
     public bool isTrigger = false;
 
@@ -26,11 +26,19 @@ public class ScaledCollider : MonoBehaviour
 
     private HashSet<uint> ignoredColliders = new HashSet<uint>();
 
+    [HideInInspector] public Vector3d prevCenterPos;
+
     private void Awake()
     {
         id = nextId++;
-        scaledRigidbody = GetComponent<ScaledRigidbody>();
+        scaledRigidbody = GetComponentInParent<ScaledRigidbody>();
+        if (scaledRigidbody == null)
+        {
+            Debug.LogError($"[ScaledCollider] {name} requires an attached ScaledRigidbody on this object or in the parent hierarchy.");
+            return;
+        }
         scaledRigidbody.AddCollider(this);
+        prevCenterPos = GetRealCenter();
     }
 
     private void OnEnable()
@@ -50,16 +58,11 @@ public class ScaledCollider : MonoBehaviour
         Vector3d rotatedOffset = new Vector3d(center.x * transform.localScale.x, center.y * transform.localScale.y, center.z * transform.localScale.z);
         if (scaledRigidbody == null)
         {
-            scaledRigidbody = GetComponent<ScaledRigidbody>();
+            scaledRigidbody = GetComponentInParent<ScaledRigidbody>();
         }
         rotatedOffset = rotatedOffset.Rotate(scaledRigidbody.transform.rotation);
 
         Gizmos.DrawWireSphere(transform.position + rotatedOffset.ToVector3(), GetGizmoRadius());
-    }
-
-    public Vector3d GetLocalCenter()
-    {
-        return center;
     }
 
     public Vector3d GetRealCenter()
@@ -68,6 +71,14 @@ public class ScaledCollider : MonoBehaviour
         Vector3d rotatedOffset = new Vector3d(center.x * scale.x, center.y * scale.y, center.z * scale.z);
         rotatedOffset = rotatedOffset.Rotate(scaledRigidbody.transform.rotation);
         return scaledRigidbody.scaledTransform.realPosition + rotatedOffset;
+    }
+
+    public void SetRadius(double radius)
+    {
+        if (radius < 0.0)
+            this.radius = -1.0;
+        this.radius = radius;
+        ScaledSpacePhysics.Instance.UpdateGridSize(scaledRigidbody);
     }
 
     public double GetRadius()

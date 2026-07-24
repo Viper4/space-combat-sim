@@ -12,6 +12,8 @@ public class TurretSystem : MonoBehaviour
 {
     private Ship ship;
     private TargetingSystem targetingSystem;
+
+    [SerializeField] private Radar radar;
     
     [SerializeField] private int maxAmmo = 10000;
     public int currentAmmo {get; private set;}
@@ -40,10 +42,6 @@ public class TurretSystem : MonoBehaviour
     private HashSet<string> offensiveTagsSet = new HashSet<string>();
     [SerializeField, Tooltip("tags of RadarTargets to use defensive strategy when targeting")] private string[] defensiveTags;
     private HashSet<string> defensiveTagsSet = new HashSet<string>();
-    public float detectRadius = 10000f;
-    [SerializeField] private float killRadius = 500f;
-
-    public HashSet<uint> targetsInRange = new HashSet<uint>();
 
     public Action StartTargetSearch;
     public Action<RadarTarget, bool> CheckTarget;
@@ -103,7 +101,6 @@ public class TurretSystem : MonoBehaviour
         
         targetingSystem.SetCrosshairActive(!manualControl);
         manualControlCrosshair.gameObject.SetActive(manualControl);
-        ship.scaledRigidbody.OnScaledTriggerEnter += CheckTargetOnEnter;
         GameManager.Instance.inputActions.Player.Primary.performed += StartTrigger;
         GameManager.Instance.inputActions.Player.Primary.canceled += StopTrigger;
 
@@ -114,14 +111,13 @@ public class TurretSystem : MonoBehaviour
     {
         if (!initialized)
             return;
-        ship.scaledRigidbody.OnScaledTriggerEnter -= CheckTargetOnEnter;
         GameManager.Instance.inputActions.Player.Primary.performed -= StartTrigger;
         GameManager.Instance.inputActions.Player.Primary.canceled -= StopTrigger;
     }
 
     private void FixedUpdate()
     {
-        if (!initialized)
+        if (!initialized || !ship.isStarted)
             return;
         if (manualControl)
         {
@@ -147,26 +143,16 @@ public class TurretSystem : MonoBehaviour
                 UpdateTurretOnHUD(i);
             }
         }
-        else
+        else if (radar != null && radar.IsEnabled)
         {
             StartTargetSearch?.Invoke();
-            foreach (uint id in targetsInRange.ToList())
+            foreach (RadarTarget radarTarget in radar.GetAllDetectedTargets())
             {
-                if (!RadarRegistry.TryGet(id, out var radarTarget))
-                {
-                    targetsInRange.Remove(id);
+                if (radarTarget.team == ship.attachedRadarTarget.team)
                     continue;
-                }
-
                 double sqrDistance = (radarTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition).sqrMagnitude;
-
-                if (sqrDistance > detectRadius * detectRadius)
-                    continue;
-
-                if (radarTarget.stealthDistance != -1 && sqrDistance > radarTarget.stealthDistance * radarTarget.stealthDistance)
-                    continue;
-
-                bool inKillRadius = sqrDistance < killRadius * killRadius;
+                double killRadius = radar.GetKillRadius(radarTarget.tag, 500.0);
+                bool inKillRadius = radar.IsKillOn(radarTarget.tag) && sqrDistance < killRadius * killRadius;
                 CheckTarget?.Invoke(radarTarget, inKillRadius);
             }
 
@@ -182,7 +168,7 @@ public class TurretSystem : MonoBehaviour
 
     private void StartTrigger(InputAction.CallbackContext context)
     {
-        if (GameManager.Instance.IsPaused)
+        if (GameManager.Instance.IsPaused || !ship.isStarted)
             return;
         triggerHeld = true;
         if (!manualControl)
@@ -209,6 +195,14 @@ public class TurretSystem : MonoBehaviour
     private void UpdateTurretOnHUD(int i)
     {
         Turret turret = turrets[i];
+        if (!turret.active)
+        {
+            if (turretCrosshairImages[i].gameObject.activeSelf)
+                turretCrosshairImages[i].gameObject.SetActive(false);
+            return;
+        }
+        if (!turretCrosshairImages[i].gameObject.activeSelf)
+            turretCrosshairImages[i].gameObject.SetActive(true);
         Vector3 screenHit;
         bool gotHit = turret.GetRaycastHit(out RaycastHit turretHit);
         if (gotHit)
@@ -247,23 +241,6 @@ public class TurretSystem : MonoBehaviour
         {
             turretCrosshairs[i].position = turretCrosshairPos;
         }
-    }
-
-    private void CheckTargetOnEnter(Component other)
-    {
-        if (!initialized)
-            return;
-        if (!other.TryGetComponent<RadarTarget>(out var target))
-            return;
-        if (target.team == ship.radarTarget.team)
-            return;
-
-        targetsInRange.Add(target.GetID());
-    }
-
-    private void OnTriggerEnter(Collider other)
-    {
-        CheckTargetOnEnter(other);
     }
 
     public bool IsOffensive(RadarTarget target)

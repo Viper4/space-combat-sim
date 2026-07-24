@@ -159,6 +159,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  overrideUnity: 0
   _mass: 0.0000001
   _isKinematic: 0
   _velocity:
@@ -169,14 +170,12 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
+  affectedByGravity: 1
   gravityAcceleration:
     x: 0
     y: 0
     z: 0
-  prevPos:
-    x: 0
-    y: 0
-    z: 0
+  collisionDetection: 0
 --- !u!114 &824532636656329706
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -190,11 +189,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
   team: 
-  alertSystem: {fileID: 0}
+  radar: {fileID: 0}
   alertWhenTargeting: 1
+  passiveRadarIndex: -1
+  activeRadarIndex: -1
   radarIcon: {fileID: 0}
   turretsTargeting: 0
+  emissionStrength: 0
   stealthDistance: -1
+  collidersInRadarRange: 0
   useScaleForBounds: 1
   boundsRenderers: []
 --- !u!114 &3432351637793023832
@@ -216,8 +219,17 @@ MonoBehaviour:
   radius: -1
   isTrigger: 0
   restitution: 0.15
+  hGridCell:
+    level: 0
+    x: 0
+    y: 0
+    z: 0
   listIndex: -1
   overrideUnity: 0
+  prevCenterPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &1847065452805617377
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -277,7 +289,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584170746978610102
+  _initializedTimestamp: -8584168085050900702
 --- !u!114 &-467688900442111250
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -298,6 +310,7 @@ MonoBehaviour:
   interpolateSpeed: 1
   controlType: 1
   activeWhenOffline: 1
+  syncMass: 0
 --- !u!114 &7898235769844472124
 MonoBehaviour:
   m_ObjectHideFlags: 0

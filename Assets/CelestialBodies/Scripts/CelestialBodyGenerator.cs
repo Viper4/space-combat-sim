@@ -48,6 +48,28 @@ public class CelestialBodyGenerator : MonoBehaviour
 
     private Vector3[] currentSeeds = null;
     
+    private void InitRootChunks()
+    {
+        rootChunks = new TerrainChunk[6 * rootLOD * rootLOD];
+
+        Vector3[] directions = new Vector3[] { Vector3.up, Vector3.down, Vector3.right, Vector3.left, Vector3.forward, Vector3.back };
+
+        int arrayIndex = 0;
+        for (int i = 0; i < 6; i++)
+        {
+            for (int r = 0; r < rootLOD; r++)
+            {
+                for (int c = 0; c < rootLOD; c++)
+                {
+                    rootChunks[arrayIndex] = new TerrainChunk(shapeGenerator, shapeSettings, baseMaxScreenSize, directions[i], r, c, rootLOD);
+                    if (renderMask == FaceRenderMask.All || (int)renderMask - 1 == i)
+                        rootChunks[arrayIndex].GenerateEmptyTree(transform, colorGenerator);
+                    arrayIndex++;
+                }
+            }
+        }
+    }
+
     public void Init(Vector3[] seeds = null)
     {
         shapeGenerator = new ShapeGenerator();
@@ -81,24 +103,7 @@ public class CelestialBodyGenerator : MonoBehaviour
         shapeGenerator.UpdateSettings(shapeSettings);
         colorGenerator.UpdateSettings(colorSettings, bodyMaterial);
 
-        rootChunks = new TerrainChunk[6 * rootLOD * rootLOD];
-
-        Vector3[] directions = new Vector3[] { Vector3.up, Vector3.down, Vector3.right, Vector3.left, Vector3.forward, Vector3.back };
-
-        int arrayIndex = 0;
-        for (int i = 0; i < 6; i++)
-        {
-            for (int r = 0; r < rootLOD; r++)
-            {
-                for (int c = 0; c < rootLOD; c++)
-                {
-                    rootChunks[arrayIndex] = new TerrainChunk(shapeGenerator, shapeSettings, baseMaxScreenSize, directions[i], r, c, rootLOD);
-                    if (renderMask == FaceRenderMask.All || (int)renderMask - 1 == i)
-                        rootChunks[arrayIndex].GenerateEmptyTree(transform, colorGenerator);
-                    arrayIndex++;
-                }
-            }
-        }
+        InitRootChunks();
 
         if (seeds != null)
         {
@@ -162,8 +167,8 @@ public class CelestialBodyGenerator : MonoBehaviour
                     Destroy(child.gameObject);
             }
         }
-        rootChunks = null;
         generated = false;
+        rootChunks = null;
     }
 
     public bool UpdateQuadTrees(Camera camera)
@@ -184,6 +189,8 @@ public class CelestialBodyGenerator : MonoBehaviour
             return;
         if (randomizeSeeds)
             RandomizeSeeds();
+        if (rootChunks == null)
+            InitRootChunks();
         GenerateMeshes();
         GenerateColors();
         generated = true;

@@ -1,16 +1,18 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
 
 [RequireComponent(typeof(StatSystem))]
 public class Shields : MonoBehaviour
 {
+    public bool IsActive {get; private set;}
+
     private StatSystem statSystem;
     [SerializeField] private Ship ship;
     [SerializeField, Tooltip("The thing this shield is protecting.")] private StatSystem protectedStatSystem;
     [SerializeField] private AlertSystem alertSystem;
 
-    private bool active;
     [SerializeField] private GameObject colliderObject;
     private MeshRenderer shieldRenderer;
     private Material shieldMaterial;
@@ -26,6 +28,9 @@ public class Shields : MonoBehaviour
     [SerializeField] private float damageDurationScale = 0.01f;
     [SerializeField] private float damageMagnitudeScale = 0.005f;
 
+    [SerializeField] private UnityEvent OnActivate;
+    [SerializeField] private UnityEvent OnDeactivate;
+
 
     // Start is called before the first frame update
     void Start()
@@ -35,7 +40,7 @@ public class Shields : MonoBehaviour
         shieldRenderer = colliderObject.GetComponent<MeshRenderer>();
         shieldMaterial = shieldRenderer.material; // Clone material
         shieldCollider = colliderObject.GetComponent<Collider>();
-        colliderObject.SetActive(active);
+        colliderObject.SetActive(IsActive);
         if (alertSystem != null)
         {
             alertSystem.SetAlert("Shields", false);
@@ -53,16 +58,32 @@ public class Shields : MonoBehaviour
 
     public void ToggleShields(int state)
     {
-        if (statSystem.health <= 0 || (ship != null && ship.isShutdown))
+        if (statSystem.health <= 0 || (ship != null && !ship.isStarted))
             return;
         
-        active = state == 1;
-        colliderObject.SetActive(active);
+        TrySetActive(state == 1);
+    }
+
+    private void TrySetActive(bool value)
+    {
+        if (IsActive == value)
+            return;
+        if (value)
+        {
+            if (statSystem.health <= 0f)
+                return;
+            IsActive = true;
+            colliderObject.SetActive(true);
+            OnActivate?.Invoke();
+        }
+        IsActive = false;
+        colliderObject.SetActive(false);
+        OnDeactivate?.Invoke();
     }
 
     public void Damage(float amount, Vector3 origin)
     {
-        if (active)
+        if (IsActive)
         {
             Vector3 colliderPoint = shieldCollider.ClosestPoint(origin);
             // Shields are up, damage the shield
@@ -81,7 +102,7 @@ public class Shields : MonoBehaviour
 
     private void OnDeath(float remainingDamage)
     {
-        active = false;
+        IsActive = false;
         colliderObject.SetActive(false);
         if (damageAfterDeath && protectedStatSystem != null)
             protectedStatSystem.Damage(remainingDamage);

@@ -178,7 +178,7 @@ public class PauseUI : MonoBehaviour
         }
         else
         {
-            LobbyManager.Instance.Disconnect();
+            LobbyManager.Instance.IntentionallyDisconnect();
         }
     }
 

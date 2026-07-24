@@ -27,7 +27,7 @@ public class AsteroidField : MonoBehaviour
                 yield break;
             }
             asteroid.pauseUpdates = true;
-            yield return new WaitUntil(asteroid.Initialized);
+            yield return new WaitUntil(asteroid.IsInitialized);
 
             asteroid.scaledTransform.realPosition = GetRandomPointInTorus();
             asteroid.transform.rotation = Random.rotation;

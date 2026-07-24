@@ -178,6 +178,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbody
+  overrideUnity: 0
   _mass: 0.0000001
   _isKinematic: 0
   _velocity:
@@ -188,11 +189,9 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
+  affectedByGravity: 1
   gravityAcceleration:
     x: 0
     y: 0
     z: 0
-  prevPos:
-    x: 0
-    y: 0
-    z: 0
+  collisionDetection: 0

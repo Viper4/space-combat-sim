@@ -9,15 +9,18 @@ public class ConditionalHideAttribute : PropertyAttribute
 {
     public string conditionalSourceField;
     public int enumIndex;
+    public bool not;
 
-    public ConditionalHideAttribute(string boolVariableName)
+    public ConditionalHideAttribute(string boolVariableName, bool not = false)
     {
         conditionalSourceField = boolVariableName;
+        this.not = not;
     }
 
-    public ConditionalHideAttribute(string enumVariableName, int enumIndex)
+    public ConditionalHideAttribute(string enumVariableName, int enumIndex, bool not = false)
     {
         conditionalSourceField = enumVariableName;
         this.enumIndex = enumIndex;
+        this.not = not;
     }
 }

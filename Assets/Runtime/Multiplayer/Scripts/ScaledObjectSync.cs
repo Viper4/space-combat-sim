@@ -33,7 +33,6 @@ public class ScaledObjectSync : NetworkBehaviour
     private float snapshotDuration;
     private bool hasInitState;
     private bool isController;
-    private bool hasNewSnapshot;
 
     private void Awake()
     {
@@ -118,7 +117,7 @@ public class ScaledObjectSync : NetworkBehaviour
 
     private void Update()
     {
-        if (!hasInitState || IsOffline || isController || !hasNewSnapshot)
+        if (!hasInitState || IsOffline || isController)
             return;
 
         interpolationTimer += Time.deltaTime;
@@ -139,7 +138,6 @@ public class ScaledObjectSync : NetworkBehaviour
         transform.rotation = rotation;
         scaledRigidbody.velocity = velocity;
         scaledRigidbody.angularVelocity = angularVelocity;
-        hasNewSnapshot = false;
     }
 
     private void UpdateState(ScaledObjectState state)
@@ -151,7 +149,6 @@ public class ScaledObjectSync : NetworkBehaviour
         interpolationTimer = 0f;
         snapshotDuration = hasInitState ? Mathf.Clamp(now - lastSnapshotTime, 0.01f, 0.5f) : 1f / Mathf.Max(1f, snapshotRate);
         lastSnapshotTime = now;
-        hasNewSnapshot = true;
     }
 
     [ObserversRpc(BufferLast = true, ExcludeServer = true, RunLocally = false)]

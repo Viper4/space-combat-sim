@@ -1,5 +1,89 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6165805356613791881
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8959804211805828646}
+  - component: {fileID: 5583040929535009511}
+  - component: {fileID: 5808707154644366391}
+  m_Layer: 0
+  m_Name: Detonate Trigger
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8959804211805828646
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6165805356613791881}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8959325904046899293}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &5583040929535009511
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6165805356613791881}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 15
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &5808707154644366391
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6165805356613791881}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
+    z: 0
+  radius: 15
+  isTrigger: 1
+  restitution: 0
+  hGridCell:
+    level: 0
+    x: 0
+    y: 0
+    z: 0
+  listIndex: -1
+  overrideUnity: 0
+  prevCenterPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!1 &6316366540338611349
 GameObject:
   m_ObjectHideFlags: 0
@@ -13,13 +97,11 @@ GameObject:
   - component: {fileID: 2153530488087983894}
   - component: {fileID: 1613615964272944648}
   - component: {fileID: 2688048666450355157}
-  - component: {fileID: 4006850097849104209}
   - component: {fileID: 4633688431431094526}
   - component: {fileID: 2821699641902407001}
   - component: {fileID: 6829326925194150218}
   - component: {fileID: 5523896917430819422}
   - component: {fileID: 1404306499154668698}
-  - component: {fileID: 2848928438514413154}
   - component: {fileID: 6577287821693102537}
   - component: {fileID: 8942289586678289918}
   - component: {fileID: 1209257913728134229}
@@ -45,6 +127,8 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4721656760093672716}
+  - {fileID: 8959804211805828646}
+  - {fileID: 8246588247797686659}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &4274497117098890081
@@ -156,27 +240,6 @@ CapsuleCollider:
   m_Height: 2.24
   m_Direction: 2
   m_Center: {x: 8.832e-42, y: 0.0000000037252903, z: -0.01202172}
---- !u!135 &4006850097849104209
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6316366540338611349}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 15
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &4633688431431094526
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -220,6 +283,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
+  overrideUnity: 0
   _mass: 300
   _isKinematic: 0
   _velocity:
@@ -230,14 +294,12 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
+  affectedByGravity: 1
   gravityAcceleration:
     x: 0
     y: 0
     z: 0
-  prevPos:
-    x: 0
-    y: 0
-    z: 0
+  collisionDetection: 1
 --- !u!114 &6829326925194150218
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -254,11 +316,20 @@ MonoBehaviour:
     x: 0
     y: 0
     z: -0.9
-  radius: 0.15
+  radius: 0.2
   isTrigger: 0
   restitution: 0
+  hGridCell:
+    level: 0
+    x: 0
+    y: 0
+    z: 0
   listIndex: -1
   overrideUnity: 0
+  prevCenterPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &5523896917430819422
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -275,11 +346,20 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0.9
-  radius: 0.15
+  radius: 0.2
   isTrigger: 0
   restitution: 0
+  hGridCell:
+    level: 0
+    x: 0
+    y: 0
+    z: 0
   listIndex: -1
   overrideUnity: 0
+  prevCenterPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &1404306499154668698
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -296,32 +376,20 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  radius: 0.15
+  radius: 0.2
   isTrigger: 0
   restitution: 0
-  listIndex: -1
-  overrideUnity: 0
---- !u!114 &2848928438514413154
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6316366540338611349}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
-  center:
+  hGridCell:
+    level: 0
     x: 0
     y: 0
     z: 0
-  radius: 15
-  isTrigger: 1
-  restitution: 0
   listIndex: -1
   overrideUnity: 0
+  prevCenterPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &6577287821693102537
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -338,7 +406,10 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 8624868431337818510}
   _networkObjectCache: {fileID: 8624868431337818510}
   active: 0
+  targetEmissionRadius: 1500
+  idleEmissionRadius: 250
   _collider: {fileID: 2688048666450355157}
+  detonateTrigger: {fileID: 5808707154644366391}
   engineForce: 300000
   thrusterForce: 500
   proportionalGain: 5.118147
@@ -368,12 +439,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd05b432c58d5ad41be439478d9c0ad3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 8624868431337818510}
+  _networkObjectCache: {fileID: 0}
   team: 
-  alertSystem: {fileID: 0}
+  attachedRadar: {fileID: 0}
   alertWhenTargeting: 1
+  stealthReduction: 0
+  emissionTrigger: {fileID: 7606262934043396829}
+  radarIndex: -1
+  passivelyDetected: 0
+  activelyDetected: 0
+  collidersInActiveRadar: 0
   radarIcon: {fileID: 0}
   turretsTargeting: 0
-  stealthDistance: -1
   useScaleForBounds: 0
   boundsRenderers:
   - {fileID: 2153530488087983894}
@@ -397,6 +476,7 @@ MonoBehaviour:
   interpolateSpeed: 1
   controlType: 1
   activeWhenOffline: 1
+  syncMass: 0
 --- !u!114 &8624868431337818510
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -455,7 +535,69 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584170749796354092
+  _initializedTimestamp: -8584168085050900702
+--- !u!1 &7891829006686870921
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8246588247797686659}
+  - component: {fileID: 7606262934043396829}
+  m_Layer: 0
+  m_Name: Passive Emission
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8246588247797686659
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7891829006686870921}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8959325904046899293}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7606262934043396829
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7891829006686870921}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2951f6ee8618a04381b9452b76413e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledCollider
+  center:
+    x: 0
+    y: 0
+    z: 0
+  radius: 0
+  isTrigger: 1
+  restitution: 0
+  hGridCell:
+    level: 0
+    x: 0
+    y: 0
+    z: 0
+  listIndex: -1
+  overrideUnity: 1
+  prevCenterPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!1001 &4109854028599492452
 PrefabInstance:
   m_ObjectHideFlags: 0

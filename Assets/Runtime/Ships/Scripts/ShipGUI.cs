@@ -16,26 +16,27 @@ public class ShipGUI : MonoBehaviour
 
     private Coroutine animationRoutine;
 
-    private void Start()
+    private void OnEnable()
     {
         canvas.SetActive(open);
     }
 
     private void Update()
     {
-        if (ship.isShutdown)
+        if (GameManager.Instance.IsPaused)
             return;
-        if (!GameManager.Instance.IsPaused && GameManager.Instance.inputActions.Player.GUIToggle.WasPressedThisFrame())
+        if (GameManager.Instance.inputActions.Player.GUIToggle.WasPressedThisFrame())
         {
+            open = !open;
             if (animationRoutine != null)
                 StopCoroutine(animationRoutine);
-            animationRoutine = StartCoroutine(ToggleGUI());
+            animationRoutine = StartCoroutine(GUIAnimation());
         }
     }
 
-    private IEnumerator ToggleGUI()
+    private IEnumerator GUIAnimation()
     {
-        open = !open;
+        yield return new WaitUntil(() => ship.isStarted);
         if (open)
         {
             canvas.SetActive(true);
@@ -56,5 +57,6 @@ public class ShipGUI : MonoBehaviour
 
             canvas.SetActive(false);
         }
+        animationRoutine = null;
     }
 }

@@ -3,7 +3,9 @@ using SpaceStuff;
 using System;
 using System.Collections;
 using UnityEngine;
-using Random = UnityEngine.Random;
+using UnityRandom = UnityEngine.Random;
+using SystemRandom = System.Random;
+using FishNet;
 
 [RequireComponent(typeof(ScaledTransform), typeof(ScaledRigidbody))]
 public class CelestialBody : NetworkBehaviour
@@ -36,7 +38,10 @@ public class CelestialBody : NetworkBehaviour
     private Vector3d scale = Vector3d.zero;
 
     private bool initialized;
+    private bool orbitSet;
     public bool pauseUpdates = false;
+    private bool hasBaryCenter;
+    private Vector3d baryCenter;
 
     private bool IsServerOrOffline => IsServerInitialized || IsOffline;
 
@@ -47,7 +52,7 @@ public class CelestialBody : NetworkBehaviour
         TryGetComponent(out generator);
         TryGetComponent(out spaceLight);
 
-        if (IsOffline)
+        if (InstanceFinder.IsOffline)
             Init();
     }
 
@@ -77,22 +82,22 @@ public class CelestialBody : NetworkBehaviour
                 float randomZ;
                 if (generationSettings.sphere)
                 {
-                    randomX = randomY = randomZ = Random.Range(generationSettings.scaleRange[0].x, generationSettings.scaleRange[1].x);
+                    randomX = randomY = randomZ = UnityRandom.Range(generationSettings.scaleRange[0].x, generationSettings.scaleRange[1].x);
                 }
                 else
                 {
                     // Prevent extremely elongated objects (pancakes/needles)
-                    float randomXt = Random.Range(0f, 1f);
-                    float randomYt = Random.Range(0f, 1f);
-                    float randomZt = Random.Range(0f, 1f);
+                    float randomXt = UnityRandom.value;
+                    float randomYt = UnityRandom.value;
+                    float randomZt = UnityRandom.value;
                     int buckets = 3;
                     float bucketSize = 1f / buckets;
                     for(int i = 0; i < buckets; i++)
                     {
                         if (randomXt < (i + 1) * bucketSize)
                         {
-                            randomYt = Random.Range(i * bucketSize, (i + 1) * bucketSize);
-                            randomZt = Random.Range(i * bucketSize, (i + 1) * bucketSize);
+                            randomYt = UnityRandom.Range(i * bucketSize, (i + 1) * bucketSize);
+                            randomZt = UnityRandom.Range(i * bucketSize, (i + 1) * bucketSize);
                             break;
                         }
                     }
@@ -102,7 +107,7 @@ public class CelestialBody : NetworkBehaviour
                 }
                 scale = new Vector3d(randomX, randomY, randomZ);
 
-                float density = Random.Range(generationSettings.densityRange.x, generationSettings.densityRange.y);
+                float density = UnityRandom.Range(generationSettings.densityRange.x, generationSettings.densityRange.y);
                 scaledRigidbody.mass = density * v * scale.x * scale.y * scale.z;
                 break;
             case GenerationSettings.BodyType.Star:
@@ -112,7 +117,7 @@ public class CelestialBody : NetworkBehaviour
                 foreach (var rule in rules)
                     totalWeight += Mathf.Max(0f, rule.weight);
 
-                float roll = Random.Range(0f, totalWeight);
+                float roll = UnityRandom.Range(0f, totalWeight);
                 float cumulative = 0f;
                 GenerationSettings.StarTypeRule picked = rules[^1];
 
@@ -126,7 +131,7 @@ public class CelestialBody : NetworkBehaviour
                     }
                 }
 
-                float t = Random.value;
+                float t = UnityRandom.value;
                 double massInSolarMasses = Mathf.Lerp(picked.minMass, picked.maxMass, t);
                 scaledRigidbody.mass = massInSolarMasses * solarMass;
 
@@ -190,7 +195,9 @@ public class CelestialBody : NetworkBehaviour
 
         Vector3 min = generationSettings.initialAngularVelocityRange[0];
         Vector3 max = generationSettings.initialAngularVelocityRange[1];
-        scaledRigidbody.angularVelocity = new Vector3d(Random.Range(min.x, max.x), Random.Range(min.y, max.y), Random.Range(min.z, max.z));
+        SystemRandom rand = new SystemRandom();
+        
+        scaledRigidbody.angularVelocity = new Vector3d(RandomRange(min.x, max.x), RandomRange(min.y, max.y), RandomRange(min.z, max.z));
 
         if (generator != null)
             generator.Init();
@@ -205,11 +212,15 @@ public class CelestialBody : NetworkBehaviour
         Debug.Log($"[CelestialBody] {name} initialized locally.");
     }
 
+    private double RandomRange(double min, double max)
+    {
+        SystemRandom rand = new SystemRandom();
+        return (rand.NextDouble() * (max - min)) + min;
+    }
+
     [ObserversRpc(ExcludeServer = true, BufferLast = true)]
     private void InitializeObserversRpc(double scaleX, double scaleY, double scaleZ, double mass, Vector3[] seeds)
     {
-        if (IsServerInitialized)
-            return;
         Debug.Log($"[CelestialBody] {name} initializing from server data.");
         scaledTransform.realScale = new Vector3d(scaleX, scaleY, scaleZ);
         scaledRigidbody.mass = mass;
@@ -225,15 +236,19 @@ public class CelestialBody : NetworkBehaviour
     [ObserversRpc(ExcludeServer = true, BufferLast = true)]
     private void SetSpaceLightObserversRpc(float temperature, Color tint)
     {
-        if (IsServerInitialized)
-            return;
         if (spaceLight != null)
             spaceLight.SetTemperature(temperature, tint);
     }
 
-    public bool Initialized()
+    public bool IsInitialized()
     {
         return initialized;
+    }
+
+    public void SetBaryCenter(Vector3d baryCenter)
+    {
+        hasBaryCenter = true;
+        this.baryCenter = baryCenter;
     }
 
     public void SetOrbit(CelestialBody toOrbit)
@@ -247,14 +262,16 @@ public class CelestialBody : NetworkBehaviour
      */
     private IEnumerator SetOrbitalVelocity()
     {
-        yield return new WaitUntil(orbitTarget.Initialized);
+        yield return new WaitUntil(orbitTarget.IsInitialized);
 
         Vector3d posA = scaledTransform.realPosition;
         Vector3d posB = orbitTarget.scaledTransform.realPosition;
-        double distance;
-        double g;
+        Vector3d toCenter = posB - posA;
+        double distance = toCenter.magnitude;
         if (orbitTarget.orbitTarget == this)
         {
+            if (orbitSet)
+                yield break;
             // Handle binary systems
             double massA = scaledRigidbody.mass;
             double massB = orbitTarget.scaledRigidbody.mass;
@@ -262,7 +279,6 @@ public class CelestialBody : NetworkBehaviour
 
             Vector3d rA = posA - barycenter;
             Vector3d rB = posB - barycenter;
-            distance = rA.magnitude + rB.magnitude;
 
             // orbital plane
             Vector3d axis = Vector3d.Cross(rA, rB);
@@ -273,48 +289,81 @@ public class CelestialBody : NetworkBehaviour
             Vector3d dirA = Vector3d.Cross(axis, rA).normalized;
             Vector3d dirB = Vector3d.Cross(axis, rB).normalized;
 
-            g = orbitTarget.CalculateGravityAcceleration(posA);
+            double gA = orbitTarget.CalculateGravityAcceleration(posA);
+            double gB = CalculateGravityAcceleration(posB);
 
-            double orbitalSpeed = Math.Sqrt(g * (massA + massB) / distance);
+            double orbitalSpeedA = Math.Sqrt(distance * gA);
+            double orbitalSpeedB = Math.Sqrt(distance * gB);
 
-            // velocities (opposite directions, mass-weighted)
-            Vector3d vA = dirA * orbitalSpeed * (massB / (massA + massB));
-            Vector3d vB = -dirB * orbitalSpeed * (massA / (massA + massB));
+            Vector3d vA = dirA * orbitalSpeedA;
+            Vector3d vB = dirB * orbitalSpeedB;
 
             scaledRigidbody.velocity = vA;
             orbitTarget.scaledRigidbody.velocity = vB;
+            if (vA != scaledRigidbody.velocity)
+            {
+                Debug.LogWarning($"[CelestialBody] Reached speed limit when attempting to set orbital velocity of {name} for a binary system.");
+            }
+            if (vB != orbitTarget.scaledRigidbody.velocity)
+            {
+                Debug.LogWarning($"[CelestialBody] Reached speed limit when attempting to set orbital velocity of {orbitTarget.name} for a binary system.");
+            }
+            Debug.Log($"[CelestialBody] Updated {name}'s and {orbitTarget.name}'s velocities to {scaledRigidbody.velocity} {scaledRigidbody.velocity.magnitude} m/s and {orbitTarget.scaledRigidbody.velocity} {orbitTarget.scaledRigidbody.velocity.magnitude} m/s for a binary system.");
+            orbitSet = true;
+            orbitTarget.orbitSet = true;
+            SetBaryCenter(baryCenter);
+            orbitTarget.SetBaryCenter(baryCenter);
             yield break;
         }
 
+        yield return new WaitUntil(() => orbitTarget.orbitSet);
+
         // Treat A as secondary body, B as primary
+        Vector3d rotationAxis;
+        // Get rotation axis to orbit in the direction of spin
+        if (orbitTarget.scaledRigidbody.angularVelocity.sqrMagnitude < 0.0000001)
+        {
+            rotationAxis = orbitTarget.transform.up.ToVector3d();
+        }
+        else
+        {
+            rotationAxis = orbitTarget.scaledRigidbody.angularVelocity.normalized;
+        }
+        Vector3d perpendicular = Vector3d.Cross(toCenter, rotationAxis).normalized;
 
-        Vector3d toCenter = posB - posA;
-        Vector3d perpendicular = Vector3d.Cross(toCenter, orbitTarget.transform.up.ToVector3d()).normalized;
-
-        g = orbitTarget.CalculateGravityAcceleration(scaledTransform.realPosition);
-        distance = toCenter.magnitude;
+        double g = orbitTarget.CalculateGravityAcceleration(scaledTransform.realPosition);
 
         Vector3d orbitVelocity = Math.Sqrt(distance * g) * perpendicular;
-
-        // Inherit target's velocity to handle nested orbits
-        scaledRigidbody.velocity = orbitTarget.scaledRigidbody.velocity + orbitVelocity;
+        
+        if (!orbitTarget.hasBaryCenter)
+        {
+            // Inherit target's velocity to handle nested orbits
+            orbitVelocity += orbitTarget.scaledRigidbody.velocity;
+        }
+        scaledRigidbody.velocity = orbitVelocity;
+        if (orbitVelocity != scaledRigidbody.velocity)
+        {
+            Debug.LogWarning($"[CelestialBody] Reached speed limit when attempting to set orbital velocity of {name}.");
+        }
+        Debug.Log($"[CelestialBody] Updated {name}'s velocity to {scaledRigidbody.velocity} {scaledRigidbody.velocity.magnitude} m/s to orbit {orbitTarget.name}.");
 
         if (tidallyLocked)
         {
             // Set angular velocity so the body is always facing the orbit target
             double angularSpeed = orbitVelocity.magnitude / distance;
-            Vector3d rotationAxis;
+            Vector3d newRotationAxis;
             if (overrideRotationAxis)
             {
-                rotationAxis = Vector3d.Cross(toCenter, orbitVelocity).normalized;
+                newRotationAxis = Vector3d.Cross(toCenter, orbitVelocity).normalized;
             }
             else
             {
-                rotationAxis = transform.up.ToVector3d();
+                newRotationAxis = transform.up.ToVector3d();
             }
 
-            scaledRigidbody.angularVelocity = rotationAxis * angularSpeed;
+            scaledRigidbody.angularVelocity = newRotationAxis * angularSpeed;
         }
+        orbitSet = true;
     }
 
     private void UpdateTidalLock()

@@ -92,6 +92,8 @@ MonoBehaviour:
   maxGridLevels: 16
   baseGridCellSize: 1
   cellScalingFactor: 16
+  logCollisions: 0
+  logTimings: 0
 --- !u!1 &230284701958847676
 GameObject:
   m_ObjectHideFlags: 0
@@ -2967,7 +2969,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 5
+  m_SortingOrder: 10
   m_TargetDisplay: 0
 --- !u!114 &5368599082581972639
 MonoBehaviour:

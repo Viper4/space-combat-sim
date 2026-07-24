@@ -89,7 +89,9 @@ public class HUDSystem : NetworkBehaviour
         Vector3 position = CalculateHUDPosition(target.scaledRigidbody.scaledTransform.realPosition, target.tag);
         Vector3 prediction = CalculateHUDPosition(predictedPosition, target.tag);
         float sqrDistanceToCenter = (Camera.main.transform.position + Camera.main.transform.forward * radarHUDDistance - position).sqrMagnitude;
-        bool detailsActive = sqrDistanceToCenter < detailsDistance * detailsDistance;
+        
+        bool detailsActive = (targetingSystem.lockedTarget != null && targetingSystem.lockedTarget.GetID() == target.GetID())
+                             || sqrDistanceToCenter < detailsDistance * detailsDistance;
         HUDObject newHUDObject = Instantiate(radarHudObjectPrefab, radarHudParent.transform).GetComponent<HUDObject>();
         newHUDObject.Init(this, position, target.GetID(), details, detailsActive, prediction);
         newHUDObject.sqrDistanceToCenter = sqrDistanceToCenter;
@@ -105,11 +107,12 @@ public class HUDSystem : NetworkBehaviour
         Vector3 predicted = CalculateHUDPosition(predictedPosition, target.tag);
         float sqrDistanceToCenter = (Camera.main.transform.position + Camera.main.transform.forward * radarHUDDistance - position).sqrMagnitude;
         HUDObject.sqrDistanceToCenter = sqrDistanceToCenter;
-
-        if (targetingSystem.lockedTarget != target || !target.scaledRigidbody.scaledTransform.visible)
+        bool isLockedTarget = targetingSystem.lockedTarget != null && targetingSystem.lockedTarget.GetID() == target.GetID();
+        bool detailsActive = isLockedTarget || sqrDistanceToCenter < detailsDistance * detailsDistance;
+        if (!isLockedTarget || !target.scaledRigidbody.scaledTransform.visible)
         {
             // No quad bounds
-            HUDObject.UpdateObject(position, details, sqrDistanceToCenter < detailsDistance * detailsDistance, predicted);
+            HUDObject.UpdateObject(position, details, detailsActive, predicted);
             return true;
         }
 
@@ -126,7 +129,7 @@ public class HUDSystem : NetworkBehaviour
             quad = SpaceGeometry.GetMinimumBoundingBox(target.boundsRenderers, Camera.main);
         }
 
-        HUDObject.UpdateObject(position, quad, details, true, predicted);
+        HUDObject.UpdateObject(position, quad, details, detailsActive, predicted);
         return true;
     }
 
@@ -202,18 +205,7 @@ public class HUDSystem : NetworkBehaviour
         return best;
     }
 
-    [TargetRpc]
-    public void SetTurretsTargetingTargetRpc(NetworkConnection conn, uint targetId, int num)
-    {
-        if (!radarHudActive)
-            return;
-        if (TryGetValue(targetId, out HUDObject hudObject))
-        {
-            hudObject.SetTargetText(num);
-        }
-    }
-
-    public void SetTurretsTargetingOffline(uint targetId, int num)
+    public void SetTurretsTargeting(uint targetId, int num)
     {
         if (!radarHudActive)
             return;

@@ -26,12 +26,13 @@ public class SceneLoader : DefaultSceneProcessor
         Instance = this;
     }
 
-    public void BeginOfflineLoad(string sceneName)
+    public void BeginOfflineLoad(string sceneName, string message = null)
     {
-        StartCoroutine(LoadOfflineSceneAsync(sceneName));
+        Debug.Log($"[SceneLoader] Started loading scene offline: {sceneName}.");
+        StartCoroutine(LoadOfflineSceneAsync(sceneName, message));
     }
 
-    private IEnumerator LoadOfflineSceneAsync(string sceneName)
+    private IEnumerator LoadOfflineSceneAsync(string sceneName, string message = null)
     {
         AsyncOperation op = UnitySceneManager.LoadSceneAsync(sceneName);
 
@@ -53,6 +54,10 @@ public class SceneLoader : DefaultSceneProcessor
             Cursor.visible = true;
         }
         OnEndSceneLoad?.Invoke();
+        if (message != null)
+        {
+            LobbyManager.Instance.InvokeConnectionFail(message);
+        }
     }
 
     public override void LoadStart(LoadQueueData queueData)

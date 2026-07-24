@@ -158,6 +158,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  overrideUnity: 0
   _mass: 0.0000001
   _isKinematic: 0
   _velocity:
@@ -173,10 +174,7 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
-  prevPos:
-    x: 0
-    y: 0
-    z: 0
+  collisionDetection: 0
 --- !u!114 &2070474964120565486
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -189,12 +187,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd05b432c58d5ad41be439478d9c0ad3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
+  _componentIndexCache: 1
+  _addedNetworkObject: {fileID: 1329950267029833902}
+  _networkObjectCache: {fileID: 1329950267029833902}
   team: 
-  alertSystem: {fileID: 0}
+  attachedRadar: {fileID: 0}
   alertWhenTargeting: 1
+  stealthReduction: 0
+  emissionTrigger: {fileID: 0}
+  radarIndex: -1
+  passivelyDetected: 0
+  activelyDetected: 0
+  collidersInActiveRadar: 0
   radarIcon: {fileID: 0}
   turretsTargeting: 0
-  stealthDistance: -1
   useScaleForBounds: 1
   boundsRenderers: []
 --- !u!114 &2531517365616847470
@@ -216,8 +222,17 @@ MonoBehaviour:
   radius: -1
   isTrigger: 0
   restitution: 0
+  hGridCell:
+    level: 0
+    x: 0
+    y: 0
+    z: 0
   listIndex: -1
   overrideUnity: 0
+  prevCenterPos:
+    x: 0
+    y: 0
+    z: 0
 --- !u!114 &1329950267029833902
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -265,6 +280,7 @@ MonoBehaviour:
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
   - {fileID: 1208913255037145551}
+  - {fileID: 2070474964120565486}
   - {fileID: 4511071373608105315}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
@@ -276,7 +292,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584169821424183920
+  _initializedTimestamp: -8584166972375615985
 --- !u!114 &4511071373608105315
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -289,7 +305,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87f21fb26d74cb446adea6577efd64e9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbodySync
-  _componentIndexCache: 1
+  _componentIndexCache: 2
   _addedNetworkObject: {fileID: 1329950267029833902}
   _networkObjectCache: {fileID: 1329950267029833902}
   snapshotRate: 10

@@ -82,7 +82,7 @@ public class TorpedoSystem : NetworkBehaviour
 
     public void TorpedoBaySwitch(int state)
     {
-        if (!IsOwnerOrOffline)
+        if (!IsOwnerOrOffline || !ship.isStarted)
             return;
         torpedoBayDoorOpen = state == 1;
         if (torpedoBayDoorOpen)
@@ -102,7 +102,7 @@ public class TorpedoSystem : NetworkBehaviour
         launchAudio.ResetPlay(true);
 
         if (IsOffline || IsServerInitialized)
-            launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(ship.scaledRigidbody.scaledTransform, ship.scaledRigidbody.velocity, lockedTarget, i, ship.radarTarget.team);
+            launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(ship.scaledRigidbody.scaledTransform, ship.scaledRigidbody.velocity, lockedTarget, i, ship.attachedRadarTarget.team);
         UpdateTorpedoUI(i, false);
     }
 
@@ -172,7 +172,7 @@ public class TorpedoSystem : NetworkBehaviour
 
     private void TryLaunchTorpedo(InputAction.CallbackContext context)
     {
-        if (!torpedoBayDoorOpen || !canLaunch)
+        if (!torpedoBayDoorOpen || !canLaunch || !ship.isStarted)
             return;
         if (IsOffline)
         {

@@ -207,7 +207,7 @@ public class LobbyUI : MonoBehaviour
 
     private void OnClickStopHosting()
     {
-        LobbyManager.Instance.Disconnect();
+        LobbyManager.Instance.IntentionallyDisconnect();
         ShowPanel(mainMenuPanel);
     }
 
@@ -247,7 +247,7 @@ public class LobbyUI : MonoBehaviour
 
     private void Disconnect()
     {
-        LobbyManager.Instance.Disconnect();
+        LobbyManager.Instance.IntentionallyDisconnect();
         ShowPanel(joinPanel);
         ShowStatus(false);
     }
@@ -349,7 +349,7 @@ public class LobbyUI : MonoBehaviour
         joinPanel      .SetActive(target == joinPanel);
         connectingPanel.SetActive(target == connectingPanel);
         connectedPanel .SetActive(target == connectedPanel);
-        ShowStatus(false);
+        // ShowStatus(false);
         UpdateUsernameFields();
     }
 
@@ -371,6 +371,7 @@ public class LobbyUI : MonoBehaviour
     private void HidePanels()
     {
         mainMenuPanel  .SetActive(false);
+        hostPortPanel  .SetActive(false);
         hostPanel      .SetActive(false);
         joinPanel      .SetActive(false);
         connectingPanel.SetActive(false);

@@ -2,21 +2,21 @@
     "rangedSettings": [
         {
             "name": "Sensitivity",
-            "value": 0.4853639602661133,
+            "value": 0.41660502552986147,
             "min": 0.0,
             "max": 1.0,
             "integer": false
         },
         {
             "name": "Field of View",
-            "value": 66.6359634399414,
+            "value": 60.865478515625,
             "min": 15.0,
             "max": 90.0,
             "integer": false
         },
         {
             "name": "Target Frame Rate",
-            "value": 132.0,
+            "value": 50.0,
             "min": 1.0,
             "max": 300.0,
             "integer": true

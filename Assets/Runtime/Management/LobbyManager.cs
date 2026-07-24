@@ -10,6 +10,7 @@ using FishNet.Object;
 using FishNet.Transporting;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnitySceneManager = UnityEngine.SceneManagement.SceneManager;
 
 /// <summary>
 /// Central lobby system. Manages the always-on main server connection,
@@ -143,6 +144,11 @@ public class LobbyManager : MonoBehaviour
 
     // -- Public API -------------------------------------------------------------
 
+    public void InvokeConnectionFail(string reason)
+    {
+        OnConnectionFailed?.Invoke(reason);
+    }
+
     public void UpdatePlayerCount()
     {
         OnPlayerCountChanged?.Invoke(InstanceFinder.ClientManager.Clients.Count, _maxPlayers);
@@ -268,7 +274,7 @@ public class LobbyManager : MonoBehaviour
     {
         if (!TryDecodeInviteCode(code, out string ip, out ushort port))
         {
-            OnConnectionFailed?.Invoke("Invalid invite code — double-check and try again.");
+            InvokeConnectionFail("Invalid invite code — double-check and try again.");
             return;
         }
         JoinByAddress(ip, port);
@@ -286,30 +292,10 @@ public class LobbyManager : MonoBehaviour
     /// Disconnect the client; also stops the server if this machine is hosting.
     /// Suppresses OnConnectionFailed — this is an intentional action.
     /// </summary>
-    public void Disconnect()
+    public void IntentionallyDisconnect()
     {
         _disconnectingIntentionally = true;
-        StopAllCoroutines(); // Cancel any in-progress ValidateAndConnect
-
-        if (InstanceFinder.IsClientStarted)
-        {
-            InstanceFinder.ClientManager.OnRemoteConnectionState -= HandleRemoteConnectionClient;
-            InstanceFinder.ClientManager.StopConnection();
-        }
-
-        if (_isHosting && InstanceFinder.IsServerStarted)
-        {
-            if (PlayerInfoRelay.Instance != null)
-            {
-                InstanceFinder.ServerManager.Despawn(PlayerInfoRelay.Instance);
-            }
-            InstanceFinder.ServerManager.OnRemoteConnectionState -= HandleRemoteConnectionServer;
-            InstanceFinder.ServerManager.StopConnection(sendDisconnectMessage: true);
-        }
-
-        _isHosting = false;
-        SetState(LobbyState.Disconnected);
-        SceneLoader.Instance.BeginOfflineLoad("StartScene");
+        Disconnect();
     }
 
     // -- Invite Code ------------------------------------------------------------
@@ -403,6 +389,31 @@ public class LobbyManager : MonoBehaviour
         InstanceFinder.ClientManager.OnRemoteConnectionState += HandleRemoteConnectionClient;
     }
 
+    private void Disconnect()
+    {
+        StopAllCoroutines(); // Cancel any in-progress ValidateAndConnect
+        if (InstanceFinder.IsClientStarted)
+        {
+            InstanceFinder.ClientManager.OnRemoteConnectionState -= HandleRemoteConnectionClient;
+            InstanceFinder.ClientManager.StopConnection();
+        }
+
+        if (_isHosting && InstanceFinder.IsServerStarted)
+        {
+            if (PlayerInfoRelay.Instance != null)
+            {
+                InstanceFinder.ServerManager.Despawn(PlayerInfoRelay.Instance);
+            }
+            InstanceFinder.ServerManager.OnRemoteConnectionState -= HandleRemoteConnectionServer;
+            InstanceFinder.ServerManager.StopConnection(sendDisconnectMessage: true);
+        }
+
+        SetState(LobbyState.Disconnected);
+
+        if (UnitySceneManager.GetActiveScene().buildIndex != 0)
+            SceneLoader.Instance.BeginOfflineLoad("StartScene");
+    }
+
     /// <summary>
     /// Called when a connection attempt ends in Stopped without being intentional.
     /// Uses the elapsed time and _everReachedStarted to pick the most accurate message.
@@ -438,14 +449,14 @@ public class LobbyManager : MonoBehaviour
                 : $"Host at {at} is unreachable. Check the address and that the server is online.";
         }
 
-        OnConnectionFailed?.Invoke(msg);
+        InvokeConnectionFail(msg);
     }
 
     /// <summary>Sets state to Disconnected and fires OnConnectionFailed with a pre-built message.</summary>
     private void Fail(string message)
     {
         SetState(LobbyState.Disconnected);
-        OnConnectionFailed?.Invoke(message);
+        InvokeConnectionFail(message);
         Debug.Log($"[LobbyManager] Connection failed: {message}");
     }
 
@@ -538,6 +549,40 @@ public class LobbyManager : MonoBehaviour
         OnStateChanged?.Invoke(state);
     }
 
+    private void ConnectionFailed()
+    {
+        if (!_disconnectingIntentionally)
+        {
+            switch (State)
+            {
+                case LobbyState.Connecting:
+                    ClassifyAndFireFailure();
+                    break;
+                case LobbyState.Connected:
+                    if (UnitySceneManager.GetActiveScene().buildIndex != 0)
+                    {
+                        SceneLoader.Instance.BeginOfflineLoad("StartScene", "Lost connection to the server");
+                    }
+                    else
+                    {
+                        InvokeConnectionFail("Lost connection to the server.");
+                    }
+                    break;
+                case LobbyState.Hosting:
+                    if (UnitySceneManager.GetActiveScene().buildIndex != 0)
+                    {
+                        SceneLoader.Instance.BeginOfflineLoad("StartScene", "Server failed to start. This usually occurs when the specified port is unavailable.");
+                    }
+                    else
+                    {
+                        InvokeConnectionFail("Server failed to start. This usually occurs when the specified port is unavailable.");
+                    }
+                    break;
+            }
+        }
+        Disconnect();
+    }
+
     // -- FishNet Callbacks ------------------------------------------------------
 
     private void HandleClientState(ClientConnectionStateArgs args)
@@ -553,32 +598,10 @@ public class LobbyManager : MonoBehaviour
                     SetState(LobbyState.Connected);
                 }
                 break;
-
             case LocalConnectionState.Stopped:
             {
-                bool wasConnecting = State == LobbyState.Connecting;
-                bool wasLive       = State == LobbyState.Connected || State == LobbyState.Hosting;
-
-                // If the server is also gone (or we were never hosting), go fully Disconnected.
-                if (!_isHosting || !InstanceFinder.IsServerStarted)
-                {
-                    _isHosting = false;
-                    SetState(LobbyState.Disconnected);
-                }
-
-                if (!_disconnectingIntentionally)
-                {
-                    if (wasConnecting)
-                    {
-                        ClassifyAndFireFailure();
-                    }
-                    else if (wasLive)
-                    {
-                        SceneLoader.Instance.BeginOfflineLoad("StartScene");
-                        OnConnectionFailed?.Invoke("Lost connection to the server.");
-                    }
-                }
                 _disconnectingIntentionally = false;
+                ConnectionFailed();
                 break;
             }
         }
@@ -587,6 +610,9 @@ public class LobbyManager : MonoBehaviour
     private void HandleServerState(ServerConnectionStateArgs args)
     {
         if (args.ConnectionState == LocalConnectionState.Stopped && _isHosting)
-            _isHosting = false; // Client Stopped will follow and call SetState(Disconnected)
+        {
+            _disconnectingIntentionally = false;
+            ConnectionFailed();
+        }
     }
 }

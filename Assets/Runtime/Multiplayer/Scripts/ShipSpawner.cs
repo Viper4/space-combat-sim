@@ -5,13 +5,10 @@ using FishNet;
 using UnityEngine;
 using SpaceStuff;
 using FishNet.Managing.Scened;
-using System.Collections;
-using UnityEngine.SceneManagement;
+using UnitySceneManager = UnityEngine.SceneManagement.SceneManager;
 
 public class ShipSpawner : MonoBehaviour
 {
-    public static ShipSpawner Instance { get; private set; }
-
     [Header("Spawn")]
     [SerializeField] private NetworkObject shipPrefab;
     [SerializeField] private Transform[] spawnPoints;
@@ -22,30 +19,22 @@ public class ShipSpawner : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        Debug.Log("[ShipSpawner] Initializing ShipSpawner.");
+
         if (InstanceFinder.IsOffline)
         {
             SpawnOfflinePlayerShip();
         }
-        else if (InstanceFinder.IsServerStarted)
+        else if (InstanceFinder.ServerManager != null)
         {
-            // InstanceFinder.SceneManager.OnClientLoadedStartScenes += OnClientLoadedStartScenes;
             InstanceFinder.SceneManager.OnClientPresenceChangeEnd += OnClientPresenceChangeEnd;
             InstanceFinder.ServerManager.OnRemoteConnectionState += OnRemoteConnectionState;
-
-            // SpawnPlayerShip(InstanceFinder.ClientManager.Connection);
         }
-
-        Instance = this;
     }
 
     private void OnDestroy()
     {
-        if (InstanceFinder.IsServerStarted && InstanceFinder.ServerManager != null)
+        if (InstanceFinder.ServerManager != null)
         {
             // InstanceFinder.SceneManager.OnClientLoadedStartScenes -= OnClientLoadedStartScenes;
             InstanceFinder.SceneManager.OnClientPresenceChangeEnd -= OnClientPresenceChangeEnd;
