@@ -30,7 +30,6 @@ public class RangedSettingRow : MonoBehaviour
     // ── State ──────────────────────────────────────────────────────────────────
 
     private string settingName;
-    private float originalValue;
     private bool hasOverride;
 
     // ── Initialization ─────────────────────────────────────────────────────────
@@ -48,11 +47,11 @@ public class RangedSettingRow : MonoBehaviour
             return;
         }
         RangedSetting setting = GameManager.Instance.gameSettings.rangedSettings[index];
-        originalValue = setting.value;
 
         slider.minValue = setting.min;
         slider.maxValue = setting.max;
         slider.value = setting.value;
+        hasOverride = setting.value != SaveSystem.defaultGameSettings.rangedSettings[index].value;
 
         if (setting.integer)
         {
@@ -92,7 +91,6 @@ public class RangedSettingRow : MonoBehaviour
         slider.SetValueWithoutNotify(setting.value);
 
         GameManager.Instance.InvokeRangedSettingAction(settingName);
-        GameManager.Instance.SaveSettings();
 
         // Dim the reset button if there is no override to undo.
         resetButton.interactable = hasOverride;
@@ -128,13 +126,13 @@ public class RangedSettingRow : MonoBehaviour
         Refresh();
     }
 
-    private void OnResetClicked()
+    public void OnResetClicked()
     {
         int index = GameManager.Instance.GetRangedSettingIndex(settingName);
         if (index < 0)
             return;
         RangedSetting setting = GameManager.Instance.gameSettings.rangedSettings[index];
-        setting.value = originalValue;
+        setting.value = SaveSystem.defaultGameSettings.rangedSettings[index].value;
         GameManager.Instance.gameSettings.rangedSettings[index] = setting;
         hasOverride = false;
         Refresh();

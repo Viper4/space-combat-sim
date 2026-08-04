@@ -116,8 +116,8 @@ ParticleSystem:
     startLifetime:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 3
-      minScalar: 2
+      scalar: 10
+      minScalar: 5
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -980,7 +980,7 @@ ParticleSystem:
       countCurve:
         serializedVersion: 2
         minMaxState: 0
-        scalar: 15
+        scalar: 30
         minScalar: 30
         maxCurve:
           serializedVersion: 2
@@ -14827,7 +14827,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12b7d4da67002134d96d5032658c9c84, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  delay: 3
+  delay: 10
 --- !u!114 &509690018214148608
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14870,6 +14870,12 @@ MonoBehaviour:
     z: 1
   minScreenPixelSize: 3
   visible: 1
+  trackedColliders: []
+  trackedRenderers:
+  - {fileID: 3982350210874365307}
+  - {fileID: 6082999102225684888}
+  - {fileID: 800744073287562394}
+  - {fileID: 7887108282999977110}
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 1000
@@ -14918,21 +14924,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbody
-  _active: 0
+  freezePositionX: 0
+  freezePositionY: 0
+  freezePositionZ: 0
+  freezeRotationX: 0
+  freezeRotationY: 0
+  freezeRotationZ: 0
+  overrideUnity: 0
   _mass: 0.0000001
   _isKinematic: 0
   _velocity:
     x: 0
     y: 0
     z: 0
-  _angularVelocity:
+  affectedByGravity: 1
+  gravityAcceleration:
     x: 0
     y: 0
     z: 0
-  prevPos:
-    x: 0
-    y: 0
-    z: 0
+  collisionDetection: 0
 --- !u!1 &7979410831539372171
 GameObject:
   m_ObjectHideFlags: 0

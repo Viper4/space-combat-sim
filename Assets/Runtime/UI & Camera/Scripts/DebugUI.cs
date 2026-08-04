@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using System.Text.RegularExpressions;
 using FishNet;
 using TMPro;
@@ -16,9 +17,11 @@ public class DebugUI : MonoBehaviour
     [Header("Settings")]
     [SerializeField] private int maxUniqueLogs = 200;
 
+    private StringBuilder logStringBuilder = new(4096);
+
     private readonly Dictionary<string, LogData> logs = new();
 
-    private static readonly Regex ColonRegex = new(@".*:", RegexOptions.Compiled);
+    private static readonly Regex ColonRegex = new(@"].*:", RegexOptions.Compiled);
     private static readonly Regex NumberRegex = new(@"\d+(\.\d+)?", RegexOptions.Compiled);
 
     private float time;
@@ -109,20 +112,17 @@ public class DebugUI : MonoBehaviour
 
     private string GenerateTemplateKey(string message)
     {
-        if (message.Contains(":"))
+        Match colonMatch = ColonRegex.Match(message);
+        if (colonMatch.Success)
         {
-            return ColonRegex.Match(message).Value;
+            return colonMatch.Value;
         }
-        // else
-        // {
-        //     return NumberRegex.Match(message).Value;
-        // }
         return message;
     }
 
     private void RefreshLog()
     {
-        logText.text = string.Empty;
+        logStringBuilder.Clear();
 
         foreach (var pair in logs)
         {
@@ -137,14 +137,14 @@ public class DebugUI : MonoBehaviour
                 _ => "#FFFFFF"
             };
 
-            logText.text +=
-                $"<color={color}>{log.LatestMessage}</color>";
+            string logMessage = $"<color={color}>{log.LatestMessage}</color>";
 
             if (log.Count > 1)
-                logText.text += $" <color=#88FF88>(x{log.Count})</color>";
+                logMessage += $" <color=#88FF88>(x{log.Count})</color>";
 
-            logText.text += "\n";
+            logStringBuilder.Append(logMessage + "\n");
         }
+        logText.text = logStringBuilder.ToString();
     }
 
     public void ClearLogs()

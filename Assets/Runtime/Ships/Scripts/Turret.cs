@@ -29,9 +29,13 @@ public class Turret : NetworkBehaviour
     [SerializeField] private float rotateSpeed = 180f;
 
     [Header("Shooting")]
+    [SerializeField] private int maxAmmo;
+    private int ammo;
+    [SerializeField] private SliderIndicator ammoIndicator;
     [SerializeField] private float maxShootDelta = 0.05f;
     [SerializeField, Tooltip("One bullet per fireRate seconds.")] private float fireRate = 0.15f;
     private float nextFireTime = 0f;
+    private float fireTimeOffset = 0f;
     [SerializeField] protected GameObject projectilePrefab;
     [SerializeField] private GameObject shootParticles;
     [SerializeField] protected float projectileSpeed = 50;
@@ -86,6 +90,7 @@ public class Turret : NetworkBehaviour
             turretSystem.StartTargetSearch += ResetTargetSearch;
             turretSystem.CheckTarget += CheckTarget;
         }
+        SetCurrentAmmo(maxAmmo);
     }
 
     private void OnDestroy()
@@ -131,10 +136,10 @@ public class Turret : NetworkBehaviour
 
     private void FixedUpdate()
     {
-        if (!active || !ship.isStarted)
-            return;
+        if (IsServerInitialized && !IsOwner)
+            CheckFire(); // Owner controls rotation of turret
 
-        if (!IsOwnerOrOffline)
+        if (!active || !ship.isStarted || !IsOwnerOrOffline)
             return;
 
         if (currentTarget != null)
@@ -209,27 +214,31 @@ public class Turret : NetworkBehaviour
             }
         }
 
-        if (Time.fixedTime >= nextFireTime)
+        CheckFire();
+    }
+
+    private void CheckFire()
+    {
+        if (Time.fixedTime < nextFireTime)
+            return;
+        if (!obstructed && shoot && ammo > 0)
         {
-            if (!obstructed && shoot && turretSystem.currentAmmo > 0)
+            if (IsOffline)
             {
-                if (IsOffline)
-                {
-                    FireRealBullet();
-                }
-                else if (IsServerInitialized)
-                {
-                    FireVisualBulletObserversRpc();
-                    FireRealBullet();
-                }
-                else if (IsOwner)
-                {
-                    // Fire visual bullet immediately to avoid perceived lag for owner client
-                    FireVisualBullet();
-                }
+                FireRealBullet();
             }
-            nextFireTime += fireRate;
+            else if (IsServerInitialized)
+            {
+                FireVisualBulletObserversRpc();
+                FireRealBullet();
+            }
+            else if (IsOwner)
+            {
+                // Fire visual bullet immediately to avoid perceived lag for owner client
+                FireVisualBullet();
+            }
         }
+        nextFireTime += fireRate;
     }
 
     private void ResetTargetSearch()
@@ -330,7 +339,9 @@ public class Turret : NetworkBehaviour
     [TargetRpc]
     private void SetOwnerAmmoCountTargetRpc(NetworkConnection conn, int ammo)
     {
-        turretSystem.SetAmmo(ammo);
+        this.ammo = ammo;
+        if (ammoIndicator != null)
+            ammoIndicator.UpdateUI(ammo, maxAmmo);
     }
 
     public void SetShoot(bool shoot)
@@ -387,7 +398,7 @@ public class Turret : NetworkBehaviour
 
     private void FireRealBullet()
     {
-        turretSystem.OnTurretFire();
+        ammo--;
         Vector3d realBulletPoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(firePoint.position);
         // Retarded hack needed to prevent ScaledTransform from running Awake() and overriding transform.position with a zero Vector realPosition
         firePoint.gameObject.SetActive(false);
@@ -431,14 +442,19 @@ public class Turret : NetworkBehaviour
             Vector3d realCasingPoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(casingPoint.position);
             ScaledRigidbody casingRigidbody = Instantiate(casingPrefab, casingPoint.position, casingPoint.rotation).GetComponent<ScaledRigidbody>();
             casingRigidbody.scaledTransform.realPosition = realCasingPoint;
-            casingRigidbody.angularVelocity = (Random.insideUnitSphere * casingRandomness).ToVector3d();
+            casingRigidbody.angularVelocity = Random.insideUnitSphere * casingRandomness;
             casingRigidbody.velocity = ship.scaledRigidbody.velocity + ((casingPoint.up + Random.insideUnitSphere * casingRandomness) * casingSpeed).ToVector3d();
         }
 
-        if (IsServerInitialized && !IsOwner)
+        if (IsOwnerOrOffline)
         {
-            // Periodically synchronize ammo count with owner
-            SetOwnerAmmoCountTargetRpc(Owner, turretSystem.currentAmmo);
+            if (ammoIndicator != null)
+                ammoIndicator.UpdateUI(ammo, maxAmmo);
+        }
+        else if (IsServerInitialized)
+        {
+            // Synchronize ammo count with owner
+            SetOwnerAmmoCountTargetRpc(Owner, ammo);
         }
     }
 
@@ -487,5 +503,20 @@ public class Turret : NetworkBehaviour
     public void SetFireOffset(int index, int turretCount)
     {
         nextFireTime = Time.fixedTime + index * fireRate / turretCount;
+    }
+
+    public int GetCurrentAmmo()
+    {
+        return ammo;
+    }
+
+    public void SetCurrentAmmo(int value)
+    {
+        ammo = Mathf.Clamp(value, 0, maxAmmo);
+    }
+
+    public int GetMaxAmmo()
+    {
+        return maxAmmo;
     }
 }

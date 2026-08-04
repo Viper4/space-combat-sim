@@ -46,7 +46,7 @@ public class Atmosphere : MonoBehaviour
             return;
         float radius = Mathf.Max(planet.transform.localScale.x, planet.transform.localScale.y, planet.transform.localScale.z);
         material.SetVector("_LightDirection", (planet.realPosition - lightSource.scaledTransform.realPosition).normalized.ToVector3());
-        material.SetColor("_LightColor", lightSource.mainColor);
+        material.SetColor("_LightColor", lightSource.baseColor);
         material.SetVector("_PlanetPosition", planet.transform.position);
         material.SetFloat("_PlanetRadius", radius);
         material.SetFloat("_AtmosphereRadius", radius + 2);

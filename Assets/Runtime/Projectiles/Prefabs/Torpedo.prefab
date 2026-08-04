@@ -262,6 +262,11 @@ MonoBehaviour:
     z: 1
   minScreenPixelSize: 3
   visible: 1
+  trackedColliders:
+  - {fileID: 2688048666450355157}
+  trackedRenderers:
+  - {fileID: 2153530488087983894}
+  - {fileID: 1511601194769986097}
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 10
@@ -283,14 +288,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhysicsHandler
+  freezePositionX: 0
+  freezePositionY: 0
+  freezePositionZ: 0
+  freezeRotationX: 0
+  freezeRotationY: 0
+  freezeRotationZ: 0
   overrideUnity: 0
   _mass: 300
   _isKinematic: 0
   _velocity:
-    x: 0
-    y: 0
-    z: 0
-  _angularVelocity:
     x: 0
     y: 0
     z: 0
@@ -410,11 +417,11 @@ MonoBehaviour:
   idleEmissionRadius: 250
   _collider: {fileID: 2688048666450355157}
   detonateTrigger: {fileID: 5808707154644366391}
-  engineForce: 300000
-  thrusterForce: 500
-  proportionalGain: 5.118147
+  engineForce: 294000
+  thrusterForce: 15000
+  proportionalGain: 389.4045
   integralGain: 0
-  derivativeGain: 3.921913
+  derivativeGain: 109.9889
   rocketTrail: {fileID: 4901987813079629749}
   collideSpeedThreshold: 100
   explosionPrefab: {fileID: 3982350210874365306, guid: 38256d267e02f9045b36a61ca4903a4d, type: 3}
@@ -427,6 +434,7 @@ MonoBehaviour:
     m_Bits: 52
   target: {fileID: 0}
   navigationConstant: 4
+  thrusterTorque: 0
 --- !u!114 &8942289586678289918
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -439,9 +447,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd05b432c58d5ad41be439478d9c0ad3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
-  _componentIndexCache: 255
+  _componentIndexCache: 1
   _addedNetworkObject: {fileID: 8624868431337818510}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 8624868431337818510}
   team: 
   attachedRadar: {fileID: 0}
   alertWhenTargeting: 1
@@ -468,7 +476,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87f21fb26d74cb446adea6577efd64e9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DoubleRigidbodySync
-  _componentIndexCache: 1
+  _componentIndexCache: 2
   _addedNetworkObject: {fileID: 8624868431337818510}
   _networkObjectCache: {fileID: 8624868431337818510}
   snapshotRate: 10
@@ -524,6 +532,7 @@ MonoBehaviour:
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
   - {fileID: 6577287821693102537}
+  - {fileID: 8942289586678289918}
   - {fileID: 1209257913728134229}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
@@ -535,7 +544,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584168085050900702
+  _initializedTimestamp: -8584160609944774445
 --- !u!1 &7891829006686870921
 GameObject:
   m_ObjectHideFlags: 0
@@ -607,6 +616,10 @@ PrefabInstance:
     m_TransformParent: {fileID: 8959325904046899293}
     m_Modifications:
     - target: {fileID: 6312848545668391724, guid: 76fc3a337ebe7a34d8069d2a60704bf5, type: 3}
+      propertyPath: InitialModule.startSize.scalar
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6312848545668391724, guid: 76fc3a337ebe7a34d8069d2a60704bf5, type: 3}
       propertyPath: InitialModule.startSpeed.scalar
       value: 0.5
       objectReference: {fileID: 0}
@@ -667,6 +680,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 76fc3a337ebe7a34d8069d2a60704bf5, type: 3}
+--- !u!199 &1511601194769986097 stripped
+ParticleSystemRenderer:
+  m_CorrespondingSourceObject: {fileID: 3311108013224578389, guid: 76fc3a337ebe7a34d8069d2a60704bf5, type: 3}
+  m_PrefabInstance: {fileID: 4109854028599492452}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &4721656760093672716 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8687324626278546024, guid: 76fc3a337ebe7a34d8069d2a60704bf5, type: 3}

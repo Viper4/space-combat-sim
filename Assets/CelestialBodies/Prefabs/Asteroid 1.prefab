@@ -18,7 +18,7 @@ GameObject:
   - component: {fileID: 3432351637793023832}
   - component: {fileID: 1847065452805617377}
   - component: {fileID: -467688900442111250}
-  - component: {fileID: 7898235769844472124}
+  - component: {fileID: 8419449798854834267}
   m_Layer: 0
   m_Name: Asteroid 1
   m_TagString: CelestialBody
@@ -63,6 +63,8 @@ MonoBehaviour:
     z: 1
   minScreenPixelSize: 3
   visible: 1
+  trackedColliders: []
+  trackedRenderers: []
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 1000
@@ -159,14 +161,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  freezePositionX: 0
+  freezePositionY: 0
+  freezePositionZ: 0
+  freezeRotationX: 0
+  freezeRotationY: 0
+  freezeRotationZ: 0
   overrideUnity: 0
   _mass: 0.0000001
   _isKinematic: 0
   _velocity:
-    x: 0
-    y: 0
-    z: 0
-  _angularVelocity:
     x: 0
     y: 0
     z: 0
@@ -188,16 +192,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd05b432c58d5ad41be439478d9c0ad3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RadarTarget
+  _componentIndexCache: 1
+  _addedNetworkObject: {fileID: 1847065452805617377}
+  _networkObjectCache: {fileID: 1847065452805617377}
   team: 
-  radar: {fileID: 0}
+  attachedRadar: {fileID: 0}
   alertWhenTargeting: 1
-  passiveRadarIndex: -1
-  activeRadarIndex: -1
+  stealthReduction: 0
+  emissionTrigger: {fileID: 0}
+  radarIndex: -1
+  passivelyDetected: 0
+  activelyDetected: 0
+  collidersInActiveRadar: 0
   radarIcon: {fileID: 0}
   turretsTargeting: 0
-  emissionStrength: 0
-  stealthDistance: -1
-  collidersInRadarRange: 0
   useScaleForBounds: 1
   boundsRenderers: []
 --- !u!114 &3432351637793023832
@@ -277,8 +285,8 @@ MonoBehaviour:
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
   - {fileID: 1673852074928851070}
+  - {fileID: 824532636656329706}
   - {fileID: -467688900442111250}
-  - {fileID: 7898235769844472124}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -289,7 +297,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584168085050900702
+  _initializedTimestamp: -8584160609944774445
 --- !u!114 &-467688900442111250
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -302,7 +310,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87f21fb26d74cb446adea6577efd64e9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbodySync
-  _componentIndexCache: 1
+  _componentIndexCache: 2
   _addedNetworkObject: {fileID: 1847065452805617377}
   _networkObjectCache: {fileID: 1847065452805617377}
   snapshotRate: 15
@@ -311,7 +319,7 @@ MonoBehaviour:
   controlType: 1
   activeWhenOffline: 1
   syncMass: 0
---- !u!114 &7898235769844472124
+--- !u!114 &8419449798854834267
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -320,14 +328,6 @@ MonoBehaviour:
   m_GameObject: {fileID: 4028611689432565048}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d7d320e38f6226f47be69104d9185400, type: 3}
+  m_Script: {fileID: 11500000, guid: ae8d01bf5d32f2e458a64a733b1508d0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NetworkObjectDestroyer
-  _componentIndexCache: 2
-  _addedNetworkObject: {fileID: 1847065452805617377}
-  _networkObjectCache: {fileID: 1847065452805617377}
-  nonOwnerGOsToDestroy: []
-  nonOwnerBehaviorsToDestroy: []
-  nonServerGOsToDestroy: []
-  nonServerBehaviorsToDestroy:
-  - {fileID: 3432351637793023832}
+  m_EditorClassIdentifier: Assembly-CSharp::RelativisticObject

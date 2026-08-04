@@ -50,6 +50,8 @@ public class AlertSystem : MonoBehaviour
 
     public void NewContact()
     {
+        if (!radar.IsEnabled)
+            return;
         contactAudioSource.Stop();
         contactAudioSource.clip = contactClip;
         contactAudioSource.Play();
@@ -57,6 +59,8 @@ public class AlertSystem : MonoBehaviour
 
     public void NewSpecialContact()
     {
+        if (!radar.IsEnabled)
+            return;
         contactAudioSource.Stop();
         contactAudioSource.clip = specialContactClip;
         contactAudioSource.Play();
@@ -64,6 +68,8 @@ public class AlertSystem : MonoBehaviour
 
     private void UpdateRadarLock()
     {
+        if (!radar.IsEnabled)
+            return;
         if (radar.radarLocks > 0)
         {
             if (lockAudioSource.clip != radarLockClip)
@@ -95,6 +101,8 @@ public class AlertSystem : MonoBehaviour
 
     private void UpdateMissileLock()
     {
+        if (!radar.IsEnabled)
+            return;
         if (radar.missileLocks > 0)
         {
             if (lockAudioSource.clip != missileLockClip)

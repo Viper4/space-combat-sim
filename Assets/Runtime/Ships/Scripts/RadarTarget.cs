@@ -33,7 +33,8 @@ public class RadarTarget : NetworkBehaviour
     /// </summary>
     public Renderer[] boundsRenderers;
 
-    private bool IsServerOrOffline => IsServerInitialized || IsOffline;
+    private bool IsOwnerOrOffline => NetworkObject == null || IsOffline || IsOwner;
+    private bool IsServerOrOffline => NetworkObject == null || IsOffline || IsServerInitialized;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     private void Start()
@@ -44,7 +45,7 @@ public class RadarTarget : NetworkBehaviour
 
         if (!useScaleForBounds && (boundsRenderers == null || boundsRenderers.Length == 0))
         {
-            boundsRenderers = scaledRigidbody.scaledTransform.GetTrackedRenderers();
+            boundsRenderers = scaledRigidbody.scaledTransform.CloneTrackedRenderers();
         }
 
         inverseFixedDeltaTime = 1f / Time.fixedDeltaTime;
@@ -69,15 +70,15 @@ public class RadarTarget : NetworkBehaviour
     {
         if (!IsServerOrOffline || emissionTrigger == null || source.id != emissionTrigger.id)
             return;
-        if (other.TryGetComponent<Radar>(out var radar))
+        if (other.scaledRigidbody.TryGetComponent<Radar>(out var otherRadar))
         {
-            if (IsOffline)
+            if (IsOffline || otherRadar.IsOwner)
             {
-                radar.AddPassiveTarget(this);
+                otherRadar.AddPassiveTarget(this);
             }
             else
             {
-                radar.StartPing(NetworkObject.ObjectId);
+                otherRadar.StartPing(NetworkObject.ObjectId);
             }
         }
     }
@@ -86,15 +87,15 @@ public class RadarTarget : NetworkBehaviour
     {
         if (!IsServerOrOffline || emissionTrigger == null || source.id != emissionTrigger.id)
             return;
-        if (other.TryGetComponent<Radar>(out var radar))
+        if (other.scaledRigidbody.TryGetComponent<Radar>(out var otherRadar))
         {
-            if (IsOffline)
+            if (IsOffline || otherRadar.IsOwner)
             {
-                radar.RemovePassiveTarget(this);
+                otherRadar.RemovePassiveTarget(this);
             }
             else
             {
-                radar.StopPing(NetworkObject.ObjectId);
+                otherRadar.StopPing(NetworkObject.ObjectId);
             }
         }
     }
@@ -124,5 +125,12 @@ public class RadarTarget : NetworkBehaviour
     {
         if (emissionTrigger != null)
             emissionTrigger.SetRadius(newRadius);
+    }
+
+    public double GetEmissionTriggerRadius()
+    {
+        if (!emissionTrigger.enabled)
+            return -1.0;
+        return emissionTrigger.GetRadius();
     }
 }

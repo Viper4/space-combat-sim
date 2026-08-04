@@ -39,13 +39,13 @@ public class ScaledObjectSync : NetworkBehaviour
         scaledRigidbody = GetComponent<ScaledRigidbody>();
         if (controlType == ControlType.Client)
         {
-            Debug.LogWarning("[ScaledObjectSync] Cannot initialize with Client control type. Defaulting to Owner.");
+            Debug.LogWarning(GameLog.ObjectLog(this, "Cannot initialize with Client control type. Defaulting to Owner."));
             controlType = ControlType.Owner;
         }
 
         if (InstanceFinder.IsOffline && activeWhenOffline && NetworkObject.GetIsNetworked())
         {
-            Debug.Log($"[ScaledObjectSync] Setting {name} IsNetworked to false to keep GameObject active for Offline mode.");
+            Debug.Log(GameLog.ObjectLog(this, $"Setting IsNetworked to false to keep GameObject active for Offline mode."));
             NetworkObject.SetIsNetworked(false);
         }
     }
@@ -132,7 +132,7 @@ public class ScaledObjectSync : NetworkBehaviour
         Vector3d position = Vector3d.Lerp(scaledRigidbody.scaledTransform.realPosition, targetState.Position, t);
         Quaternion rotation = Quaternion.Slerp(transform.rotation, targetState.Rotation, t);
         Vector3d velocity = Vector3d.Lerp(scaledRigidbody.velocity, targetState.Velocity, t);
-        Vector3d angularVelocity = Vector3d.Lerp(scaledRigidbody.angularVelocity, targetState.AngularVelocity, t);
+        Vector3 angularVelocity = Vector3.Lerp(scaledRigidbody.angularVelocity, targetState.AngularVelocity, t);
 
         scaledRigidbody.scaledTransform.realPosition = position;
         transform.rotation = rotation;
@@ -215,7 +215,7 @@ public class ScaledObjectSync : NetworkBehaviour
         {
             if (connection == null)
             {
-                Debug.LogWarning("[ScaledObjectSync] Cannot set control type to Client without specifying a controller connection.");
+                Debug.Log(GameLog.ObjectLog(this, "Cannot set control type to Client without specifying a controller connection."));
                 return;
             }
             controller = connection;

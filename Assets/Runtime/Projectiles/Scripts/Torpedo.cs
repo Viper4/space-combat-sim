@@ -10,12 +10,10 @@ public class Torpedo : NetworkBehaviour
 {
     private ScaledRigidbody scaledRigidbody;
     private RadarTarget thisRadarTarget;
-    private PIDController xPID;
-    private PIDController yPID;
-    private PIDController zPID;
 
     [Header("Torpedo")]
     [SerializeField] private bool active;
+    private bool canThrust;
     [SerializeField] private float targetEmissionRadius = 2000;
     [SerializeField] private float idleEmissionRadius = 250;
     [SerializeField] private CapsuleCollider _collider;
@@ -26,6 +24,9 @@ public class Torpedo : NetworkBehaviour
     [SerializeField] private float proportionalGain = 16.0f;
     [SerializeField] private float integralGain = 0.0f;
     [SerializeField] private float derivativeGain = 4.0f;
+    private PIDController xPID;
+    private PIDController yPID;
+    private PIDController zPID;
 
     [SerializeField] private GameObject rocketTrail;
 
@@ -39,7 +40,7 @@ public class Torpedo : NetworkBehaviour
     [SerializeField] private LayerMask ignoreLayers;
     [SerializeField] private RadarTarget target;
     [SerializeField] private float navigationConstant = 4f;
-    private float thrusterTorque;
+    [SerializeField] private float thrusterTorque;
     private float engineAcceleration;
 
     // Need to use this to prevent stack overflows
@@ -53,14 +54,15 @@ public class Torpedo : NetworkBehaviour
         thisRadarTarget = GetComponent<RadarTarget>();
         thrusterTorque = _collider.height * thrusterForce;
         engineAcceleration = (float)(engineForce / scaledRigidbody.mass);
-        xPID = new PIDController(proportionalGain, integralGain, derivativeGain);
-        yPID = new PIDController(proportionalGain, integralGain, derivativeGain);
-        zPID = new PIDController(proportionalGain, integralGain, derivativeGain);
         if (IsOffline)
         {
             scaledRigidbody.OnScaledCollisionEnter += OnScaledCollide;
             scaledRigidbody.OnScaledTriggerEnter += OnScaledTrigger;
         }
+
+        xPID = new PIDController(proportionalGain, integralGain, derivativeGain);
+        yPID = new PIDController(proportionalGain, integralGain, derivativeGain);
+        zPID = new PIDController(proportionalGain, integralGain, derivativeGain);
     }
 
     private void OnDestroy()
@@ -80,8 +82,6 @@ public class Torpedo : NetworkBehaviour
 
     private void FixedUpdate()
     {
-        if (!IsServerOrOffline)
-            return;
         if (!active || target == null)
         {
             SetRocketTrailActive(false);
@@ -89,9 +89,9 @@ public class Torpedo : NetworkBehaviour
         }
 
         Vector3d targetVelocity = target.scaledRigidbody.velocity;
-        Vector3d torpedoVelocity = thisRadarTarget.scaledRigidbody.velocity;
+        Vector3d torpedoVelocity = scaledRigidbody.velocity;
         Vector3d realTargetPosition = target.scaledRigidbody.scaledTransform.realPosition;
-        Vector3d realTorpedoPosition = thisRadarTarget.scaledRigidbody.scaledTransform.realPosition;
+        Vector3d realTorpedoPosition = scaledRigidbody.scaledTransform.realPosition;
 
         Vector3d relativePosition = realTargetPosition - realTorpedoPosition;
         Vector3d relativeVelocity = targetVelocity - torpedoVelocity;
@@ -106,56 +106,83 @@ public class Torpedo : NetworkBehaviour
 
         // How perpendicular is the torpedo's velocity to the target direction?
         // 0 = heading straight at target, 1 = fully sideways (orbiting)
-        Vector3d torpedoDir = torpedoVelocity.normalized;
-        double perpendicularFactor = 1.0 - Math.Abs(Vector3d.Dot(torpedoDir, targetDir));
+        Vector3d velocityDir = torpedoVelocity.normalized;
+        double perpendicularFactor = 1.0 - Math.Abs(Vector3d.Dot(velocityDir, targetDir));
 
         // Blend a braking force into the acceleration, scaled by how sideways we are
-        Vector3d brakeAcceleration = -torpedoDir * engineAcceleration * perpendicularFactor;
+        Vector3d brakeAcceleration = -velocityDir * engineAcceleration * perpendicularFactor;
         Vector3d desiredAcceleration = targetDir * engineAcceleration + pnAcceleration + brakeAcceleration;
 
         Vector3d desiredForce = desiredAcceleration * scaledRigidbody.mass;
-        Vector3 localDesiredForce = transform.InverseTransformDirection(desiredForce.ToVector3());
-        
-        // Clamp lateral (X/Y) force by magnitude, not per-component
-        // This preserves steering direction when saturated
-        Vector2 lateralForce = new Vector2(localDesiredForce.x, localDesiredForce.y);
-        if (lateralForce.sqrMagnitude > thrusterForce * thrusterForce)
-            lateralForce = lateralForce.normalized * thrusterForce;
-
-        localDesiredForce.x = lateralForce.x;
-        localDesiredForce.y = lateralForce.y;
-
-        // Z axis stays the same — per-axis clamping is correct here
-        if (localDesiredForce.z >= 0.0f)
+        if (canThrust)
         {
-            localDesiredForce.z = Mathf.Min(localDesiredForce.z, engineForce);
-            SetRocketTrailActive(true);
+            Vector3 localDesiredForce = transform.InverseTransformDirection(desiredForce.ToVector3());
+        
+            // Find maximum force in desiredForce direction while maintaining thrust limits
+            float scale = float.PositiveInfinity;
+
+            // X thruster
+            float xMagnitude = Mathf.Abs(localDesiredForce.x);
+            if (xMagnitude > 0f)
+            {
+                scale = Mathf.Min(scale, thrusterForce / xMagnitude);
+            }
+
+            // Y thruster
+            float yMagnitude = Mathf.Abs(localDesiredForce.y);
+            if (yMagnitude > 0f)
+            {
+                scale = Mathf.Min(scale, thrusterForce / yMagnitude);
+            }
+
+            // Z engine/thruster
+            float zLimit = localDesiredForce.z >= 0f ? engineForce : thrusterForce;
+
+            float zMagnitude = Mathf.Abs(localDesiredForce.z);
+            if (zMagnitude > 0f)
+            {
+                scale = Mathf.Min(scale, zLimit / zMagnitude);
+            }
+
+            Vector3 localForce = localDesiredForce * scale;
+
+            scaledRigidbody.AddRelativeForce(localForce.ToVector3d(), ForceMode.Force);
+
+            // Z axis stays the same — per-axis clamping is correct here
+            if (localForce.z >= 0.0f)
+            {
+                SetRocketTrailActive(true);
+                float trailScale = localForce.z / engineForce;
+                rocketTrail.transform.localScale = Vector3.one * trailScale;
+            }
+            else
+            {
+                SetRocketTrailActive(false);
+            }
         }
         else
         {
-            localDesiredForce.z = Mathf.Max(localDesiredForce.z, -thrusterForce);
             SetRocketTrailActive(false);
         }
 
-        scaledRigidbody.AddRelativeForce(localDesiredForce.ToVector3d(), ForceMode.Force);
-
-        // Rotate engine to align with desired force
-        // Desired facing direction
-        Vector3 desiredForward = desiredForce.normalized.ToVector3();
-        Debug.DrawRay(transform.position, desiredForce.ToVector3(), Color.green);
-
-        if (desiredForward.sqrMagnitude > 0.0001f)
+        // Rotate torpedo to align with desired force
+        if (desiredForce.sqrMagnitude > 0.0001)
         {
-            Vector3 rotationError = Vector3.Cross(transform.forward, desiredForward);
+            Vector3 desiredForward = desiredForce.normalized.ToVector3();
+
+            Debug.DrawRay(transform.position, desiredForce.ToVector3(), Color.green);
+            
+            Vector3 worldRotationError = Vector3.Cross(transform.forward, desiredForward);
 
             Vector3 torque = new Vector3(
-                xPID.GetOutput(rotationError.x, Time.fixedDeltaTime) * thrusterTorque,
-                yPID.GetOutput(rotationError.y, Time.fixedDeltaTime) * thrusterTorque,
-                zPID.GetOutput(rotationError.z, Time.fixedDeltaTime) * thrusterTorque
+                xPID.GetOutput(worldRotationError.x, scaledRigidbody.angularVelocity.x, Time.fixedDeltaTime),
+                yPID.GetOutput(worldRotationError.y, scaledRigidbody.angularVelocity.y, Time.fixedDeltaTime),
+                zPID.GetOutput(worldRotationError.z, scaledRigidbody.angularVelocity.z, Time.fixedDeltaTime)
             );
+
             torque = Vector3.ClampMagnitude(torque, thrusterTorque);
 
-            scaledRigidbody.AddTorque(torque.ToVector3d(), ForceMode.Force);
+            scaledRigidbody.AddTorque(torque, ForceMode.Force);
         }
     }
 
@@ -186,10 +213,11 @@ public class Torpedo : NetworkBehaviour
 
     private IEnumerator ActivateRoutine(float delay)
     {
-        yield return new WaitForSeconds(delay);
         active = true;
-        _collider.enabled = true;
-        scaledRigidbody.EnableScaledColliders(true);
+        yield return new WaitForSeconds(delay);
+        canThrust = true;
+        // _collider.enabled = true;
+        // scaledRigidbody.EnableScaledColliders(true);
         if (target == null)
         {
             thisRadarTarget.SetEmissionTriggerRadius(idleEmissionRadius);
@@ -224,7 +252,7 @@ public class Torpedo : NetworkBehaviour
 
         if (target == thisRadarTarget)
         {
-            Debug.Log("Torpedo self destruct");
+            Debug.Log(GameLog.ObjectLog(this, "Self destruct detonate."));
             Detonate(null);
         }
     }
@@ -260,12 +288,23 @@ public class Torpedo : NetworkBehaviour
         detonating = true;
         Vector3d hitVelocity = Vector3d.zero;
         double hitMass = 0.0;
-        if (hitNetId != -1 && ClientManager.Objects.Spawned.TryGetValue(hitNetId, out var networkObject))
+        if (hitNetId != -1)
         {
-            if (networkObject.TryGetComponent<ScaledRigidbody>(out var hitRB))
+            if (ClientManager.Objects.Spawned.TryGetValue(hitNetId, out var networkObject))
             {
-                hitVelocity = hitRB.velocity;
-                hitMass = hitRB.mass;
+                if (networkObject.TryGetComponent<ScaledRigidbody>(out var hitRB))
+                {
+                    hitVelocity = hitRB.velocity;
+                    hitMass = hitRB.mass;
+                }
+                else
+                {
+                    Debug.LogWarning(GameLog.ComponentNotFound(this, "DetonateObserversRpc", networkObject, "ScaledRigidbody"));
+                }
+            }
+            else
+            {
+                Debug.LogWarning(GameLog.NetworkObjectNotFound(this, "DetonateObserversRpc", hitNetId));
             }
         }
         InstantiateExplosion(position, hitVelocity, hitMass);
@@ -323,7 +362,6 @@ public class Torpedo : NetworkBehaviour
                     Torpedo otherTorpedo = otherRB.GetComponent<Torpedo>();
                     if (otherTorpedo != this)
                     {
-                        Debug.Log("Chain torpedo detonate");
                         double distance = (otherTorpedo.scaledRigidbody.scaledTransform.realPosition - scaledRigidbody.scaledTransform.realPosition).sqrMagnitude;
                         float percent = (float)(distance / (explosionRadius * explosionRadius));
                         otherTorpedo.DelayedDetonate(collidedRB, 0.125f * percent);
@@ -373,6 +411,7 @@ public class Torpedo : NetworkBehaviour
             return;
         if (detonating) // Prevent stack overflow
             return;
+        Debug.Log(GameLog.ObjectLog(this, "Delayed detonate."));
         StartCoroutine(DetonateDelayRoutine(collidedRB, delay));
     }
 
@@ -381,9 +420,15 @@ public class Torpedo : NetworkBehaviour
         Vector3d velocityA = collisionInfo.colliderA == null ? Vector3d.zero : collisionInfo.colliderA.scaledRigidbody.velocity;
         Vector3d velocityB = collisionInfo.colliderB == null ? Vector3d.zero : collisionInfo.colliderB.scaledRigidbody.velocity;
         Vector3d relativeVelocity = velocityA - velocityB;
-        if (relativeVelocity.sqrMagnitude > collideSpeedThreshold * collideSpeedThreshold)
+        bool isTarget = false;
+        if (target != null)
         {
-            Debug.Log($"Scaled collide detonate with {collisionInfo.colliderA.name} and {collisionInfo.colliderB.name}\npenetration: {collisionInfo.penetration}\ndistance to contact: {(collisionInfo.contactPoint - scaledRigidbody.scaledTransform.realPosition).magnitude}");
+            isTarget = collisionInfo.colliderB.scaledRigidbody == target.scaledRigidbody;
+        }
+
+        if (isTarget || relativeVelocity.sqrMagnitude > collideSpeedThreshold * collideSpeedThreshold)
+        {
+            Debug.Log(GameLog.ObjectLog(this, $"Scaled collide detonate with {collisionInfo.colliderB.name}."));
             Detonate(collisionInfo.colliderB.scaledRigidbody);
         }
     }
@@ -394,7 +439,7 @@ public class Torpedo : NetworkBehaviour
             return;
         if (other.scaledRigidbody == target.scaledRigidbody || other.transform == target.transform)
         {
-            Debug.Log($"[Torpedo] Detonated due to scaled trigger with {other.name}.");
+            Debug.Log(GameLog.ObjectLog(this, $"Scaled trigger detonate with {other.name}."));
             Detonate(other.scaledRigidbody);
         }
     }
@@ -414,10 +459,9 @@ public class Torpedo : NetworkBehaviour
             velocityB = otherDoubleRB.velocity;
         }
         Vector3d relativeVelocity = scaledRigidbody.velocity - velocityB;
-        Vector3d contactPoint = scaledRigidbody.scaledTransform.TransformRenderPoint(collision.GetContact(0).point);
         if (relativeVelocity.sqrMagnitude > collideSpeedThreshold * collideSpeedThreshold)
         {
-            Debug.Log($"Normal collide detonate with {collision.gameObject.name}");
+            Debug.Log(GameLog.ObjectLog(this, $"Unity collide detonate with {collision.gameObject.name}."));
             Detonate(otherDoubleRB);
         }
     }
@@ -431,7 +475,7 @@ public class Torpedo : NetworkBehaviour
 
         if (other.transform == target.transform || (other.transform.TryGetComponent<RadarTarget>(out var otherTarget) && otherTarget.GetID() == target.GetID()))
         {
-            Debug.Log($"Normal trigger detonate with {other.name}");
+            Debug.Log(GameLog.ObjectLog(this, $"Unity trigger detonate with {other.name}."));
             Detonate(other.GetComponent<ScaledRigidbody>());
         }
     }

@@ -6,13 +6,56 @@ using System.Collections.Generic;
 [RequireComponent(typeof(Rigidbody), typeof(ScaledTransform))]
 public class ScaledRigidbody : MonoBehaviour
 {
-    public static float speedLimit = 2.99792458e8f; // Speed of light in m/s
     private static uint nextId;
 
     public uint id {get; private set;}
     public ScaledTransform scaledTransform {get; private set;}
 
+    [SerializeField] private bool freezePositionX;
+    [SerializeField] private bool freezePositionY;
+    [SerializeField] private bool freezePositionZ;
+    [SerializeField] private bool freezeRotationX;
+    [SerializeField] private bool freezeRotationY;
+    [SerializeField] private bool freezeRotationZ;
+
+    public RigidbodyConstraints constraints
+    {
+        get
+        {
+            RigidbodyConstraints result = RigidbodyConstraints.None;
+
+            if (freezePositionX)
+                result |= RigidbodyConstraints.FreezePositionX;
+            if (freezePositionY)
+                result |= RigidbodyConstraints.FreezePositionY;
+            if (freezePositionZ)
+                result |= RigidbodyConstraints.FreezePositionZ;
+
+            if (freezeRotationX)
+                result |= RigidbodyConstraints.FreezeRotationX;
+            if (freezeRotationY)
+                result |= RigidbodyConstraints.FreezeRotationY;
+            if (freezeRotationZ)
+                result |= RigidbodyConstraints.FreezeRotationZ;
+
+            return result;
+        }
+        set
+        {
+            freezePositionX = (value & RigidbodyConstraints.FreezePositionX) != 0;
+            freezePositionY = (value & RigidbodyConstraints.FreezePositionY) != 0;
+            freezePositionZ = (value & RigidbodyConstraints.FreezePositionZ) != 0;
+
+            freezeRotationX = (value & RigidbodyConstraints.FreezeRotationX) != 0;
+            freezeRotationY = (value & RigidbodyConstraints.FreezeRotationY) != 0;
+            freezeRotationZ = (value & RigidbodyConstraints.FreezeRotationZ) != 0;
+
+            if (attachedRigidbody != null)
+                attachedRigidbody.constraints = value;
+        }
+    }
     [SerializeField, Tooltip("Always use ScaledRigidbody if true.")] private bool overrideUnity;
+    private bool collidersEnabled = true;
 
     private bool _active;
     public bool active
@@ -29,26 +72,12 @@ public class ScaledRigidbody : MonoBehaviour
             if (overrideUnity || (FloatingWorldOrigin.Instance != null && FloatingWorldOrigin.Instance.scaledRigidbody == this))
             {
                 _active = true;
-                attachedRigidbody.isKinematic = true;
+                attachedRigidbody.constraints = RigidbodyConstraints.FreezePosition | constraints;
                 return;
             }
 
-            if (value)
-            {
-                attachedRigidbody.isKinematic = true;
-            }
-            else
-            {
-                attachedRigidbody.isKinematic = false;
-                if (FloatingWorldOrigin.Instance != null)
-                {
-                    // Floating origin stays static so need to use relative velocity
-                    Vector3 relativeVelocity = (_velocity - FloatingWorldOrigin.Instance.scaledRigidbody.velocity).ToVector3();
-                    attachedRigidbody.linearVelocity = relativeVelocity;
-                }
-                attachedRigidbody.angularVelocity = _angularVelocity.ToVector3();
-            }
             _active = value;
+            UpdateActive();
         }
     }
 
@@ -94,9 +123,21 @@ public class ScaledRigidbody : MonoBehaviour
         }
         set
         {
-            if (value.sqrMagnitude > speedLimit * speedLimit)
+            if (freezePositionX)
             {
-                _velocity = Vector3d.ClampMagnitude(value, speedLimit);
+                value.x = 0.0;
+            }
+            if (freezePositionY)
+            {
+                value.y = 0.0;
+            }
+            if (freezePositionZ)
+            {
+                value.z = 0.0;
+            }
+            if (value.sqrMagnitude > ScaledSpacePhysics.speedOfLight * ScaledSpacePhysics.speedOfLight)
+            {
+                _velocity = Vector3d.ClampMagnitude(value, ScaledSpacePhysics.speedOfLight);
                 if (!_active && FloatingWorldOrigin.Instance != null)
                 {
                     Vector3 relativeVelocity = (_velocity - FloatingWorldOrigin.Instance.scaledRigidbody.velocity).ToVector3();
@@ -114,30 +155,31 @@ public class ScaledRigidbody : MonoBehaviour
         }
     }
 
-    [SerializeField] private Vector3d _angularVelocity;
-    public Vector3d angularVelocity
+    public Vector3 angularVelocity
     {
         get
         {
-            if (_active)
-            {
-                return _angularVelocity;
-            }
-            else
-            {
-                return attachedRigidbody.angularVelocity.ToVector3d();
-            }
+            return attachedRigidbody.angularVelocity;
         }
         set
         {
-            if (value.sqrMagnitude > speedLimit * speedLimit)
+            if (freezeRotationX)
+            {
+                value.x = 0.0f;
+            }
+            if (freezeRotationY)
+            {
+                value.y = 0.0f;
+            }
+            if (freezeRotationZ)
+            {
+                value.z = 0.0f;
+            }
+            
+            if (value.sqrMagnitude > ScaledSpacePhysics.speedOfLight * ScaledSpacePhysics.speedOfLight)
                 return;
 
-            _angularVelocity = value;
-            if (!_active)
-            {
-                attachedRigidbody.angularVelocity = value.ToVector3();
-            }
+            attachedRigidbody.angularVelocity = value;
         }
     }
     public bool affectedByGravity = true;
@@ -171,6 +213,8 @@ public class ScaledRigidbody : MonoBehaviour
     {
         scaledTransform = GetComponent<ScaledTransform>();
         attachedRigidbody = GetComponent<Rigidbody>();
+        attachedRigidbody.isKinematic = _isKinematic;
+        UpdateActive();
         scaledColliders = new List<ScaledCollider>();
         id = nextId++;
 
@@ -195,9 +239,10 @@ public class ScaledRigidbody : MonoBehaviour
 
     public void AddCollider(ScaledCollider newCollider)
     {
+        newCollider.enabled = collidersEnabled;
         foreach(ScaledCollider collider in scaledColliders)
         {
-            collider.IgnoreCollider(newCollider.id, true);
+            newCollider.IgnoreCollider(collider, true);
         }
         scaledColliders.Add(newCollider);
     }
@@ -230,24 +275,42 @@ public class ScaledRigidbody : MonoBehaviour
             AddForce(gravityAcceleration, ForceMode.Acceleration);
         }
 
-        double sqrAngularSpeed = _angularVelocity.sqrMagnitude;
+        float sqrAngularSpeed = attachedRigidbody.angularVelocity.sqrMagnitude;
         if (_active || overrideUnity)
         {
             scaledTransform.realPosition += _velocity * Time.fixedDeltaTime;
 
-            if (sqrAngularSpeed > 0.00001)
-            {
-                double angularSpeed = Math.Sqrt(sqrAngularSpeed);
-                double angle = angularSpeed * Time.fixedDeltaTime;
-                Vector3 axis = (_angularVelocity / angularSpeed).ToVector3();
-                Quaternion delta = Quaternion.AngleAxis((float)(angle * Mathf.Rad2Deg), axis);
-                transform.rotation = delta * transform.rotation;
-            }
+            // if (sqrAngularSpeed > 0.00001)
+            // {
+            //     double angularSpeed = Math.Sqrt(sqrAngularSpeed);
+            //     double angle = angularSpeed * Time.fixedDeltaTime;
+            //     Vector3 axis = (_angularVelocity / angularSpeed).ToVector3();
+            //     Quaternion delta = Quaternion.AngleAxis((float)(angle * Mathf.Rad2Deg), axis);
+            //     transform.rotation = delta * transform.rotation;
+            // }
         }
 
-        if (_velocity.sqrMagnitude > 0.0001 || sqrAngularSpeed > 0.0001)
+        if (_velocity.sqrMagnitude > 0.0001 || sqrAngularSpeed > 0.0001f)
         {
             ScaledSpacePhysics.Instance.UpdateGridPos(this);
+        }
+    }
+
+    private void UpdateActive()
+    {
+        if (_active)
+        {
+            attachedRigidbody.constraints = RigidbodyConstraints.FreezePosition | constraints;
+        }
+        else
+        {
+            attachedRigidbody.constraints = constraints;
+            if (FloatingWorldOrigin.Instance != null)
+            {
+                // Floating origin stays static so need to use relative velocity
+                Vector3 relativeVelocity = (_velocity - FloatingWorldOrigin.Instance.scaledRigidbody.velocity).ToVector3();
+                attachedRigidbody.linearVelocity = relativeVelocity;
+            }
         }
     }
 
@@ -263,7 +326,7 @@ public class ScaledRigidbody : MonoBehaviour
             ForceMode.Acceleration => _velocity + (force * Time.fixedDeltaTime),
             _ => _velocity + (force * (Time.fixedDeltaTime / _mass)),
         };
-        if (newVelocity.sqrMagnitude < speedLimit * speedLimit)
+        if (newVelocity.sqrMagnitude < ScaledSpacePhysics.speedOfLight * ScaledSpacePhysics.speedOfLight)
         {
             _velocity = newVelocity;
             if (!_active && FloatingWorldOrigin.Instance != null)
@@ -284,43 +347,45 @@ public class ScaledRigidbody : MonoBehaviour
         AddForce(new Vector3d(globalX, globalY, globalZ), forceMode);
     }
 
-    public void AddTorque(Vector3d torque, ForceMode forceMode)
+    public void AddTorque(Vector3 torque, ForceMode forceMode)
     {
         if (_isKinematic)
             return;
 
-        if (_active)
-        {
-            Quaternion tensorRot = transform.rotation * attachedRigidbody.inertiaTensorRotation;
-            Vector3 localTorque = Quaternion.Inverse(tensorRot) * torque.ToVector3();
-            Vector3 inertia = attachedRigidbody.inertiaTensor;
+        attachedRigidbody.AddTorque(torque, forceMode);
 
-            Vector3 localAngularAccel = forceMode switch
-            {
-                ForceMode.Impulse => new Vector3(
-                    localTorque.x / inertia.x,
-                    localTorque.y / inertia.y,
-                    localTorque.z / inertia.z),
-                ForceMode.VelocityChange => localTorque,
-                ForceMode.Acceleration => localTorque * Time.fixedDeltaTime,
-                _ => new Vector3(
-                    localTorque.x * Time.fixedDeltaTime / inertia.x, 
-                    localTorque.y * Time.fixedDeltaTime / inertia.y, 
-                    localTorque.z * Time.fixedDeltaTime / inertia.z)
-            };
-            Vector3 worldAngularAccel = tensorRot * localAngularAccel;
+        // if (_active)
+        // {
+        //     Quaternion tensorRot = transform.rotation * attachedRigidbody.inertiaTensorRotation;
+        //     Vector3 localTorque = Quaternion.Inverse(tensorRot) * torque.ToVector3();
+        //     Vector3 inertia = attachedRigidbody.inertiaTensor;
 
-            Vector3d newVelocity = _angularVelocity + worldAngularAccel.ToVector3d();
+        //     Vector3 localAngularAccel = forceMode switch
+        //     {
+        //         ForceMode.Impulse => new Vector3(
+        //             localTorque.x / inertia.x,
+        //             localTorque.y / inertia.y,
+        //             localTorque.z / inertia.z),
+        //         ForceMode.VelocityChange => localTorque,
+        //         ForceMode.Acceleration => localTorque * Time.fixedDeltaTime,
+        //         _ => new Vector3(
+        //             localTorque.x * Time.fixedDeltaTime / inertia.x, 
+        //             localTorque.y * Time.fixedDeltaTime / inertia.y, 
+        //             localTorque.z * Time.fixedDeltaTime / inertia.z)
+        //     };
+        //     Vector3 worldAngularAccel = tensorRot * localAngularAccel;
 
-            if (newVelocity.sqrMagnitude < speedLimit * speedLimit)
-            {
-                _angularVelocity = newVelocity;
-            }
-        }
-        else
-        {
-            attachedRigidbody.AddTorque(torque.ToVector3(), forceMode);
-        }
+        //     Vector3d newVelocity = _angularVelocity + worldAngularAccel.ToVector3d();
+
+        //     if (newVelocity.sqrMagnitude < ScaledSpacePhysics.speedOfLight * ScaledSpacePhysics.speedOfLight)
+        //     {
+        //         _angularVelocity = newVelocity;
+        //     }
+        // }
+        // else
+        // {
+        //     attachedRigidbody.AddTorque(torque.ToVector3(), forceMode);
+        // }
     }
 
     public void AddRelativeTorque(Vector3d torque, ForceMode forceMode)
@@ -328,17 +393,19 @@ public class ScaledRigidbody : MonoBehaviour
         if (_isKinematic)
             return;
 
-        if (_active)
-        {
-            double globalX = transform.right.x * torque.x + transform.up.x * torque.y + transform.forward.x * torque.z;
-            double globalY = transform.right.y * torque.x + transform.up.y * torque.y + transform.forward.y * torque.z;
-            double globalZ = transform.right.z * torque.x + transform.up.z * torque.y + transform.forward.z * torque.z;
-            AddTorque(new Vector3d(globalX, globalY, globalZ), forceMode);
-        }
-        else
-        {
-            attachedRigidbody.AddRelativeTorque(torque.ToVector3(), forceMode);
-        }
+        attachedRigidbody.AddRelativeTorque(torque.ToVector3(), forceMode);
+
+        // if (_active)
+        // {
+        //     double globalX = transform.right.x * torque.x + transform.up.x * torque.y + transform.forward.x * torque.z;
+        //     double globalY = transform.right.y * torque.x + transform.up.y * torque.y + transform.forward.y * torque.z;
+        //     double globalZ = transform.right.z * torque.x + transform.up.z * torque.y + transform.forward.z * torque.z;
+        //     AddTorque(new Vector3d(globalX, globalY, globalZ), forceMode);
+        // }
+        // else
+        // {
+        //     attachedRigidbody.AddRelativeTorque(torque.ToVector3(), forceMode);
+        // }
     }
 
     public void AddForceAtPosition(Vector3d force, Vector3d position, ForceMode forceMode)
@@ -359,7 +426,7 @@ public class ScaledRigidbody : MonoBehaviour
             leverArm.x * force.y - leverArm.y * force.x
         );
 
-        AddTorque(torque, forceMode);
+        AddTorque(torque.ToVector3(), forceMode);
     }
 
     public void AddExplosionForce(float explosionForce, Vector3d explosionPosition, float explosionRadius, float upwardsModifier = 0f, ForceMode forceMode = ForceMode.Force)
@@ -434,7 +501,7 @@ public class ScaledRigidbody : MonoBehaviour
         {
             foreach (ScaledCollider otherCollider in other.scaledColliders)
             {
-                collider.IgnoreCollider(otherCollider.id, ignore);
+                collider.IgnoreCollider(otherCollider, ignore);
             }
         }
     }
@@ -453,11 +520,12 @@ public class ScaledRigidbody : MonoBehaviour
         {
             scaledColliders[i].enabled = value;
         }
+        collidersEnabled = value;
     }
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (isKinematic || !_active)
+        if (_isKinematic || !_active)
             return;
 
         // Need to handle collisions between unity colliders and scaled rigidbodies

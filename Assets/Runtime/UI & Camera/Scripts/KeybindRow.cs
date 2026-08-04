@@ -4,93 +4,65 @@ using UnityEngine.InputSystem;
 using TMPro;
 
 /// <summary>
-/// A single row in the keybind settings list.
-/// 
-/// Prefab layout (all children of this GameObject):
-///   ┌─────────────────────────────────────────────────────┐
-///   │  [ActionNameLabel]  [BindingLabel]  [Rebind] [Reset]│
-///   └─────────────────────────────────────────────────────┘
+/// Represents a single editable binding.
 ///
-/// Setup:
-///   1. Create a prefab with this script on the root.
-///   2. Add a horizontal layout group and wire the four references below.
-///   3. Assign to PauseUI.keybindRowPrefab.
+/// Examples:
 ///
-/// The row is initialized by PauseUI.BuildKeybindList() and talks back to
-/// PauseUI when the player clicks Rebind or Reset.
+/// Move      Up        W
+///           Down      S
+///           Left      A
+///           Right     D
+///
+/// Jump                 Space
+///
+/// Fire                 Left Mouse
 /// </summary>
 public class KeybindRow : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private TextMeshProUGUI actionNameLabel;
+    [SerializeField] private TextMeshProUGUI bindingNameLabel;
     [SerializeField] private TextMeshProUGUI bindingLabel;
-    [SerializeField] private Button          rebindButton;
-    [SerializeField] private Button          resetButton;
 
-    // ── State ──────────────────────────────────────────────────────────────────
+    [SerializeField] private Button rebindButton;
+    [SerializeField] private Button resetButton;
 
-    private InputAction _action;
-    private int         _bindingIndex;
-    private PauseUI     _owner;
+    private InputAction action;
+    private int bindingIndex;
+    private PauseUI owner;
 
-    // ── Initialization ─────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Called once by PauseUI after instantiation.
-    /// </summary>
-    public void Initialize(InputAction action, int bindingIndex, PauseUI owner)
+    public void Initialize(InputAction inputAction, int inputBindingIndex, string bindingName, string actionName, PauseUI pauseUI)
     {
-        _action       = action;
-        _bindingIndex = bindingIndex;
-        _owner        = owner;
+        action = inputAction;
+        bindingIndex = inputBindingIndex;
+        owner = pauseUI;
 
-        // Human-readable map prefix only when multiple maps are shown.
-        actionNameLabel.text = FormatActionName(action, bindingIndex);
+        actionNameLabel.text = actionName;
+        bindingNameLabel.text = bindingName;
+
+        rebindButton.onClick.RemoveAllListeners();
+        resetButton.onClick.RemoveAllListeners();
 
         rebindButton.onClick.AddListener(OnRebindClicked);
-        resetButton .onClick.AddListener(OnResetClicked);
+        resetButton.onClick.AddListener(OnResetClicked);
 
         Refresh();
     }
 
-    // ── Public ─────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Re-reads the current effective binding path and updates the label.
-    /// Called by PauseUI after a rebind or reset completes.
-    /// </summary>
     public void Refresh()
     {
-        bindingLabel.text = GetDisplayString();
+        bindingLabel.text = action.GetBindingDisplayString(bindingIndex, InputBinding.DisplayStringOptions.DontUseShortDisplayNames);
 
-        // Dim the reset button if there is no override to undo.
-        bool hasOverride = (_action.bindings[_bindingIndex].overridePath != null);
-        resetButton.interactable = hasOverride;
+        resetButton.interactable = !string.IsNullOrEmpty(action.bindings[bindingIndex].overridePath);
     }
 
-    // ── Private ────────────────────────────────────────────────────────────────
-
-    private void OnRebindClicked() => _owner.StartRebind(_action, _bindingIndex, this);
-    private void OnResetClicked()  => _owner.ResetBinding(_action, _bindingIndex, this);
-
-    private string GetDisplayString()
+    private void OnRebindClicked()
     {
-        // InputBinding.ToDisplayString gives the human-readable key name
-        // (e.g. "Space", "Left Ctrl", "Mouse Left") rather than the raw path.
-        return _action.GetBindingDisplayString(_bindingIndex, InputBinding.DisplayStringOptions.DontUseShortDisplayNames);
+        owner.StartRebind(action, bindingIndex, this);
     }
 
-    /// <summary>
-    /// Formats "Jump" or (if binding is a composite) "Move/Up" style names.
-    /// </summary>
-    private static string FormatActionName(InputAction action, int bindingIndex)
+    public void OnResetClicked()
     {
-        InputBinding binding = action.bindings[bindingIndex];
-        if (binding.isComposite)
-        {
-            // Show "Move" for the composite header.
-            return action.name;
-        }
-        return action.name;
+        owner.ResetBinding(action, bindingIndex, this);
     }
 }

@@ -12,6 +12,8 @@ using System.Collections;
 /// </summary>
 public class ScaledSpacePhysics : MonoBehaviour
 {
+    public static float speedOfLight = 2.99792458e8f; // Speed of light in m/s
+
     public static ScaledSpacePhysics Instance { get; private set; }
     
     public event Action<ScaledRigidbody> GravityStep;
@@ -117,13 +119,13 @@ public class ScaledSpacePhysics : MonoBehaviour
         stopwatch.Start();
         foreach (ScaledCollider collider in scaledColliders)
         {
-            if (collider.scaledRigidbody == null)
+            if (collider == null || !collider.enabled || collider.scaledRigidbody == null)
                 continue;
             stopwatch1.Reset();
             stopwatch1.Start();
             foreach (ScaledCollider candidate in hGrid.GetCandidates(collider))
             {
-                if (candidate.scaledRigidbody == null)
+                if (candidate == null || !candidate.enabled || candidate.scaledRigidbody == null)
                     continue;
                 Pair collisionKey = collider.id < candidate.id ? new Pair(collider.id, candidate.id) : new Pair(candidate.id, collider.id);
                 if (currentCollisions.Contains(collisionKey))
@@ -135,9 +137,17 @@ public class ScaledSpacePhysics : MonoBehaviour
                 {
                     // Check if either can skip over the other in one fixed update
                     Vector3d relativeVelocity = collider.scaledRigidbody.velocity - candidate.scaledRigidbody.velocity;
-                    double combinedRadius = collider.GetRadius() + candidate.GetRadius();
+                    double colliderRadius = collider.GetRadius();
+                    double candidateRadius = candidate.GetRadius();
+                    double combinedRadius = colliderRadius + candidateRadius;
+                    // double combinedRadius = collider.GetRadius() + candidate.GetRadius();
                     double sqrTravelDistance = relativeVelocity.sqrMagnitude * Time.fixedDeltaTime * Time.fixedDeltaTime;
                     deferToUnity &= sqrTravelDistance <= 4.0 * combinedRadius * combinedRadius;
+
+                    // if (collider.CompareTag("Torpedo") || candidate.CompareTag("Torpedo"))
+                    // {
+                    //     Debug.Log(GameLog.ObjectLog(this, $"Checking {collider.name} with {candidate.name}. Defer to Unity: {deferToUnity}\nrelSpeed: {relativeVelocity.magnitude} travelDistance: {Math.Sqrt(sqrTravelDistance)} combinedRad: {combinedRadius}"));
+                    // }
                 }
                 
                 if (deferToUnity)
@@ -192,7 +202,7 @@ public class ScaledSpacePhysics : MonoBehaviour
         stopwatch.Stop();
         fullLoopTicks = stopwatch.ElapsedTicks;
         if (logTimings)
-            Debug.Log($"Full loop ticks: {fullLoopTicks}, Get candidates loop ticks: {getCandidatesTicks - collisionCheckTicks}, Check Collision ticks: {collisionCheckTicks}");
+            Debug.Log(GameLog.ObjectLog(this, $"Full loop ticks: {fullLoopTicks}, Get candidates loop ticks: {getCandidatesTicks - collisionCheckTicks}, Check Collision ticks: {collisionCheckTicks}."));
         
         // Detect collision exits
         foreach (Pair collision in previousCollisions)
@@ -203,6 +213,8 @@ public class ScaledSpacePhysics : MonoBehaviour
             {
                 ScaledCollider colliderA = scaledColliders[indexA];
                 ScaledCollider colliderB = scaledColliders[indexB];
+                if (colliderA == null || colliderB == null)
+                    continue;
                 if (colliderA.isTrigger)
                 {
                     colliderA.scaledRigidbody.RaiseTriggerExit(colliderA, colliderB);
@@ -308,7 +320,7 @@ public class ScaledSpacePhysics : MonoBehaviour
             // Overlapping at end of frame — standard intersection
             distance = Math.Sqrt(sqrDistance);
             if (logCollisions)
-                Debug.Log($"[ScaledSpacePhysics] Intersect Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
+                Debug.Log(GameLog.ObjectLog(this, $"Intersect Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}."));
         }
         else
         {
@@ -326,7 +338,7 @@ public class ScaledSpacePhysics : MonoBehaviour
             relativePosition = posB - posA;
             distance = minDistance; // Should be safe to assume the collision is once the spheres begin touching
             if (logCollisions)
-                Debug.Log($"[ScaledSpacePhysics] CCD Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}.");
+                Debug.Log(GameLog.ObjectLog(this, $"CCD Collide: {a.id} {a.isTrigger} {a.name} and {b.id} {b.isTrigger} {b.name}."));
         }
 
         Vector3d normal = distance > 0.0001 ? relativePosition / distance : Vector3d.up;
@@ -355,8 +367,8 @@ public class ScaledSpacePhysics : MonoBehaviour
         Vector3d rA = collision.contactPoint - collision.colliderA.scaledRigidbody.scaledTransform.realPosition;
         Vector3d rB = collision.contactPoint - collision.colliderB.scaledRigidbody.scaledTransform.realPosition;
 
-        Vector3d velocityA = collision.colliderA.scaledRigidbody.velocity + Vector3d.Cross(collision.colliderA.scaledRigidbody.angularVelocity, rA);
-        Vector3d velocityB = collision.colliderB.scaledRigidbody.velocity + Vector3d.Cross(collision.colliderB.scaledRigidbody.angularVelocity, rB);
+        Vector3d velocityA = collision.colliderA.scaledRigidbody.velocity + Vector3d.Cross(collision.colliderA.scaledRigidbody.angularVelocity.ToVector3d(), rA);
+        Vector3d velocityB = collision.colliderB.scaledRigidbody.velocity + Vector3d.Cross(collision.colliderB.scaledRigidbody.angularVelocity.ToVector3d(), rB);
         Vector3d relativeVelocity = velocityB - velocityA;
 
         double velocityAlongNormal = Vector3d.Dot(relativeVelocity, collision.normal);
@@ -387,6 +399,27 @@ public class ScaledSpacePhysics : MonoBehaviour
         {
             collision.colliderB.scaledRigidbody.scaledTransform.realPosition += collision.normal * collision.penetration;
         }
+    }
+
+    public bool CheckSphere(Vector3d position, double radius, int layerMask, bool ignoreTriggers)
+    {
+        foreach(ScaledCollider collider in hGrid.GetOverlapCandidates(position, radius))
+        {
+            if (ignoreTriggers && collider.isTrigger)
+                continue;
+            if (((1 << collider.gameObject.layer) & layerMask) == 0)
+                continue;
+            double minDistance = collider.GetRadius() + radius;
+
+            Vector3d colliderPos = collider.GetRealCenter();
+            Vector3d relativePosition = colliderPos - position;
+
+            if (relativePosition.sqrMagnitude < minDistance * minDistance)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     public List<ScaledCollider> GetOverlapSphere(Vector3d position, double radius, int layerMask, bool ignoreTriggers)

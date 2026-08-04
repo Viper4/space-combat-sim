@@ -15,7 +15,7 @@ public class HoverInteractor : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update()
+    void FixedUpdate()
     {
         if (Cursor.lockState != CursorLockMode.Locked)
         {

@@ -32,16 +32,17 @@ public class PlayerInfoRelay : NetworkBehaviour
         yield return new WaitUntil(() => IsClientInitialized);
 
         // Ask server for current player infos.
-        GetInitialDataServerRpc(LocalConnection);
+        if (!IsServerInitialized)
+            GetInitialDataServerRpc(LocalConnection);
         // Then submit my player info
         LobbyManager.Instance.UpdatePlayerUsername();
         if (!PlayerRegistry.TryGetPlayer(LocalConnection.ClientId, out var thisInfo))
         {
-            Debug.LogWarning($"[PlayerInfoRelay] Failed to get local client's player info, manually setting Username.");
             thisInfo = PlayerInfo.Default(LocalConnection.ClientId);
             thisInfo.Username = LobbyManager.Instance.GetLocalUsername();
         }
-        SendPlayerInfoServerRpc(thisInfo, LocalConnection);
+        if (!IsServerInitialized)
+            SendPlayerInfoServerRpc(thisInfo, LocalConnection);
 
         // Also need to ensure LobbyManager stuff is properly setup
         LobbyManager.Instance.UpdatePlayerCount();
@@ -72,7 +73,7 @@ public class PlayerInfoRelay : NetworkBehaviour
         // Force correct client id.
         info.ClientId = sender.ClientId;
         PlayerRegistry.SetPlayer(info);
-        Debug.Log($"[PlayerInfoRelay] Updated PlayerInfo ({info.Username}) for client {sender.ClientId} on the Server.");
+        Debug.Log(GameLog.ObjectLog(this, $"Updated PlayerInfo ({info.Username}) for client {sender.ClientId} on the Server."));
 
         BroadcastPlayerInfoObserversRpc(info);
     }
@@ -100,7 +101,7 @@ public class PlayerInfoRelay : NetworkBehaviour
     {
         PlayerRegistry.SetPlayer(info);
         OnPlayerInfoChanged?.Invoke();
-        Debug.Log($"[PlayerInfoRelay] Updated PlayerInfo ({info.Username}) for client {info.ClientId} for the local client.");
+        Debug.Log(GameLog.ObjectLog(this, $"Updated PlayerInfo ({info.Username}) for client {info.ClientId} for the local client."));
     }
 
     [ObserversRpc]
@@ -119,7 +120,7 @@ public class PlayerInfoRelay : NetworkBehaviour
         foreach (PlayerInfo info in infos)
             PlayerRegistry.SetPlayer(info);
         OnPlayerInfoChanged?.Invoke();
-        Debug.Log($"[PlayerInfoRelay] Received all PlayerInfos from Server for the local client.");
+        Debug.Log(GameLog.ObjectLog(this, "Received all PlayerInfos from Server for the local client."));
     }
 
     // ---------------------------------------------------------

@@ -61,7 +61,7 @@ public static class SaveSystem
     public static void SaveGameSettings(GameSettings fromSettings)
     {
         string json = JsonUtility.ToJson(fromSettings, prettyPrint: true);
-        Debug.Log("[SaveSystem] Saved settings.");
+        Debug.Log("Saved settings.");
 
         File.WriteAllText(SETTINGS_FOLDER + gameSettingsFile, json);
     }
@@ -75,12 +75,12 @@ public static class SaveSystem
 
             if (!string.IsNullOrWhiteSpace(json))
             {
-                Debug.Log("[SaveSystem] Loaded settings.");
+                Debug.Log("Loaded settings.");
                 return JsonUtility.FromJson<GameSettings>(json);
             }
         }
 
-        Debug.LogWarning("[SaveSystem] Could not find file, or file was empty '" + SETTINGS_FOLDER + gameSettingsFile + "', saving and loading defaults.");
+        Debug.LogWarning("Could not find file, or file was empty '" + SETTINGS_FOLDER + gameSettingsFile + "', saving and loading defaults.");
         SaveGameSettings(defaultGameSettings);
         return defaultGameSettings;
     }

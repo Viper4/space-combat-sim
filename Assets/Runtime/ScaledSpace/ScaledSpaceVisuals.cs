@@ -142,8 +142,8 @@ public class ScaledSpaceVisuals : MonoBehaviour
                 scaledTransform.scaleFactor = distance / renderDistance;
             }
         }
-        Debug.Log($"[ScaledSpaceVisuals] Updated scale factors.");
         updating = false;
+        Debug.Log(GameLog.ObjectLog(this, "Updated scale factors"));
     }
 
     public void UpdateScaleFactors()

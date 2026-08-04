@@ -5518,22 +5518,23 @@ MonoBehaviour:
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 1172940210611663231}
   _networkObjectCache: {fileID: 0}
+  active: 1
   statSystem: {fileID: 239452514770276629}
   turretSystem: {fileID: 0}
-  active: 1
-  ignoreLayers:
-    serializedVersion: 2
-    m_Bits: 12
+  ship: {fileID: 0}
   origin: {fileID: 6939258844466216673}
   platform: {fileID: 8688002752668988421}
   barrel: {fileID: 2981506058383095860}
   firePoint: {fileID: 5584307085463201831}
+  ignoreLayers:
+    serializedVersion: 2
+    m_Bits: 12
   minAngles: {x: -80, y: -180, z: 0}
   maxAngles: {x: 25, y: 180, z: 0}
   rotateSpeed: 180
+  maxAmmo: 1000
   maxShootDelta: 0.025
   fireRate: 0.15
-  fireTime: 0
   projectilePrefab: {fileID: 1854897518929172335, guid: 6e8b419a39dc4244c9bcae8a86f97bee, type: 3}
   shootParticles: {fileID: 3610617624835580716, guid: 71b07424ffcb49a41830ab0761db5c07, type: 3}
   projectileSpeed: 2000
@@ -5555,6 +5556,7 @@ MonoBehaviour:
   aliveGameObject: {fileID: 3410632779327792015}
   destroyedGameObject: {fileID: 2025617513269491925}
   test: 0
+  overrideShoot: 0
 --- !u!114 &239452514770276629
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -6,13 +6,12 @@ using System;
 
 public class RadarUI : MonoBehaviour
 {
-    private bool active;
-
     [SerializeField] private Radar radar;
     [SerializeField] private Ship ship;
 
     [SerializeField] private float[] iconRadii;
     [SerializeField] private GameObject iconParent;
+    [SerializeField] private GameObject passiveEmissionIndicator;
     [SerializeField] private GameObject activeRadarIndicator;
     [SerializeField] private Vector3 hologramScale;
 
@@ -45,14 +44,34 @@ public class RadarUI : MonoBehaviour
         }
     }
 
-    private void FixedUpdate()
+    private void LateUpdate()
     {
-        if (!active)
+        if (!radar.IsEnabled)
+        {
+            if (iconParent.activeSelf)
+                iconParent.SetActive(false);
             return;
+        }
+
+        if (!iconParent.activeSelf)
+            iconParent.SetActive(true);
+        
+        double radarRange = radar.GetCurrentRange();
+        double passiveEmissionRadius = ship.attachedRadarTarget.GetEmissionTriggerRadius();
+        if (passiveEmissionRadius <= 0.0 && passiveEmissionIndicator.activeSelf)
+        {
+            passiveEmissionIndicator.SetActive(false);
+        }
+        else
+        {
+            if (!passiveEmissionIndicator.activeSelf)
+                passiveEmissionIndicator.SetActive(true);
+            passiveEmissionIndicator.transform.localScale = (float)(passiveEmissionRadius / radarRange) * Vector3.one;
+        }
 
         if (radar.IsActive)
         {
-            activeRadarIndicator.transform.localScale += activeAnimationSpeed * Time.fixedDeltaTime * Vector3.one;
+            activeRadarIndicator.transform.localScale += activeAnimationSpeed * Time.deltaTime * Vector3.one;
             if (activeRadarIndicator.transform.localScale.sqrMagnitude > 3) // (1, 1, 1)
                 activeRadarIndicator.transform.localScale = Vector3.zero;
         }
@@ -62,7 +81,6 @@ public class RadarUI : MonoBehaviour
             Vector3d relativePosition = radarTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition;
             double distance = relativePosition.magnitude;
             Vector3d direction = relativePosition / distance;
-            double radarRange = radar.GetCurrentRange();
             
             // Display on radar hologram
             Vector3 offset = direction.ToVector3() * (float)(distance / radarRange * 0.5);
@@ -92,8 +110,6 @@ public class RadarUI : MonoBehaviour
                             (float)(realScale.y / radarRange * hologramScale.y),
                             (float)(realScale.z / radarRange * hologramScale.z)
                         );
-                        break;
-                    default:
                         break;
                 }
                 radarTarget.radarIcon.UpdateIcon(
@@ -252,12 +268,6 @@ public class RadarUI : MonoBehaviour
                 }
             }
         }
-    }
-    
-    public void SetActive(bool value)
-    {
-        active = value;
-        iconParent.SetActive(value);
     }
 
     public void SetRange()

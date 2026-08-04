@@ -28,6 +28,16 @@ public class PIDController
         return kP * error + kI * integral + kD * derivative;
     }
 
+    public float GetOutput(float error, float measuredRate, float deltaTime)
+    {
+        if (deltaTime <= 0f)
+            return 0f;
+
+        integral += error * deltaTime;
+
+        return kP * error + kI * integral - kD * measuredRate;
+    }
+
     public void Reset()
     {
         integral = 0;

@@ -27,7 +27,7 @@ public class FloatingWorldOrigin : NetworkBehaviour
             }
             else
             {
-                Debug.Log($"[FloatingWorldOrigin] Instance already exists in Offline mode, destroying the component on {name}.");
+                Debug.Log(GameLog.ObjectLog(this, $"Instance already exists in Offline mode, destroying the component on {name}."));
                 Destroy(this);
             }
         }
@@ -38,7 +38,6 @@ public class FloatingWorldOrigin : NetworkBehaviour
         base.OnStartClient();
         if (IsOwner)
         {
-            Debug.Log($"[FloatingWorldOrigin] Set Instance to {name}.");
             Instance = this;
             // Things could have set this object's realPosition to something before Instance was set, so set its position to zero and force world space
             transform.position = Vector3.zero;

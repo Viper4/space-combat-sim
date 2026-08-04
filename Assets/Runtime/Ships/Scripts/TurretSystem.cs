@@ -15,8 +15,6 @@ public class TurretSystem : MonoBehaviour
 
     [SerializeField] private Radar radar;
     
-    [SerializeField] private int maxAmmo = 10000;
-    public int currentAmmo {get; private set;}
     [SerializeField] SliderIndicator ammoIndicator;
     [SerializeField] private Transform[] turretPoints;
     [HideInInspector] public Turret[] turrets;
@@ -50,12 +48,7 @@ public class TurretSystem : MonoBehaviour
 
     public bool initialized {get; private set;}
 
-    private void Start()
-    {
-        StartCoroutine(WaitToInit());
-    }
-
-    private IEnumerator WaitToInit()
+    private IEnumerator Start()
     {
         yield return new WaitWhile(() => HUDSystem.Instance == null);
         Init();
@@ -71,8 +64,6 @@ public class TurretSystem : MonoBehaviour
 
         ship = GetComponent<Ship>();
         targetingSystem = GetComponent<TargetingSystem>();
-        currentAmmo = maxAmmo;
-        ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
         for (int i = 0; i < offensiveTags.Length; i++)
         {
             offensiveTagsSet.Add(offensiveTags[i]);
@@ -81,7 +72,7 @@ public class TurretSystem : MonoBehaviour
         {
             defensiveTagsSet.Add(defensiveTags[i]);
         }
-        Collider[] shipColliders = ship.scaledRigidbody.scaledTransform.GetTrackedColliders();
+        Collider[] shipColliders = ship.scaledRigidbody.scaledTransform.CloneTrackedColliders();
 
         turrets = new Turret[turretPoints.Length];
         turretCrosshairs = new Transform[turretPoints.Length];
@@ -164,6 +155,7 @@ public class TurretSystem : MonoBehaviour
                 }
             }
         }
+        UpdateTotalAmmoIndicator();
     }
 
     private void StartTrigger(InputAction.CallbackContext context)
@@ -278,17 +270,16 @@ public class TurretSystem : MonoBehaviour
         }
     }
 
-    public void OnTurretFire()
+    private void UpdateTotalAmmoIndicator()
     {
-        if (currentAmmo <= 0)
-            return;
-        currentAmmo--;
-        ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
-    }
+        int totalAmmo = 0;
+        int totalMaxAmmo = 0;
+        for (int i = 0; i < turrets.Length; i++)
+        {
+            totalAmmo += turrets[i].GetCurrentAmmo();
+            totalMaxAmmo += turrets[i].GetMaxAmmo();
+        }
 
-    public void SetAmmo(int amount)
-    {
-        currentAmmo = Mathf.Min(maxAmmo, amount);
-        ammoIndicator.UpdateUI(currentAmmo, maxAmmo);
+        ammoIndicator.UpdateUI(totalAmmo, totalMaxAmmo);
     }
 }

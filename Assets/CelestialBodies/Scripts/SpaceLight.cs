@@ -17,7 +17,7 @@ public class SpaceLight : MonoBehaviour
     [SerializeField] private float gradientMaxTemperature = 20000f;
     [SerializeField] private float cellTemperatureOffset = 1000f;
 
-    public Color mainColor {get; private set;}
+    public Color baseColor {get; private set;}
     private Color cellColor;
     private double radius;
     private double luminosity;
@@ -47,10 +47,10 @@ public class SpaceLight : MonoBehaviour
         this.temperature = temperature;
         float clampedTemp = Mathf.Clamp(temperature, gradientMinTemperature, gradientMaxTemperature);
         float t = Mathf.InverseLerp(gradientMinTemperature, gradientMaxTemperature, clampedTemp);
-        mainColor = temperatureGradient.Evaluate(t) * tint;
+        baseColor = temperatureGradient.Evaluate(t) * tint;
         float cellTemperature = Mathf.Clamp(cellTemperatureOffset + temperature, gradientMinTemperature, gradientMaxTemperature);
         cellColor = temperatureGradient.Evaluate(Mathf.InverseLerp(gradientMinTemperature, gradientMaxTemperature, cellTemperature));
-        worldLight.color = mainColor;
+        worldLight.color = baseColor;
         radius = Math.Max(Math.Max(scaledTransform.realScale.x, scaledTransform.realScale.y), scaledTransform.realScale.z);
         luminosity = 4.0 * Math.PI * radius * radius * SpaceMath.stefanBoltzmann * temperature * temperature * temperature * temperature;
 
@@ -60,7 +60,7 @@ public class SpaceLight : MonoBehaviour
 
         float colorIntensity = (float)Math.Log10(relativeLuminosity + 1.0) * intensityMultiplier;
 
-        materialClone.SetColor("_MainColor", mainColor * colorIntensity);
+        materialClone.SetColor("_BaseColor", baseColor * colorIntensity);
         materialClone.SetColor("_CellColor", cellColor * colorIntensity);
         UpdateLight();
     }

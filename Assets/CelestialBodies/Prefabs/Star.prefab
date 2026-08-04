@@ -20,6 +20,7 @@ GameObject:
   - component: {fileID: -3219646378955236575}
   - component: {fileID: 9185686016837872124}
   - component: {fileID: 4553538610552094174}
+  - component: {fileID: 5037673740273060479}
   m_Layer: 3
   m_Name: Star
   m_TagString: CelestialBody
@@ -122,6 +123,9 @@ MonoBehaviour:
     z: 695700000
   minScreenPixelSize: 3
   visible: 0
+  trackedColliders: []
+  trackedRenderers:
+  - {fileID: 4653979682324458050}
   scaledSpaceLayer: 3
   inScaledSpace: 1
   scaleFactor: 10000000
@@ -195,14 +199,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  freezePositionX: 0
+  freezePositionY: 0
+  freezePositionZ: 0
+  freezeRotationX: 0
+  freezeRotationY: 0
+  freezeRotationZ: 0
   overrideUnity: 0
   _mass: 0.0000001
   _isKinematic: 0
   _velocity:
-    x: 0
-    y: 0
-    z: 0
-  _angularVelocity:
     x: 0
     y: 0
     z: 0
@@ -354,7 +360,7 @@ MonoBehaviour:
   <AssetPathHash>k__BackingField: 2388947794978707455
   SceneId: 0
   SerializedTransformProperties:
-    Position: {x: 0, y: 0.9999998, z: 14990}
+    Position: {x: 0, y: 0, z: 0}
     Rotation: {x: 0, y: 0, z: 0, w: 1}
     Scale: {x: 69.57, y: 69.57, z: 69.57}
     IsValid: 1
@@ -378,7 +384,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584167412228930587
+  _initializedTimestamp: -8584157749340765572
 --- !u!114 &4553538610552094174
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -400,6 +406,18 @@ MonoBehaviour:
   controlType: 1
   activeWhenOffline: 1
   syncMass: 0
+--- !u!114 &5037673740273060479
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2675124551879334190}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ae8d01bf5d32f2e458a64a733b1508d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RelativisticObject
 --- !u!1 &7089161551974816913
 GameObject:
   m_ObjectHideFlags: 0
@@ -543,7 +561,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.LensFlareComponentSRP
   m_LensFlareData: {fileID: 11400000, guid: 1a3d4dc25dbea974fbe8a4155d8d7fd8, type: 2}
   version: 0
-  intensity: 1
+  intensity: 0
   maxAttenuationDistance: 100
   maxAttenuationScale: 100
   distanceAttenuationCurve:
@@ -678,7 +696,9 @@ MonoBehaviour:
     m_Bits: 9
   numSamples: 32
   samplesPerFrame: 4
+  bucketIntensity: 0
   buckets: 4
+  intensitySpeed: 1
   brightnessRange: {x: 1, y: 0}
   scaleRange: {x: 2, y: 0}
   distanceRange: {x: 1000000, y: 2e+11}

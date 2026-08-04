@@ -5,13 +5,16 @@ using FishNet;
 using UnityEngine;
 using SpaceStuff;
 using FishNet.Managing.Scened;
-using UnitySceneManager = UnityEngine.SceneManagement.SceneManager;
+using System.Collections;
 
 public class ShipSpawner : MonoBehaviour
 {
     [Header("Spawn")]
     [SerializeField] private NetworkObject shipPrefab;
-    [SerializeField] private Transform[] spawnPoints;
+    [SerializeField] private Vector3d[] spawnCenters;
+    [SerializeField] private double[] spawnRadii;
+    [SerializeField] private double bufferRadius = 100.0;
+    [SerializeField] private LayerMask collisionLayers;
 
     private readonly Dictionary<int, Ship> playerShips = new();
 
@@ -19,8 +22,6 @@ public class ShipSpawner : MonoBehaviour
 
     private void Awake()
     {
-        Debug.Log("[ShipSpawner] Initializing ShipSpawner.");
-
         if (InstanceFinder.IsOffline)
         {
             SpawnOfflinePlayerShip();
@@ -81,23 +82,29 @@ public class ShipSpawner : MonoBehaviour
         if (playerShips.ContainsKey(0))
             return;
 
-        Vector3 spawnPosition;
-        Quaternion spawnRotation;
-
-        GetSpawnPoint(out spawnPosition, out spawnRotation);
-
-        NetworkObject shipObject = Instantiate(shipPrefab, spawnPosition, spawnRotation);
+        NetworkObject shipObject = Instantiate(shipPrefab);
         shipObject.name = "Player";
 
         if (!shipObject.TryGetComponent<Ship>(out var ship))
         {
-            Debug.LogError("[ShipSpawner] Ship prefab is missing Ship component.");
+            Debug.LogError(GameLog.ComponentNotFound(this, "SpawnOfflinePlayerShip", shipObject, "Ship"));
             return;
         }
 
-        playerShips.Add(0, ship);
+        GetSpawnPoint(bufferRadius, out Vector3d spawnPosition, out Quaternion spawnRotation);
+        if (!shipObject.TryGetComponent<ScaledTransform>(out var scaledTransform))
+        {
+            Debug.LogWarning(GameLog.ComponentNotFound(this, $"SpawnOfflinePlayerShip at {spawnPosition}", shipObject, "ScaledTransform"));
+        }
+        else
+        {
+            scaledTransform.realPosition = spawnPosition;
+        }
+        shipObject.transform.rotation = spawnRotation;
 
-        Debug.Log($"[ShipSpawner] Spawned offline ship.");
+        playerShips.Add(-1, ship);
+
+        Debug.Log(GameLog.ObjectLog(this, "Spawned offline player ship."));
     }
 
     private void SpawnPlayerShip(NetworkConnection conn)
@@ -108,29 +115,31 @@ public class ShipSpawner : MonoBehaviour
         if (playerShips.ContainsKey(conn.ClientId))
             return;
 
-        Vector3 spawnPosition;
-        Quaternion spawnRotation;
-
-        GetSpawnPoint(out spawnPosition, out spawnRotation);
-
-        NetworkObject shipObject = Instantiate(shipPrefab, spawnPosition, spawnRotation);
-        if (shipObject.TryGetComponent<ScaledTransform>(out var scaledTransform))
-        {
-            scaledTransform.realPosition = spawnPosition.ToVector3d();
-        }
+        NetworkObject shipObject = Instantiate(shipPrefab);
         PlayerRegistry.TryGetPlayer(conn.ClientId, out var playerInfo);
         shipObject.name = playerInfo.Username;
-
-        InstanceFinder.ServerManager.Spawn(shipObject, conn);
-        Debug.Log($"[ShipSpawner] Spawned ship for client {conn.ClientId}");
-
         if (!shipObject.TryGetComponent<Ship>(out var ship))
         {
-            Debug.LogError("[ShipSpawner] Ship prefab is missing Ship component.");
+            Debug.LogError(GameLog.ComponentNotFound(this, "SpawnPlayerShip", shipObject, "Ship"));
             return;
         }
 
+        GetSpawnPoint(bufferRadius, out Vector3d spawnPosition, out Quaternion spawnRotation);
+        if (!shipObject.TryGetComponent<ScaledTransform>(out var scaledTransform))
+        {
+            Debug.LogWarning(GameLog.ComponentNotFound(this, $"SpawnPlayerShip at {spawnPosition}", shipObject, "ScaledTransform"));
+        }
+        else
+        {
+            scaledTransform.realPosition = spawnPosition;
+        }
+        shipObject.transform.rotation = spawnRotation;
+
+        InstanceFinder.ServerManager.Spawn(shipObject, conn);
+
         playerShips.Add(conn.ClientId, ship);
+
+        Debug.Log(GameLog.ObjectLog(this, $"Spawned player ship for client {conn.ClientId}."));
     }
 
     private void RemovePlayerShip(NetworkConnection conn)
@@ -149,23 +158,31 @@ public class ShipSpawner : MonoBehaviour
         }
     }
 
-    private void GetSpawnPoint(out Vector3 position, out Quaternion rotation)
+    private void GetSpawnPoint(double bufferRadius, out Vector3d position, out Quaternion rotation)
     {
-        if (spawnPoints == null || spawnPoints.Length == 0)
+        if (spawnCenters == null || spawnCenters.Length == 0)
         {
-            position = Vector3.zero;
+            position = Vector3d.zero;
             rotation = Quaternion.identity;
             return;
         }
 
-        Transform spawn = spawnPoints[nextSpawnIndex];
+        Vector3d center = spawnCenters[nextSpawnIndex];
+        position = center + Random.insideUnitSphere.ToVector3d() * spawnRadii[nextSpawnIndex];
 
-        position = spawn.position;
-        rotation = spawn.rotation;
+        for (int i = 0; i < 100; i++)
+        {
+            if (!ScaledSpacePhysics.Instance.CheckSphere(position, bufferRadius, collisionLayers, true))
+            {
+                break;
+            }
+            position = center + Random.insideUnitSphere.ToVector3d() * spawnRadii[nextSpawnIndex];
+        }
+        rotation = Random.rotation;
 
         nextSpawnIndex++;
 
-        if (nextSpawnIndex >= spawnPoints.Length)
+        if (nextSpawnIndex >= spawnCenters.Length)
             nextSpawnIndex = 0;
     }
 

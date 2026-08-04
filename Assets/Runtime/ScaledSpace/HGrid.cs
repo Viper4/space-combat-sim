@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using NUnit.Framework;
 using SpaceStuff;
 using UnityEngine;
 
@@ -198,8 +199,9 @@ public class HGrid
 
                 foreach (ScaledCollider other in list)
                 {
-                    if (other == null || collider.id == other.id || collider.IsIgnoring(other.id) || other.IsIgnoring(collider.id))
+                    if (other == null || collider.id == other.id || collider.IsIgnoring(other) || other.IsIgnoring(collider))
                         continue;
+
                     yield return other;
                 }
             }

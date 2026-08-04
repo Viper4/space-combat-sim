@@ -43,7 +43,6 @@ public class Ship : NetworkBehaviour
 
     [HideInInspector] public bool isStarted = false;
     private bool isBatteryOn;
-    private Coroutine batteryStartupRoutine;
     private bool isAPUOn;
     private Coroutine APUOnRoutine;
     private Coroutine APUStartupRoutine;
@@ -358,11 +357,11 @@ public class Ship : NetworkBehaviour
 
         if (autoStabilizeRot && !rotating)
         {
-            Vector3 localAngularVelocity = transform.InverseTransformDirection(scaledRigidbody.angularVelocity.ToVector3());
+            Vector3 localAngularVelocity = transform.InverseTransformDirection(scaledRigidbody.angularVelocity);
             Vector3 finalStableLocalAngVel = stableLocalAngularVelocity;
             if (matchTargetAngularVelocity && targetingSystem != null && targetingSystem.lockedTarget != null)
             {
-                finalStableLocalAngVel = transform.InverseTransformDirection(targetingSystem.lockedTarget.scaledRigidbody.angularVelocity.ToVector3());
+                finalStableLocalAngVel = transform.InverseTransformDirection(targetingSystem.lockedTarget.scaledRigidbody.angularVelocity);
             }
             Vector3 error = finalStableLocalAngVel - localAngularVelocity;
 
@@ -456,6 +455,7 @@ public class Ship : NetworkBehaviour
         {
             fuel = 0f;
             Shutdown(true);
+            SetBatteryOn(false);
         }
         scaledRigidbody.mass = baseMass + fuel;
     }
@@ -614,7 +614,7 @@ public class Ship : NetworkBehaviour
                 );
                 localAngAcc = rb.inertiaTensorRotation * principalAlpha;
             }
-            inertialEffects.UpdateEffects(localLinAcc, localAngAcc, transform.InverseTransformDirection(scaledRigidbody.angularVelocity.ToVector3()));
+            inertialEffects.UpdateEffects(localLinAcc, localAngAcc, transform.InverseTransformDirection(scaledRigidbody.angularVelocity));
         }
     }
 
@@ -655,11 +655,6 @@ public class Ship : NetworkBehaviour
             ApplyCollideDamageToObservers(damage, renderContactPoint);
         else
             ApplyDamageLocally(damage, renderContactPoint);
-        Debug.Log(
-            $"Impulse: {collisionInfo.impulse:F1}, " +
-            $"Normalized impulse: {sqrImpulse:F1}, " + 
-            $"damage: {damage:F1}, " + 
-            $"attenuation: {attenuation}");
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -691,13 +686,6 @@ public class Ship : NetworkBehaviour
             ApplyCollideDamageToObservers(damage, contact.point);
         else
             ApplyDamageLocally(damage, contact.point);
-
-        Debug.Log(
-            $"Impulse: {impulse:F1}, " +
-            $"Normalized impulse: {sqrImpulse:F1}, " + 
-            $"damage: {damage:F1}, " + 
-            $"attenuation: {attenuation}, " +
-            $"Seperation: {contact.separation}");
     }
 
     [ServerRpc]
@@ -765,7 +753,7 @@ public class Ship : NetworkBehaviour
             {
                 stableVelocity = scaledRigidbody.velocity.ToVector3();
             }
-            stableLocalAngularVelocity = transform.InverseTransformDirection(scaledRigidbody.angularVelocity.ToVector3());
+            stableLocalAngularVelocity = transform.InverseTransformDirection(scaledRigidbody.angularVelocity);
         }
     }
 
@@ -872,11 +860,6 @@ public class Ship : NetworkBehaviour
             return;
         if (state == 0)
         {
-            if (batteryStartupRoutine != null)
-            {
-                StopCoroutine(batteryStartupRoutine);
-                batteryStartupRoutine = null;
-            }
             if (isStarted)
             {
                 Shutdown(true);
@@ -885,9 +868,10 @@ public class Ship : NetworkBehaviour
         }
         else
         {
-            if (batteryStartupRoutine != null)
+            if (fuel <= 0f)
                 return;
-            StartCoroutine(BatteryStartup());
+            startAudioSource.PlayOneShot(batteryStartClip);
+            SetBatteryOn(true);
         }
     }
 
@@ -980,11 +964,13 @@ public class Ship : NetworkBehaviour
         if (emissionRadius <= 0)
         {
             attachedRadarTarget.SetEmissionActive(false);
+            Debug.Log(GameLog.ObjectLog(this, $"Disabled passive emission trigger."));
         }
         else
         {
             attachedRadarTarget.SetEmissionActive(true);
             attachedRadarTarget.SetEmissionTriggerRadius(emissionRadius);
+            Debug.Log(GameLog.ObjectLog(this, $"Updated passive emission radius to {emissionRadius}."));
         }
     }
 
@@ -999,6 +985,8 @@ public class Ship : NetworkBehaviour
     private void UpdateAPUServerRpc(bool value)
     {
         isStarted = value;
+        if (!value)
+            isAPUOn = false;
         UpdatePassiveEmission();
     }
 
@@ -1006,16 +994,20 @@ public class Ship : NetworkBehaviour
     private void UpdateEngineServerRpc(bool value)
     {
         engineStarted = value;
+        if (!value)
+            isEngineOn = false;
         UpdatePassiveEmission();
     }
 
     private void SetBatteryOn(bool value)
     {
+        if (isBatteryOn == value)
+            return;
         isBatteryOn = value;
         batteryOnIndicator.SetActive(value);
         batteryOffIndicator.SetActive(!value);
         UpdatePassiveEmission();
-        if (IsOwner)
+        if (IsOwner && !IsServerInitialized)
             UpdateBatteryServerRpc(value);
     }
 
@@ -1025,7 +1017,7 @@ public class Ship : NetworkBehaviour
         if (!value)
             isAPUOn = false;
         UpdatePassiveEmission();
-        if (IsOwner)
+        if (IsOwner && !IsServerInitialized)
             UpdateAPUServerRpc(value);
     }
 
@@ -1035,24 +1027,14 @@ public class Ship : NetworkBehaviour
         if (!value)
             isEngineOn = false;
         UpdatePassiveEmission();
-        if (IsOwner)
+        if (IsOwner && !IsServerInitialized)
             UpdateEngineServerRpc(value);
-    }
-
-    private IEnumerator BatteryStartup()
-    {
-        Debug.Log($"[Ship] {name} battery starting.");
-        startAudioSource.clip = batteryStartClip;
-        startAudioSource.Play();
-        yield return new WaitWhile(() => startAudioSource.isPlaying);
-        batteryStartupRoutine = null;
-        SetBatteryOn(true);
-        Debug.Log($"[Ship] {name} battery started.");
     }
 
     private IEnumerator TurnAPUOn()
     {
-        Debug.Log($"[Ship] {name} APU turning on.");
+        if (fuel <= 0f)
+            yield break;
         startAudioSource.clip = beepClip;
         startAudioSource.Play();
         yield return new WaitForSeconds(Random.Range(APUOnTimeRange.x, APUOnTimeRange.y));
@@ -1060,13 +1042,13 @@ public class Ship : NetworkBehaviour
         isAPUOn = true;
         APUOnRoutine = null;
         OnAPUOn?.Invoke();
-        Debug.Log($"[Ship] {name} APU on.");
     }
 
     private IEnumerator APUStartup()
     {
+        if (fuel <= 0f)
+            yield break;
         yield return new WaitUntil(() => isAPUOn);
-        Debug.Log($"[Ship] {name} APU starting.");
         OnStartupStart?.Invoke();
         startAudioSource.clip = APUStartClip;
         startAudioSource.Play();
@@ -1092,7 +1074,6 @@ public class Ship : NetworkBehaviour
         {
             ambientAudioSources[i].volume = maxAmbientVolumes[i];
         }
-        Debug.Log($"[Ship] {name} APU started.");
         SetAPUStarted(true);
         APUStartupRoutine = null;
         OnStartupEnd?.Invoke();
@@ -1100,7 +1081,6 @@ public class Ship : NetworkBehaviour
 
     private IEnumerator ShutdownAPURoutine(bool instant)
     {
-        Debug.Log($"[Ship] {name} APU shutting down.");
         OnShutdownStart?.Invoke();
         startAudioSource.clip = shutdownClip;
         startAudioSource.Play();
@@ -1115,7 +1095,6 @@ public class Ship : NetworkBehaviour
             APUShutdownRoutine = null;
             OnShutdownEnd?.Invoke();
             OnAPUOff?.Invoke();
-            Debug.Log($"[Ship] {name} APU shutdown instantly.");
             yield break;
         }
         for(int i = 0; i < startupTexts.Length; i++)
@@ -1144,12 +1123,11 @@ public class Ship : NetworkBehaviour
         APUShutdownRoutine = null;
         OnShutdownEnd?.Invoke();
         OnAPUOff?.Invoke();
-        Debug.Log($"[Ship] {name} APU shutdown normally.");
     }
 
     public void StartAPU()
     {
-        if (!IsOwnerOrOffline || !isBatteryOn || isStarted || APUStartupRoutine != null)
+        if (!IsOwnerOrOffline || !isBatteryOn || isStarted || APUStartupRoutine != null || fuel <= 0f)
             return;
         APUStartupRoutine = StartCoroutine(APUStartup());
     }
@@ -1157,7 +1135,6 @@ public class Ship : NetworkBehaviour
     private void ResetAllCoroutines()
     {
         StopAllCoroutines();
-        batteryStartupRoutine = null;
         APUOnRoutine = null;
         APUStartupRoutine = null;
         engineOnRoutine = null;
@@ -1174,7 +1151,8 @@ public class Ship : NetworkBehaviour
 
     private IEnumerator EngineOnRoutine()
     {
-        Debug.Log($"[Ship] {name} turning engine on.");
+        if (fuel <= 0f)
+            yield break;
         startAudioSource.PlayOneShot(beepClip);
         startAudioSource.clip = engineOnClip;
         startAudioSource.Play();
@@ -1182,25 +1160,24 @@ public class Ship : NetworkBehaviour
         startAudioSource.PlayOneShot(beepClip);
         isEngineOn = true;
         engineOnRoutine = null;
-        Debug.Log($"[Ship] {name} engine on.");
     }
 
     private IEnumerator EngineStartRoutine()
     {
+        if (fuel <= 0f)
+            yield break;
         yield return new WaitUntil(() => isEngineOn);
-        Debug.Log($"[Ship] {name} starting engine.");
         startAudioSource.clip = engineStartClip;
         startAudioSource.Play();
         yield return new WaitWhile(() => startAudioSource.isPlaying);
         SetEngineStarted(true);
         engineStartupRoutine = null;
         OnEngineStart?.Invoke();
-        Debug.Log($"[Ship] {name} started engine.");
     }
 
     private void StartEngine()
     {
-        if (!IsOwnerOrOffline || !isStarted || engineStarted || engineStartupRoutine != null)
+        if (!IsOwnerOrOffline || !isStarted || engineStarted || engineStartupRoutine != null || fuel <= 0f)
             return;
         StartCoroutine(EngineStartRoutine());
     }

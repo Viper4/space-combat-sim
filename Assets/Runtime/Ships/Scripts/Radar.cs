@@ -49,6 +49,7 @@ public class Radar : NetworkBehaviour
     public int missileLocks {get; private set;} = 0;
 
     private bool IsOwnerOrOffline => IsOwner || IsOffline;
+    private bool IsServerOrOffline => IsServerInitialized || IsOffline;
     public Action OnRadarLockChange;
     public Action OnMissileLockChange;
     
@@ -60,7 +61,12 @@ public class Radar : NetworkBehaviour
             ship.scaledRigidbody.OnScaledTriggerExit += OnScaledTriggerExit;
             ship.OnStartupEnd.AddListener(EnableRadar);
             ship.OnShutdownStart.AddListener(DisableRadar);
+            DisableRadar(); // Start disabled
         }
+
+        if (!IsOwnerOrOffline)
+            return;
+
         for(int i = 0; i < configInits.Length; i++)
         {
             string tag = configInits[i].tag;
@@ -100,7 +106,7 @@ public class Radar : NetworkBehaviour
     public override void OnStartClient()
     {
         base.OnStartClient();
-        if (!IsOwner)
+        if (!IsOwner && !IsServerInitialized)
             return;
         Init();
     }
@@ -124,20 +130,52 @@ public class Radar : NetworkBehaviour
         }
     }
 
+    private void FixedUpdate()
+    {
+        if (!IsEnabled || !IsActive)
+            return;
+        for (int i = validTargets.Count - 1; i >= 0; i--)
+        {
+            uint targetId = validTargets[i];
+            if (!RadarRegistry.TryGet(targetId, out var radarTarget))
+            {
+                SwapRemoveValidTargetAt(i);
+                continue;
+            }
+            if (radarConfigs.TryGetValue(radarTarget.tag, out var config) && !config.detectOn)
+                continue;
+
+            Vector3d relativePosition = radarTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition;
+            double sqrDistance = relativePosition.sqrMagnitude;
+
+            double maxRange = radarRanges[emitLevel];
+            double minRadiusAtMaxRange = minDetectRadii[emitLevel];
+
+            // Inverse square law falloff
+            double minimumDetectableRadius = minRadiusAtMaxRange * sqrDistance / (maxRange * maxRange);
+            double effectiveRadius = radarTarget.GetEffectiveRadarRadius();
+            if (effectiveRadius < minimumDetectableRadius)
+            {
+                radarTarget.activelyDetected = false;
+                continue;
+            }
+            if (!radarTarget.activelyDetected)
+            {
+                radarTarget.activelyDetected = true;
+                TryContactAlert(radarTarget);
+            }
+        }
+    }
+
     private void EnableRadar()
     {
         IsEnabled = true;
-        if(radarUI != null)
-            radarUI.SetActive(true);
-        activeRadarTrigger.enabled = true;
         SetActiveEmissionLevel(emitLevel);
     }
 
     private void DisableRadar()
     {
         IsEnabled = false;
-        if (radarUI != null)
-            radarUI.SetActive(false);
         activeRadarTrigger.enabled = false;
         foreach(uint targetId in validTargets)
         {
@@ -151,14 +189,26 @@ public class Radar : NetworkBehaviour
         validTargets.Clear();
     }
 
+    [ServerRpc]
+    private void SetActiveEmissionLevelServerRpc(int level)
+    {
+        emitLevel = level;
+        activeRadarTrigger.enabled = IsActive;
+        activeRadarTrigger.SetRadius(radarRanges[emitLevel]);
+        Debug.Log(GameLog.ObjectLog(this, $"Set active emission level to {level} ({radarRanges[emitLevel]})."));
+    }
+
     public void SetActiveEmissionLevel(int state)
     {
         if (!IsOwnerOrOffline)
             return;
         emitLevel = state;
+        activeRadarTrigger.enabled = IsActive;
         activeRadarTrigger.SetRadius(radarRanges[emitLevel]);
         if (radarUI != null)
             radarUI.SetRange();
+        if (!IsOffline)
+            SetActiveEmissionLevelServerRpc(state);
     }
 
     private void TryContactAlert(RadarTarget radarTarget)
@@ -176,12 +226,14 @@ public class Radar : NetworkBehaviour
         }
     }
 
-    private void AddValidTarget(RadarTarget radarTarget)
+    private bool AddValidTarget(RadarTarget radarTarget)
     {
         if (radarTarget.GetID() == ship.attachedRadarTarget.GetID() || radarTarget.radarIndex >= 0)
-            return;
+            return false;
         radarTarget.radarIndex = validTargets.Count;
         validTargets.Add(radarTarget.GetID());
+        Debug.Log(GameLog.ObjectLog(this, $"Added valid target {radarTarget.name}."));
+        return true;
     }
 
     private void SwapRemoveValidTargetAt(int index)
@@ -199,7 +251,7 @@ public class Radar : NetworkBehaviour
             }
             else
             {
-                Debug.LogWarning($"[Radar] Could not find RadarTarget associated with ID: {lastId}.");
+                Debug.LogWarning(GameLog.DictionaryValueNotFound(this, "SwapRemoveValidTargetAt", lastId.ToString(), "RadarTarget", "RadarRegistry"));
             }
         }
         validTargets.RemoveAt(lastIndex);
@@ -210,11 +262,8 @@ public class Radar : NetworkBehaviour
         int index = radarTarget.radarIndex;
         if (index < 0 || index >= validTargets.Count)
         {
-            Debug.LogWarning(
-                $"[Radar] Invalid radarIndex {index} for " +
-                $"{radarTarget.name}. Searching validTargets for removal. List count: {validTargets.Count}");
             if (!validTargets.Remove(radarTarget.GetID()))
-                Debug.LogWarning($"[Radar] Failed to remove {radarTarget.name} with radar ID: {radarTarget.GetID()}.");
+                Debug.LogWarning(GameLog.ListItemNotFound(this, "RemoveValidTarget", radarTarget.GetID() + $"({radarTarget.name})", "validTargets"));
             radarTarget.radarIndex = -1;
             radarTarget.passivelyDetected = false;
             radarTarget.activelyDetected = false;
@@ -226,22 +275,25 @@ public class Radar : NetworkBehaviour
         radarTarget.passivelyDetected = false;
         radarTarget.activelyDetected = false;
         radarTarget.collidersInActiveRadar = 0;
+        Debug.Log(GameLog.ObjectLog(this, $"Removed valid target {radarTarget.name}."));
     }
 
     public void AddPassiveTarget(RadarTarget radarTarget)
     {
-        Debug.Log($"[Radar] Adding {radarTarget.name} as passively detected target.");
         if (!radarTarget.passivelyDetected)
         {
             radarTarget.passivelyDetected = true;
+        }
+        if (AddValidTarget(radarTarget))
+        {
             TryContactAlert(radarTarget);
         }
-        AddValidTarget(radarTarget);
     }
 
     public void RemovePassiveTarget(RadarTarget radarTarget)
     {
-        Debug.Log($"[Radar] Removing {radarTarget.name} as passively detected target.");
+        if (!radarTarget.passivelyDetected)
+            return;
         radarTarget.passivelyDetected = false;
         if (radarTarget.collidersInActiveRadar > 0)
             return; // Still being actively detected, dont remove it
@@ -252,9 +304,15 @@ public class Radar : NetworkBehaviour
     private void AddPassiveTargetRpc(NetworkConnection conn, int objectId)
     {
         if (!ClientManager.Objects.Spawned.TryGetValue(objectId, out var networkObject))
+        {
+            Debug.LogWarning(GameLog.NetworkObjectNotFound(this, "AddPassiveTargetRpc", objectId));
             return;
+        }
         if (!networkObject.TryGetComponent<RadarTarget>(out var radarTarget))
+        {
+            Debug.LogWarning(GameLog.ComponentNotFound(this, "AddPassiveTargetRpc", networkObject, "RadarTarget"));
             return;
+        }
         AddPassiveTarget(radarTarget);
     }
 
@@ -262,52 +320,122 @@ public class Radar : NetworkBehaviour
     private void RemovePassiveTargetRpc(NetworkConnection conn, int objectId)
     {
         if (!ClientManager.Objects.Spawned.TryGetValue(objectId, out var networkObject))
+        {
+            Debug.LogWarning(GameLog.NetworkObjectNotFound(this, "RemovePassiveTargetRpc", objectId));
             return;
+        }
         if (!networkObject.TryGetComponent<RadarTarget>(out var radarTarget))
+        {
+            Debug.LogWarning(GameLog.ComponentNotFound(this, "RemovePassiveTargetRpc", networkObject, "RadarTarget"));
             return;
+        }
         RemovePassiveTarget(radarTarget);
     }
 
     public void StartPing(int sourceObjectId)
     {
+        if (!IsServerInitialized)
+            return;
+        Debug.Log(GameLog.ObjectLog(this, $"Pinging to add {sourceObjectId} as passive target to owner {OwnerId}."));
         AddPassiveTargetRpc(Owner, sourceObjectId);
     }
 
     public void StopPing(int sourceObjectId)
     {
+        if (!IsServerInitialized)
+            return;
+        Debug.Log(GameLog.ObjectLog(this, $"Pinging to remove {sourceObjectId} as passive target to owner {OwnerId}."));
         RemovePassiveTargetRpc(Owner, sourceObjectId);
+    }
+
+    private void AddActiveTarget(RadarTarget radarTarget)
+    {
+        radarTarget.collidersInActiveRadar++;
+
+        AddValidTarget(radarTarget);
+    }
+
+    private void RemoveActiveTarget(RadarTarget radarTarget)
+    {
+        radarTarget.collidersInActiveRadar--;
+        if (radarTarget.collidersInActiveRadar > 0)
+            return;
+        radarTarget.collidersInActiveRadar = 0;
+
+        if (radarTarget.passivelyDetected)
+            return; // Still being passively detected dont remove it
+        
+        RemoveValidTarget(radarTarget);
+    }
+
+    [TargetRpc]
+    private void AddActiveTargetRpc(NetworkConnection conn, int objectId)
+    {
+        if (!ClientManager.Objects.Spawned.TryGetValue(objectId, out var networkObject))
+        {
+            Debug.LogWarning(GameLog.NetworkObjectNotFound(this, "AddActiveTargetRpc", objectId));
+            return;
+        }
+        if (!networkObject.TryGetComponent<RadarTarget>(out var radarTarget))
+        {
+            Debug.LogWarning(GameLog.ComponentNotFound(this, "AddActiveTargetRpc", networkObject, "RadarTarget"));
+            return;
+        }
+        AddActiveTarget(radarTarget);
+    }
+
+    [TargetRpc]
+    private void RemoveActiveTargetRpc(NetworkConnection conn, int objectId)
+    {
+        if (!ClientManager.Objects.Spawned.TryGetValue(objectId, out var networkObject))
+        {
+            Debug.LogWarning(GameLog.NetworkObjectNotFound(this, "RemoveActiveTargetRpc", objectId));
+            return;
+        }
+        if (!networkObject.TryGetComponent<RadarTarget>(out var radarTarget))
+        {
+            Debug.LogWarning(GameLog.ComponentNotFound(this, "RemoveActiveTargetRpc", networkObject, "RadarTarget"));
+            return;
+        }
+        Debug.Log(GameLog.ObjectLog(this, $"Received network object id {objectId} to remove as active target."));
+        RemoveActiveTarget(radarTarget);
     }
 
     private void OnScaledTriggerEnter(ScaledCollider source, ScaledCollider other)
     {
-        if (!IsOwnerOrOffline || source.id != activeRadarTrigger.id)
+        if (!IsServerOrOffline || source.id != activeRadarTrigger.id)
             return;
         if (!other.scaledRigidbody.TryGetComponent(out RadarTarget otherRadarTarget))
             return;
 
-        otherRadarTarget.collidersInActiveRadar++;
-
-        AddValidTarget(otherRadarTarget);
-
+        if (IsOwnerOrOffline)
+        {
+            AddActiveTarget(otherRadarTarget);
+        }
+        else
+        {
+            AddActiveTargetRpc(Owner, otherRadarTarget.NetworkObject.ObjectId);
+        }
         // Add to the other radar's passive list
-        if (otherRadarTarget.attachedRadar != null)
+        if (IsServerInitialized && otherRadarTarget.attachedRadar != null)
             otherRadarTarget.attachedRadar.StartPing(NetworkObject.ObjectId);
     }
 
     private void OnScaledTriggerExit(ScaledCollider source, ScaledCollider other)
     {
-        if (!IsOwnerOrOffline || source.id != activeRadarTrigger.id)
+        if (!IsServerOrOffline || source.id != activeRadarTrigger.id)
             return;
         if (!other.scaledRigidbody.TryGetComponent(out RadarTarget otherRadarTarget))
             return;
         
-        otherRadarTarget.collidersInActiveRadar--;
-        if (otherRadarTarget.collidersInActiveRadar > 0)
-            return;
-        otherRadarTarget.collidersInActiveRadar = 0;
-        
-        RemoveValidTarget(otherRadarTarget);
-
+        if (IsOwnerOrOffline)
+        {
+            RemoveActiveTarget(otherRadarTarget);
+        }
+        else
+        {
+            RemoveActiveTargetRpc(Owner, otherRadarTarget.NetworkObject.ObjectId);
+        }
         // Remove from the other radar's passive detections
         if (otherRadarTarget.attachedRadar != null)
             otherRadarTarget.attachedRadar.StopPing(NetworkObject.ObjectId);
@@ -446,48 +574,16 @@ public class Radar : NetworkBehaviour
         }
     }
 
-    private bool CanDetectTarget(RadarTarget radarTarget)
-    {
-        if (radarTarget.passivelyDetected)
-            return true;
-        if (!IsActive || radarTarget.collidersInActiveRadar <= 0)
-            return false;
-        Vector3d relativePosition = radarTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition;
-        double sqrDistance = relativePosition.sqrMagnitude;
-
-        double maxRange = radarRanges[emitLevel];
-        double minRadiusAtMaxRange = minDetectRadii[emitLevel];
-
-        // Inverse square law falloff
-        double minimumDetectableRadius = minRadiusAtMaxRange * sqrDistance / (maxRange * maxRange);
-        double effectiveRadius = radarTarget.GetEffectiveRadarRadius();
-        if (effectiveRadius < minimumDetectableRadius)
-        {
-            radarTarget.activelyDetected = false;
-            return false;
-        }
-        if (!radarTarget.activelyDetected)
-        {
-            radarTarget.activelyDetected = true;
-            TryContactAlert(radarTarget);
-        }
-        return true;
-    }
-
     public IEnumerable<RadarTarget> GetAllDetectedTargets()
     {
         for (int i = validTargets.Count - 1; i >= 0; i--)
         {
             uint targetId = validTargets[i];
             if (!RadarRegistry.TryGet(targetId, out var radarTarget))
-            {
-                SwapRemoveValidTargetAt(i);
-                continue;
-            }
+                continue; // FixedUpdate will remove them next update
             if (radarConfigs.TryGetValue(radarTarget.tag, out var config) && !config.detectOn)
                 continue;
-
-            if (!CanDetectTarget(radarTarget))
+            if (!radarTarget.passivelyDetected && !radarTarget.activelyDetected)
                 continue;
             yield return radarTarget;
         }

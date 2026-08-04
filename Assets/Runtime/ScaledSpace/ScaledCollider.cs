@@ -41,12 +41,12 @@ public class ScaledCollider : MonoBehaviour
         prevCenterPos = GetRealCenter();
     }
 
-    private void OnEnable()
+    private void Start()
     {
         ScaledSpacePhysics.Instance.RegisterCollider(this);
     }
 
-    private void OnDisable()
+    private void OnDestroy()
     {
         ScaledSpacePhysics.Instance.UnregisterCollider(this);
     }
@@ -107,20 +107,20 @@ public class ScaledCollider : MonoBehaviour
         return (float)realRadius;
     }
 
-    public void IgnoreCollider(uint otherId, bool ignore)
+    public void IgnoreCollider(ScaledCollider other, bool ignore)
     {
         if (ignore)
         {
-            ignoredColliders.Add(otherId);
+            ignoredColliders.Add(other.id);
         }
         else
         {
-            ignoredColliders.Remove(otherId);
+            ignoredColliders.Remove(other.id);
         }
     }
 
-    public bool IsIgnoring(uint otherId)
+    public bool IsIgnoring(ScaledCollider other)
     {
-        return ignoredColliders.Contains(otherId);
+        return ignoredColliders.Contains(other.id);
     }
 }

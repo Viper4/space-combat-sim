@@ -78,9 +78,15 @@ public class HoverInteractable : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (clickable && hovered && GameManager.Instance.inputActions.UI.Click.WasPressedThisFrame())
+        if (GameManager.Instance.IsPaused || !clickable || !hovered)
+            return;
+        if (GameManager.Instance.inputActions.UI.Click.WasPressedThisFrame())
         {
-            Interact(default);
+            IncrementState(1);
+        }
+        if (GameManager.Instance.inputActions.UI.RightClick.WasPressedThisFrame())
+        {
+            IncrementState(-1);
         }
     }
     
@@ -92,28 +98,36 @@ public class HoverInteractable : MonoBehaviour
             onInteract?.Invoke(state);
     }
 
+    private void IncrementState(int add)
+    {
+        state += add;
+        if (wrapState)
+        {
+            if (state < 0)
+            {
+                state = maxState;
+            }
+            else if (state > maxState)
+            {
+                state = 0;
+            }
+            OnInteract(false);
+        }
+        else if (state < 0 || state > maxState)
+        {
+            state -= add;
+        }
+        else
+        {
+            OnInteract(false);
+        }
+    }
+
     private void Interact(InputAction.CallbackContext context)
     {
         if (GameManager.Instance.IsPaused)
             return;
-        int add = decrement ? -1 : 1;
-        if (wrapState)
-        {
-            state = (state + add) % (maxState + 1);
-        }
-        else
-        {
-            if (state + add < 0 || state + add > maxState)
-            {
-                decrement = !decrement;
-                state -= add;
-            }
-            else
-            {
-                state += add;
-            }
-        }
-        OnInteract(false);
+        IncrementState(decrement ? -1 : 1);
     }
 
     public void OnHoverEnter()

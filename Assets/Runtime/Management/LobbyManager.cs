@@ -10,6 +10,7 @@ using FishNet.Object;
 using FishNet.Transporting;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.Rendering.Universal;
 using UnitySceneManager = UnityEngine.SceneManagement.SceneManager;
 
 /// <summary>
@@ -240,7 +241,7 @@ public class LobbyManager : MonoBehaviour
         PlayerInfo currentInfo = PlayerInfo.Default(InstanceFinder.ClientManager.Connection.ClientId);
         PlayerRegistry.TryGetPlayer(currentInfo.ClientId, out currentInfo);
         currentInfo.Username = _localUsername;
-        if (PlayerInfoRelay.Instance != null)
+        if (PlayerInfoRelay.Instance != null && !PlayerInfoRelay.Instance.IsServerInitialized)
             PlayerInfoRelay.Instance.SendPlayerInfoServerRpc(currentInfo, InstanceFinder.ClientManager.Connection);
         // Submitting ServerRPC will update PlayerInfo for all clients including this one, but to avoid lag should update locally too
         PlayerRegistry.SetPlayer(currentInfo);
@@ -253,17 +254,17 @@ public class LobbyManager : MonoBehaviour
         
         if (!InstanceFinder.IsClientStarted)
         {
-            Debug.LogWarning("[LobbyManager] Cannot submit username because client is not started.");
+            Debug.LogWarning(GameLog.ObjectLog(this, "Cannot submit username because client is not started."));
             return;
         }
         if (!relay.IsSpawned)
         {
-            Debug.LogWarning("[LobbyManager] Cannot submit username because PlayerInfoRelay is not spawned.");
+            Debug.LogWarning(GameLog.ObjectLog(this, "Cannot submit username because PlayerInfoRelay is not spawned."));
             return;
         }
         if (!relay.IsClientInitialized)
         {
-            Debug.LogWarning("[LobbyManager] Cannot submit username because PlayerInfoRelay is not client initialized.");
+            Debug.LogWarning(GameLog.ObjectLog(this, "Cannot submit username because PlayerInfoRelay is not client initialized."));
             return;
         }
         UpdatePlayerUsername();
@@ -457,7 +458,7 @@ public class LobbyManager : MonoBehaviour
     {
         SetState(LobbyState.Disconnected);
         InvokeConnectionFail(message);
-        Debug.Log($"[LobbyManager] Connection failed: {message}");
+        Debug.Log(GameLog.ObjectLog(this, $"Connection failed: {message}"));
     }
 
     // -- Max Players ------------------------------------------------------------
@@ -473,7 +474,7 @@ public class LobbyManager : MonoBehaviour
             // ServerManager.Clients already includes the newly connected client here.
             if (_maxPlayers > 0 && InstanceFinder.ServerManager.Clients.Count > _maxPlayers)
             {
-                Debug.Log($"[LobbyManager] Server full ({_maxPlayers} max); kicking client {conn.ClientId}.");
+                Debug.Log(GameLog.ObjectLog(this, $"Server full ({_maxPlayers} max); kicking client {conn.ClientId}."));
                 InstanceFinder.ServerManager.Kick(conn, KickReason.Unset);
                 // A second OnRemoteConnectionState (Stopped) will follow and update the count.
                 return;
@@ -514,8 +515,7 @@ public class LobbyManager : MonoBehaviour
         if (method != null)
             method.Invoke(transport, new object[] { port });
         else
-            Debug.LogWarning($"[LobbyManager] Transport '{transport.GetType().Name}' has no "
-                           + "SetPort(ushort) method — port will not be changed.");
+            Debug.LogWarning($"[LobbyManager] Transport '{transport.GetType().Name}' has no SetPort(ushort) method — port will not be changed.");
     }
 
     private IEnumerator FetchPublicIPAndFireCode(ushort port)
@@ -524,10 +524,10 @@ public class LobbyManager : MonoBehaviour
         yield return req.SendWebRequest();
         bool ok = req.result == UnityWebRequest.Result.Success;
         if (!ok)
-            Debug.LogWarning("[LobbyManager] Could not fetch public IP — invite code will use 127.0.0.1 (LAN only).");
+            Debug.LogWarning(GameLog.ObjectLog(this, "Could not fetch public IP — invite code will use 127.0.0.1 (LAN only)."));
         string ip = ok ? req.downloadHandler.text.Trim() : "127.0.0.1";
         OnInviteCodeReady?.Invoke(GenerateInviteCode(ip, port));
-        Debug.Log($"[LobbyManager] Hosting on {ip}:{port}");
+        Debug.Log(GameLog.ObjectLog(this, $"Hosting on {ip}:{port}"));
 
         // Spawn PlayerInfoRelay
         if (PlayerInfoRelay.Instance != null)
@@ -536,7 +536,7 @@ public class LobbyManager : MonoBehaviour
         }
         NetworkObject relay = Instantiate(playerInfoRelayPrefab);
         yield return new WaitUntil(() => InstanceFinder.ServerManager.Started);
-        Debug.Log($"[LobbyManager] Spawned PlayerInfoRelay.");
+        Debug.Log(GameLog.ObjectLog(this, $"Spawned PlayerInfoRelay."));
         InstanceFinder.ServerManager.Spawn(relay);
     }
 

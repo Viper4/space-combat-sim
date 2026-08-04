@@ -1,7 +1,7 @@
 using SpaceStuff;
 using UnityEngine;
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
 using System.Collections;
 
 public class ScaledTransform : MonoBehaviour
@@ -48,8 +48,8 @@ public class ScaledTransform : MonoBehaviour
     [SerializeField, Tooltip("Tracked colliders/renderers are disabled at screen sizes below this")] private float minScreenPixelSize = 3f;
     
     [HideInInspector] public bool visible = true;
-    private Collider[] trackedColliders;
-    private Renderer[] trackedRenderers;
+    [HideInInspector] public Collider[] trackedColliders;
+    [HideInInspector] public Renderer[] trackedRenderers;
     private int[] originalColliderLayers;
     private int[] originalRendererLayers;
     public int scaledSpaceLayer = 3;
@@ -86,10 +86,13 @@ public class ScaledTransform : MonoBehaviour
         }
 
         SetTrackedComponentsActive(visible);
+        UpdateRealRadius();
     }
 
     private void OnEnable()
     {
+        if (ScaledSpaceVisuals.Instance == null)
+            return;
         ScaledSpaceVisuals.Instance.RegisterScaledTransform(this);
     }
 
@@ -182,7 +185,7 @@ public class ScaledTransform : MonoBehaviour
         }
 
         // Disable/enable renderers
-        for(int i = 0; i < trackedRenderers.Length; i++)
+        for (int i = 0; i < trackedRenderers.Length; i++)
         {
             if (trackedRenderers[i] == null)
                 continue;
@@ -364,7 +367,7 @@ public class ScaledTransform : MonoBehaviour
                     continue;
                 trackedRenderers[i].gameObject.layer = originalRendererLayers[i];
             }
-            foreach(Renderer renderer in worldSpaceOnlyRenderers)
+            foreach (Renderer renderer in worldSpaceOnlyRenderers)
             {
                 renderer.enabled = true;
             }
@@ -407,12 +410,12 @@ public class ScaledTransform : MonoBehaviour
         }
     }
 
-    public Renderer[] GetTrackedRenderers()
+    public Renderer[] CloneTrackedRenderers()
     {
         return (Renderer[])trackedRenderers.Clone();
     }
 
-    public Collider[] GetTrackedColliders()
+    public Collider[] CloneTrackedColliders()
     {
         return (Collider[])trackedColliders.Clone();
     }

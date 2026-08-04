@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: -8214975133850535882}
   - component: {fileID: 423929763229353203}
   - component: {fileID: 3529067775758097779}
+  - component: {fileID: -4443559885487207738}
   m_Layer: 0
   m_Name: Moon 1
   m_TagString: CelestialBody
@@ -62,6 +63,8 @@ MonoBehaviour:
     z: 1
   minScreenPixelSize: 3
   visible: 1
+  trackedColliders: []
+  trackedRenderers: []
   scaledSpaceLayer: 3
   inScaledSpace: 1
   scaleFactor: 1000000
@@ -158,14 +161,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e67c9a4f7bd32b64e98f85e426f57e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  freezePositionX: 0
+  freezePositionY: 0
+  freezePositionZ: 0
+  freezeRotationX: 0
+  freezeRotationY: 0
+  freezeRotationZ: 0
   overrideUnity: 0
   _mass: 0.0000001
   _isKinematic: 0
   _velocity:
-    x: 0
-    y: 0
-    z: 0
-  _angularVelocity:
     x: 0
     y: 0
     z: 0
@@ -268,7 +273,7 @@ MonoBehaviour:
   <AssetPathHash>k__BackingField: 11235234168432016391
   SceneId: 0
   SerializedTransformProperties:
-    Position: {x: 0, y: 0, z: 0}
+    Position: {x: 0, y: 0.9999986, z: -9.999973}
     Rotation: {x: 0, y: 0, z: 0, w: 1}
     Scale: {x: 0.000001, y: 0.000001, z: 0.000001}
     IsValid: 1
@@ -292,7 +297,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584166972375615985
+  _initializedTimestamp: -8584157749340765572
 --- !u!114 &3529067775758097779
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -314,3 +319,15 @@ MonoBehaviour:
   controlType: 1
   activeWhenOffline: 1
   syncMass: 0
+--- !u!114 &-4443559885487207738
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2201142413859200454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ae8d01bf5d32f2e458a64a733b1508d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RelativisticObject

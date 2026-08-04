@@ -27,7 +27,7 @@ public class NetworkObjectDestroyer : NetworkBehaviour
 
     public void HideCriticalObjects()
     {
-        Debug.Log($"[NetworkObjectDestroyer] Hid critical objects on {name}");
+        Debug.Log(GameLog.ObjectLog(this, $"Hid critical objects on {name}"));
         // Keep everything disabled for safety until client starts
         for(int i = 0; i < nonOwnerGOsToDestroy.Length; i++)
         {
@@ -50,7 +50,7 @@ public class NetworkObjectDestroyer : NetworkBehaviour
 
     private void ShowOwnerObjects()
     {
-        Debug.Log($"[NetworkObjectDestroyer] Showing Owner objects on {name}.");
+        Debug.Log(GameLog.ObjectLog(this, $"Showing Owner objects on {name}."));
         for(int i = 0; i < nonOwnerGOsToDestroy.Length; i++)
         {
             nonOwnerGOsToDestroy[i].SetActive(true);
@@ -63,7 +63,7 @@ public class NetworkObjectDestroyer : NetworkBehaviour
 
     private void ShowServerObjects()
     {
-        Debug.Log($"[NetworkObjectDestroyer] Showing Server objects on {name}.");
+        Debug.Log(GameLog.ObjectLog(this, $"Showing Server objects on {name}."));
         for(int i = 0; i < nonServerGOsToDestroy.Length; i++)
         {
             nonServerGOsToDestroy[i].SetActive(true);
@@ -85,7 +85,7 @@ public class NetworkObjectDestroyer : NetworkBehaviour
 
         if (!IsOwner)
         {
-            Debug.Log($"[NetworkObjectDestroyer] Destroying non-owner objects for {name}.");
+            Debug.Log(GameLog.ObjectLog(this, $"Destroying non-owner objects for {name}."));
             for(int i = 0; i < nonOwnerGOsToDestroy.Length; i++)
             {
                 Destroy(nonOwnerGOsToDestroy[i]);
@@ -102,7 +102,7 @@ public class NetworkObjectDestroyer : NetworkBehaviour
 
         if (!IsServerInitialized)
         {
-            Debug.Log($"[NetworkObjectDestroyer] Destroying non-server objects for {name}.");
+            Debug.Log(GameLog.ObjectLog(this, $"Destroying non-server objects for {name}."));
             for(int i = 0; i < nonServerGOsToDestroy.Length; i++)
             {
                 Destroy(nonServerGOsToDestroy[i]);

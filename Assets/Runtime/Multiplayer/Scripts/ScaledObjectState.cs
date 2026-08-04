@@ -26,7 +26,7 @@ public struct ScaledObjectState
     public Vector3d Position => new Vector3d(posX, posY, posZ);
     public Quaternion Rotation => new Quaternion(rotX, rotY, rotZ, rotW);
     public Vector3d Velocity => new Vector3d(velX, velY, velZ);
-    public Vector3d AngularVelocity => new Vector3d(angVelX, angVelY, angVelZ);
+    public Vector3 AngularVelocity => new Vector3(angVelX, angVelY, angVelZ);
 
     public static ScaledObjectState From(ScaledRigidbody scaledRigidbody)
     {
@@ -42,9 +42,9 @@ public struct ScaledObjectState
             velX = (float)scaledRigidbody.velocity.x,
             velY = (float)scaledRigidbody.velocity.y,
             velZ = (float)scaledRigidbody.velocity.z,
-            angVelX = (float)scaledRigidbody.angularVelocity.x,
-            angVelY = (float)scaledRigidbody.angularVelocity.y,
-            angVelZ = (float)scaledRigidbody.angularVelocity.z,
+            angVelX = scaledRigidbody.angularVelocity.x,
+            angVelY = scaledRigidbody.angularVelocity.y,
+            angVelZ = scaledRigidbody.angularVelocity.z,
         };
     }
 

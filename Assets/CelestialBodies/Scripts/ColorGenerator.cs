@@ -68,7 +68,7 @@ public class ColorGenerator
 
             texture.SetPixels32(colors);
             texture.Apply();
-            materialInstance.SetTexture("_MainTexture", texture);
+            materialInstance.SetTexture("_BaseMap", texture);
         }
     }
 }

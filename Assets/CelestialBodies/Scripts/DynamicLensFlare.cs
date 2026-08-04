@@ -1,3 +1,4 @@
+using GameKit.Dependencies.Utilities;
 using SpaceStuff;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -12,7 +13,9 @@ public class DynamicLensFlare : MonoBehaviour
     [SerializeField] private LayerMask occlusionLayers;
     [SerializeField, Tooltip("Total number of linecasts to average over.")] private int numSamples = 4;
     [SerializeField, Tooltip("Linecasts per frame.")] private int samplesPerFrame = 1;
-    [SerializeField, Tooltip("Splits intensity into this many buckets to smooth out noise.")] private int buckets = 4;
+    [SerializeField] private bool bucketIntensity = false;
+    [SerializeField, ConditionalHide("bucketIntensity"), Tooltip("Splits intensity into this many buckets to smooth out noise.")] private int buckets = 4;
+    [SerializeField] private float intensitySpeed = 1f;
     [SerializeField] private Vector2 brightnessRange;
     [SerializeField] private Vector2 scaleRange;
     [SerializeField] private Vector2 distanceRange;
@@ -40,6 +43,7 @@ public class DynamicLensFlare : MonoBehaviour
         {
             // Too close or too far so disable lens flare
             lensFlare.enabled = false;
+            lensFlare.intensity = 0f;
             return;
         }
 
@@ -56,10 +60,13 @@ public class DynamicLensFlare : MonoBehaviour
                     if (otherSqrDistance < sqrDistance) // Object should be in front of this light relative to camera
                     {
                         samples[sampleIndex] = 1;
+                        Debug.DrawLine(ray.origin, hit.point, Color.red, Time.fixedDeltaTime);
+
                     }
                     else
                     {
                         samples[sampleIndex] = 0;
+                        Debug.DrawLine(ray.origin, hit.point, Color.green, Time.fixedDeltaTime);
                     }
                 }
                 else
@@ -85,24 +92,33 @@ public class DynamicLensFlare : MonoBehaviour
         if (numOccluded >= numSamples)
         {
             lensFlare.enabled = false;
+            lensFlare.intensity = 0f;
         }
         else
         {
-            int bucket = 0;
-            for (int i = 1; i < buckets; i++)
+            float fraction;
+            if (bucketIntensity)
             {
-                if (numOccluded < (i + 1) * bucketSize)
+                int bucket = 0;
+                for (int i = 1; i < buckets; i++)
                 {
-                    bucket = i;
-                    break;
+                    if (numOccluded < (i + 1) * bucketSize)
+                    {
+                        bucket = i;
+                        break;
+                    }
                 }
+                fraction = 1f - ((float)bucket / (buckets - 1));
             }
-            float fraction = 1f - ((float)bucket / (buckets - 1));
+            else
+            {
+                fraction = 1f - (float)numOccluded / numSamples;
+            }
 
             lensFlare.enabled = true;
-            // t is nonlinear but still smooth
             float t = (float)((sqrDistance - distanceRange.x * distanceRange.x) / (distanceRange.y * distanceRange.y - distanceRange.x * distanceRange.x));
-            lensFlare.intensity = Mathf.Lerp(brightnessRange.x, brightnessRange.y, t) * spaceLight.temperature * temperatureScale * fraction;
+            float targetIntensity = Mathf.Lerp(brightnessRange.x, brightnessRange.y, t) * spaceLight.temperature * temperatureScale * fraction;
+            lensFlare.intensity = Mathf.Lerp(lensFlare.intensity, targetIntensity, Time.fixedDeltaTime * intensitySpeed);
             lensFlare.scale = Mathf.Lerp(scaleRange.x, scaleRange.y, t);
         }
     }

@@ -3,8 +3,6 @@ using UnityEngine;
 
 public class TerrainChunk
 {
-    private const int visibilitySamples = 64;
-
     private TerrainChunk[] children;
     private ShapeGenerator shapeGenerator;
     private Vector3 localPosition;
@@ -171,21 +169,6 @@ public class TerrainChunk
             }
         }
         chunkObject.meshFilter.sharedMesh.uv = uv;
-    }
-
-    private bool IsMeshVisible(Camera camera, Transform parent, Vector3 centerPoint, out Vector3 visiblePoint)
-    {
-        int step = Mathf.Max(1, vertices.Length / visibilitySamples);
-        for (int i = 0; i < vertices.Length; i += step)
-        {
-            Vector3 worldPoint = parent.TransformPoint(vertices[i]);
-            visiblePoint = worldPoint;
-
-            if (IsPointVisible(camera, worldPoint, centerPoint))
-                return true;
-        }
-        visiblePoint = centerPoint;
-        return false;
     }
 
     private bool IsBoundsVisible(Camera camera, Vector3 centerPoint)

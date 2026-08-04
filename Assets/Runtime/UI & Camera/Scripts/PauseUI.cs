@@ -64,6 +64,7 @@ public class PauseUI : MonoBehaviour
     [Tooltip("Semi-transparent panel shown while waiting for a key press during rebinding.")]
     [SerializeField] private GameObject rebindOverlay;
     [SerializeField] private TextMeshProUGUI rebindOverlayLabel;
+    [SerializeField] private Button resetAllButton;
 
     // ── Private ────────────────────────────────────────────────────────────────
 
@@ -150,6 +151,7 @@ public class PauseUI : MonoBehaviour
         CancelCurrentRebind();
 
         pauseRoot.SetActive(false);
+        GameManager.Instance.SaveSettings();
 
         if (InstanceFinder.NetworkManager.IsOffline)
             Time.timeScale = 1f;
@@ -165,6 +167,7 @@ public class PauseUI : MonoBehaviour
 
     private void CloseSettings()
     {
+        GameManager.Instance.SaveSettings();
         CancelCurrentRebind();
         ShowPanel(mainPanel);
     }
@@ -190,7 +193,7 @@ public class PauseUI : MonoBehaviour
         Application.Quit();
 #endif
     }
-
+    
     // ── Leave Button ───────────────────────────────────────────────────────────
 
     private void RefreshLeaveButtonVisibility()
@@ -208,9 +211,24 @@ public class PauseUI : MonoBehaviour
 
     // ── Keybind List ───────────────────────────────────────────────────────────
 
+    private string GetBindingName(InputBinding binding)
+    {
+        // Composite parts have names like Up, Down, Left...
+        if (!string.IsNullOrEmpty(binding.name))
+            return binding.name;
+
+        if (!string.IsNullOrEmpty(binding.groups))
+        {
+            return string.Join("/", binding.groups.Split(';', System.StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        return "";
+    }
+
     private void BuildKeybindList()
     {
         // Destroy stale rows from a previous open.
+        resetAllButton.onClick.RemoveAllListeners();
         foreach (var row in _spawnedRows)
             Destroy(row);
         _spawnedRows.Clear();
@@ -222,28 +240,40 @@ public class PauseUI : MonoBehaviour
         {
             RangedSettingRow row = Instantiate(rangedSettingRowPrefab, keybindListContent);
             row.Initialize(setting.name);
+            resetAllButton.onClick.AddListener(row.OnResetClicked);
             _spawnedRows.Add(row.gameObject);
         }
 
         foreach (string mapName in rebindableMapNames)
         {
             InputActionMap map = asset.FindActionMap(mapName, throwIfNotFound: false);
-            if (map == null) continue;
+            if (map == null)
+                continue;
 
             foreach (InputAction action in map.actions)
             {
-                if (excluded.Contains(action.name)) continue;
+                if (excluded.Contains(action.name))
+                    continue;
 
-                // One row per binding (skip composites parts; show the composite itself).
+                bool firstBinding = true;
+
                 for (int i = 0; i < action.bindings.Count; i++)
                 {
                     InputBinding binding = action.bindings[i];
 
-                    // Skip composite parts — show only the composite header.
-                    if (binding.isPartOfComposite) continue;
+                    // Skip the composite header itself ("2D Vector")
+                    if (binding.isComposite)
+                        continue;
+                    
+                    string bindingName = GetBindingName(binding);
 
                     KeybindRow row = Instantiate(keybindRowPrefab, keybindListContent);
-                    row.Initialize(action, i, this);
+                    string label = firstBinding ? action.name : "";
+                    row.Initialize(action, i, bindingName, label, this);
+
+                    resetAllButton.onClick.AddListener(row.OnResetClicked);
+
+                    firstBinding = false;
                     _spawnedRows.Add(row.gameObject);
                 }
             }
@@ -273,20 +303,13 @@ public class PauseUI : MonoBehaviour
             .Start();
     }
 
-    private void FinishRebind(
-        InputActionRebindingExtensions.RebindingOperation op,
-        InputAction action,
-        KeybindRow row,
-        bool cancelled)
+    private void FinishRebind(InputActionRebindingExtensions.RebindingOperation op, InputAction action, KeybindRow row, bool cancelled)
     {
         op.Dispose();
         _currentRebind = null;
 
         action.actionMap.Enable();
         HideRebindOverlay();
-
-        if (!cancelled)
-            GameManager.Instance.SaveSettings();
 
         row.Refresh();
     }
@@ -296,13 +319,13 @@ public class PauseUI : MonoBehaviour
     {
         CancelCurrentRebind();
         action.RemoveBindingOverride(bindingIndex);
-        GameManager.Instance.SaveSettings();
         row.Refresh();
     }
 
     private void CancelCurrentRebind()
     {
-        if (_currentRebind == null) return;
+        if (_currentRebind == null)
+            return;
         _currentRebind.Cancel();   // fires OnCancel → FinishRebind
         // FinishRebind disposes and nulls _currentRebind.
     }
