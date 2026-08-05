@@ -449,17 +449,20 @@ public class Torpedo : NetworkBehaviour
         bool rbIsNull = collision.rigidbody == null;
         ScaledRigidbody otherDoubleRB = rbIsNull ? collision.transform.GetComponent<ScaledRigidbody>() : collision.rigidbody.GetComponent<ScaledRigidbody>();
         Vector3d velocityB = Vector3d.zero;
+        bool isTarget;
         if (otherDoubleRB == null)
         {
             if (!rbIsNull)
                 velocityB = collision.rigidbody.linearVelocity.ToVector3d();
+            isTarget = collision.transform == target.transform;
         }
         else
         {
             velocityB = otherDoubleRB.velocity;
+            isTarget = otherDoubleRB == target.scaledRigidbody;
         }
         Vector3d relativeVelocity = scaledRigidbody.velocity - velocityB;
-        if (relativeVelocity.sqrMagnitude > collideSpeedThreshold * collideSpeedThreshold)
+        if (isTarget || relativeVelocity.sqrMagnitude > collideSpeedThreshold * collideSpeedThreshold)
         {
             Debug.Log(GameLog.ObjectLog(this, $"Unity collide detonate with {collision.gameObject.name}."));
             Detonate(otherDoubleRB);

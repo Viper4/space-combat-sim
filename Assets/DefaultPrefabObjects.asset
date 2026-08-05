@@ -1,36 +1,3 @@
-%YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3ad70174b079c2f4ebc7931d3dd1af6f, type: 3}
-  m_Name: DefaultPrefabObjects
-  m_EditorClassIdentifier: FishNet.Runtime::FishNet.Managing.Object.DefaultPrefabObjects
-  _prefabs:
-  - {fileID: 4653574857950573837, guid: abd2823a3c3a4d34a9c4bc9d3c77e53a, type: 3}
-  - {fileID: 9185686016837872124, guid: 5b9e20a9071cd5f4f889fa3cb9905901, type: 3}
-  - {fileID: 4512293259955182956, guid: fe2b65b02f0484b41aa8cfa9fbbb0e1d, type: 3}
-  - {fileID: 1329950267029833902, guid: 01fbfa36de7235645a7cdeaa456e6aa6, type: 3}
-  - {fileID: 5936781585265924629, guid: b981d698852623f4b8a6822e592843f0, type: 3}
-  - {fileID: 4512293259955182956, guid: 35639798ad77fc145871588b25d66259, type: 3}
-  - {fileID: 201277550, guid: 26a567abbe21227428f5c3d309d1d73c, type: 3}
-  - {fileID: 4512293259955182956, guid: 0d6d0f48b03b17f49a6340103cd9b9d0, type: 3}
-  - {fileID: 8475222101369129519, guid: 8cf33e8e99a9b0c4c8f29ff725650de6, type: 3}
-  - {fileID: 4512293259955182956, guid: dafef736ca1ae384e9a19eb672843563, type: 3}
-  - {fileID: 201277550, guid: 5b712878ecece354ba4ffb026c0a221c, type: 3}
-  - {fileID: 423929763229353203, guid: 54a98c6b8f2984c489dcec8f982b3162, type: 3}
-  - {fileID: 2770388785015131211, guid: 4e3ca8337d01055439bea7c14dec7c76, type: 3}
-  - {fileID: 4512293259955182956, guid: b8017cef39731ba439c70fecc09488e3, type: 3}
-  - {fileID: 6971362235971961917, guid: b434ed6ec76e83f4d91882a7bd6034a8, type: 3}
-  - {fileID: 1847065452805617377, guid: ca23d150f78c9944fb2aa1aed5f52fe4, type: 3}
-  - {fileID: 4512293259955182956, guid: 44611030e61220d42ab7c37ba3c0ea92, type: 3}
-  - {fileID: 8192566354860284824, guid: 6331b3542e64a564c81bc39cedf70c8d, type: 3}
-  - {fileID: 4512293259955182956, guid: f32d4c19de900e64cb73cedcb8ba6f70, type: 3}
-  - {fileID: 8624868431337818510, guid: 80e3630c2347cd4479bc18cea956f487, type: 3}
-  - {fileID: 611616139817875448, guid: bf5f023b4017a5e41a9815ec5745df3d, type: 3}
+version https://git-lfs.github.com/spec/v1
+oid sha256:c2d9c1e244b5f423618ae3ff77abccceee59198a01b53ca4146372b8de088e1a
+size 2203

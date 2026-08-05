@@ -1,13 +1,14 @@
 using UnityEngine;
 using SpaceStuff;
+using System;
 
 [RequireComponent(typeof(ScaledRigidbody))]
 public class RelativisticObject : MonoBehaviour
 {
+    private static readonly int RelativeVelocityID = Shader.PropertyToID("_RelativeVelocity");
+
     private ScaledRigidbody scaledRigidbody;
     private MaterialPropertyBlock block;
-
-    static readonly int RelativeVelocityID = Shader.PropertyToID("_RelativeVelocity");
 
     private void Start()
     {
@@ -26,7 +27,7 @@ public class RelativisticObject : MonoBehaviour
         {
             relativeVelocity = new Vector3(0f, 0f, 0.1f);
         }
-        float distance = (float)(scaledRigidbody.scaledTransform.realPosition - FloatingWorldOrigin.Instance.scaledRigidbody.scaledTransform.realPosition).magnitude;
+        // float distance = (float)(scaledRigidbody.scaledTransform.realPosition - FloatingWorldOrigin.Instance.scaledRigidbody.scaledTransform.realPosition).magnitude;
 
         foreach (Renderer renderer in scaledRigidbody.scaledTransform.trackedRenderers)
         {

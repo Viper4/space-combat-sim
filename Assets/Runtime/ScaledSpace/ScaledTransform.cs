@@ -118,7 +118,7 @@ public class ScaledTransform : MonoBehaviour
 
     private void GetVisualComponents()
     {
-        Transform[] allChildren = GetComponentsInChildren<Transform>();
+        Transform[] allChildren = GetComponentsInChildren<Transform>(true);
         List<Collider> tempColliders = new List<Collider>();
         List<Renderer> tempRenderers = new List<Renderer>();
 
