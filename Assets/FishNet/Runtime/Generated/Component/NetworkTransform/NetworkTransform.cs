@@ -396,7 +396,7 @@ namespace FishNet.Component.Transforming
         /// <summary>
         /// True to enable teleport threshhold.
         /// </summary>
-        [Tooltip("True to enable teleport threshhold.")]
+        [Tooltip("True to enable teleport threshold.")]
         [SerializeField]
         private bool _enableTeleport;
         /// <summary>

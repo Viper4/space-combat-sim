@@ -139,7 +139,7 @@ public class TurretSystem : MonoBehaviour
             StartTargetSearch?.Invoke();
             foreach (RadarTarget radarTarget in radar.GetAllDetectedTargets())
             {
-                if (radarTarget.team == ship.attachedRadarTarget.team)
+                if (radarTarget.team == ship.radarTarget.team)
                     continue;
                 double sqrDistance = (radarTarget.scaledRigidbody.scaledTransform.realPosition - ship.scaledRigidbody.scaledTransform.realPosition).sqrMagnitude;
                 double killRadius = radar.GetKillRadius(radarTarget.tag, 500.0);

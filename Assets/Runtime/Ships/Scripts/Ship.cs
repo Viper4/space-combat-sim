@@ -12,9 +12,10 @@ public class Ship : NetworkBehaviour
 {
     [Header("Ship")]
     public ScaledRigidbody scaledRigidbody;
-    public RadarTarget attachedRadarTarget;
+    public RadarTarget radarTarget;
     public StatSystem statSystem;
     public Shields shields;
+    [SerializeField] private NetworkScaledObject networkScaledObject;
     [SerializeField] private AlertSystem alertSystem;
     [SerializeField, Tooltip("Minimum collision impulse for ship to take damage")] private float minImpulse = 5f;
     // Need separate scales since unity's impulse calculation is different from our custom scaled space one
@@ -34,6 +35,7 @@ public class Ship : NetworkBehaviour
     [SerializeField] private AudioClip shutdownClip;
     [SerializeField] private AudioClip engineOnClip;
     [SerializeField] private AudioClip engineStartClip;
+    [SerializeField] private float engineAmbientVolume = 0.7f;
     [SerializeField] private Vector2 APUOnTimeRange;
     [SerializeField, Tooltip("Radius to add to this RadarTarget's passive emission while battery is on.")] private float batteryOnEmission = 50f;
     [SerializeField, Tooltip("Radius to add to this RadarTarget's passive emission while APU is started.")] private float APUStartedEmission = 500f;
@@ -76,6 +78,8 @@ public class Ship : NetworkBehaviour
     [SerializeField] private InertialEffects inertialEffects;
     [SerializeField] private AudioSource thrusterAudioSource;
     [SerializeField] private float thrusterVolumeScale = 1.0f;
+    [SerializeField] private AudioSource engineAmbientAudioSource;
+    [SerializeField] private float engineAmbientShutdownTime = 2.5f;
     [SerializeField] private AudioSource engineAudioSource;
     [SerializeField] private float engineVolumeScale = 0.8f;
     [SerializeField] private GameObject rocketTrail;
@@ -84,15 +88,15 @@ public class Ship : NetworkBehaviour
     [SerializeField] private AudioClip launchEngineClip;
 
     [Header("Ship controls")]
-    [SerializeField] private float engineCruiseForce = 980000f;
-    [SerializeField] private float engineHighGForce = 3675000f;
-    [SerializeField] private float thrusterCruiseForce = 245000f;
-    [SerializeField] private float thrusterHighGForce = 980000f;
+    [SerializeField] private float engineCruiseAcc = 4f;
+    [SerializeField] private float engineHighGAcc = 14f;
+    [SerializeField] private float thrusterCruiseAcc = 1f;
+    [SerializeField] private float thrusterHighGAcc = 4f;
     [SerializeField, Tooltip("Thruster distance from ship's x axis (Pitch)")] private float thrusterRadiusX = 6f;
     [SerializeField, Tooltip("Thruster distance from ship's y axis (Yaw)")] private float thrusterRadiusY = 6f;
     [SerializeField, Tooltip("Thruster distance from ship's z axis (Roll)")] private float thrusterRadiusZ = 1.5f;
-    private Vector3 thrusterCruiseTorque;
-    private Vector3 thrusterCombatTorque;
+    [SerializeField] private Vector3 thrusterCruiseAngAcc;
+    [SerializeField] private Vector3 thrusterHighGAngAcc;
     private bool rollMode = true;
     private bool highGMode = false;
 
@@ -119,15 +123,9 @@ public class Ship : NetworkBehaviour
     [SerializeField, Range(0, 1000)] private float matchDistanceP, matchDistanceI, matchDistanceD;
     private PIDController matchDistancePID;
 
-    public struct ShipInputData
-    {
-        public Vector3 move;
-        public Vector2 look;
-    }
+    private Vector3 moveInput;
+    private Vector3 lookInput;
 
-    private ShipInputData currentInput;
-    [SerializeField] private float inputSendRate = 20f;
-    private float inputSendTimer;
     private bool moving = false;
     private bool rotating = false;
 
@@ -145,11 +143,21 @@ public class Ship : NetworkBehaviour
     private void Awake()
     {
         scaledRigidbody = GetComponent<ScaledRigidbody>();
-        attachedRadarTarget = GetComponent<RadarTarget>();
+        radarTarget = GetComponent<RadarTarget>();
 
-        thrusterCruiseTorque = new Vector3(thrusterCruiseForce * thrusterRadiusX, thrusterCruiseForce * thrusterRadiusY, thrusterCruiseForce * thrusterRadiusZ);
-        thrusterCombatTorque = new Vector3(thrusterHighGForce * thrusterRadiusX, thrusterHighGForce * thrusterRadiusY, thrusterHighGForce * thrusterRadiusZ);
+        float mass = (float)scaledRigidbody.mass;
+        Vector3 inertiaTensor = scaledRigidbody.attachedRigidbody.inertiaTensor;
+        thrusterCruiseAngAcc = new Vector3(
+            thrusterCruiseAcc * thrusterRadiusX * mass / inertiaTensor.x,
+            thrusterCruiseAcc * thrusterRadiusY * mass / inertiaTensor.y,
+            thrusterCruiseAcc * thrusterRadiusZ * mass / inertiaTensor.z
+        );
 
+        thrusterHighGAngAcc = new Vector3(
+            thrusterHighGAcc * thrusterRadiusX * mass / inertiaTensor.x,
+            thrusterHighGAcc * thrusterRadiusY * mass / inertiaTensor.y,
+            thrusterHighGAcc * thrusterRadiusZ * mass / inertiaTensor.z
+        );
         xRotatePID = new PIDController(autoP, autoI, autoD);
         yRotatePID = new PIDController(autoP, autoI, autoD);
         zRotatePID = new PIDController(autoP, autoI, autoD);
@@ -180,6 +188,7 @@ public class Ship : NetworkBehaviour
         {
             OnShutdownEnd?.Invoke(); // Update UI elements active state
         }
+        UpdateNetworkMaxAcceleration();
     }
 
     public override void OnStartServer()
@@ -222,33 +231,17 @@ public class Ship : NetworkBehaviour
 
     private void ReadLocalInput()
     {
-        currentInput.move = Vector3.zero;
-        currentInput.look = Vector2.zero;
+        moveInput = Vector3.zero;
+        lookInput = Vector2.zero;
         if (GameManager.Instance.IsPaused)
             return;
 
-        currentInput.move = GameManager.Instance.inputActions.Player.Move.ReadValue<Vector3>();
+        moveInput = GameManager.Instance.inputActions.Player.Move.ReadValue<Vector3>();
         if (Cursor.lockState == CursorLockMode.Locked)
         {
-            currentInput.look = GameManager.Instance.inputActions.Player.Look.ReadValue<Vector2>();
-            currentInput.look *= GameManager.Instance.GetRangedSettingValue("Sensitivity") * GameManager.Instance.sensitivityScale;
+            lookInput = GameManager.Instance.inputActions.Player.Look.ReadValue<Vector2>();
+            lookInput *= GameManager.Instance.GetRangedSettingValue("Sensitivity") * GameManager.Instance.sensitivityScale;
         }
-    }
-
-    private void SendInputToServer()
-    {
-        inputSendTimer += Time.fixedDeltaTime;
-        if (inputSendTimer >= 1f / Mathf.Max(1f, inputSendRate))
-        {
-            inputSendTimer -= 1f / Mathf.Max(1f, inputSendRate);
-            SetInputServerRpc(currentInput);
-        }
-    }
-
-    [ServerRpc]
-    private void SetInputServerRpc(ShipInputData input)
-    {
-        currentInput = input;
     }
 
     private float CalculateFuelBurn(double input, double maxInput)
@@ -260,7 +253,7 @@ public class Ship : NetworkBehaviour
     private void ApplyForceAndTorque()
     {
         // Calculate local force to apply
-        Vector3 desiredMove = Vector3.ClampMagnitude(currentInput.move, 1f); // Prevent from moving faster than max force allows
+        Vector3 desiredMove = Vector3.ClampMagnitude(moveInput, 1f); // Prevent from moving faster than max force allows
         moving = desiredMove.x != 0 || desiredMove.y != 0 || desiredMove.z != 0;
         
         if (autoStabilizePos)
@@ -318,42 +311,42 @@ public class Ship : NetworkBehaviour
         }
 
         // Engine can only move ship forward so use engine for +z and thrusters for -z
-        Vector3d finalForce;
+        Vector3d finalAcc;
         if (highGMode)
         {
-            finalForce = new Vector3d(
-                desiredMove.x * thrusterHighGForce,
-                desiredMove.y * thrusterHighGForce,
-                desiredMove.z > 0 ? desiredMove.z * engineHighGForce : desiredMove.z * thrusterHighGForce
+            finalAcc = new Vector3d(
+                desiredMove.x * thrusterHighGAcc,
+                desiredMove.y * thrusterHighGAcc,
+                desiredMove.z > 0 ? desiredMove.z * engineHighGAcc : desiredMove.z * thrusterHighGAcc
             );
         }
         else
         {
-            finalForce = new Vector3d(
-                desiredMove.x * thrusterCruiseForce,
-                desiredMove.y * thrusterCruiseForce,
-                desiredMove.z > 0 ? desiredMove.z * engineCruiseForce : desiredMove.z * thrusterCruiseForce
+            finalAcc = new Vector3d(
+                desiredMove.x * thrusterCruiseAcc,
+                desiredMove.y * thrusterCruiseAcc,
+                desiredMove.z > 0 ? desiredMove.z * engineCruiseAcc : desiredMove.z * thrusterCruiseAcc
             );
         }
 
-        if (finalForce.sqrMagnitude > 0.0001)
-            scaledRigidbody.AddRelativeForce(finalForce, ForceMode.Force);
+        if (finalAcc.sqrMagnitude > 0.0001)
+            scaledRigidbody.AddRelativeForce(finalAcc, ForceMode.Acceleration);
 
-        fuel -= (CalculateFuelBurn(finalForce.x, engineHighGForce) 
-                + CalculateFuelBurn(finalForce.y, engineHighGForce) 
-                + CalculateFuelBurn(finalForce.z, engineHighGForce)) * Time.fixedDeltaTime;
+        fuel -= (CalculateFuelBurn(finalAcc.x, engineHighGAcc)
+                + CalculateFuelBurn(finalAcc.y, engineHighGAcc)
+                + CalculateFuelBurn(finalAcc.z, engineHighGAcc)) * Time.fixedDeltaTime;
 
         // Calculate local torque to apply
         Vector3d desiredRotate;
 
         // Rotation inputs for pitch and roll
-        Vector2 lookInput = Vector2.ClampMagnitude(currentInput.look, 1f); // Prevent from rotating faster than max torque allows
-        desiredRotate = new Vector3d(-lookInput.y, 0.0, 0.0);
+        Vector2 desiredLook = Vector2.ClampMagnitude(lookInput, 1f); // Prevent from rotating faster than max torque allows
+        desiredRotate = new Vector3d(-desiredLook.y, 0.0, 0.0);
         if (rollMode)
-            desiredRotate.z = -lookInput.x;
+            desiredRotate.z = -desiredLook.x;
         else
-            desiredRotate.y = lookInput.x;
-        rotating = currentInput.look.x != 0 || currentInput.look.y != 0;
+            desiredRotate.y = desiredLook.x;
+        rotating = lookInput.x != 0 || lookInput.y != 0;
 
         if (autoStabilizeRot && !rotating)
         {
@@ -372,53 +365,49 @@ public class Ship : NetworkBehaviour
             desiredRotate = Vector3d.ClampMagnitude(desiredRotate, 1f);
         }
 
-        Vector3d finalTorque;
+        Vector3d finalAngAcc;
         if (highGMode)
         {
-            finalTorque = new Vector3d(
-                desiredRotate.x * thrusterCombatTorque.x,
-                desiredRotate.y * thrusterCombatTorque.y,
-                desiredRotate.z * thrusterCombatTorque.z
+            finalAngAcc = new Vector3d(
+                desiredRotate.x * thrusterHighGAngAcc.x,
+                desiredRotate.y * thrusterHighGAngAcc.y,
+                desiredRotate.z * thrusterHighGAngAcc.z
             );
         }
         else
         {
-            finalTorque = new Vector3d(
-                desiredRotate.x * thrusterCruiseTorque.x,
-                desiredRotate.y * thrusterCruiseTorque.y,
-                desiredRotate.z * thrusterCruiseTorque.z
+            finalAngAcc = new Vector3d(
+                desiredRotate.x * thrusterCruiseAngAcc.x,
+                desiredRotate.y * thrusterCruiseAngAcc.y,
+                desiredRotate.z * thrusterCruiseAngAcc.z
             );
         }
 
-        if (finalTorque.sqrMagnitude > 0.0001)
+        if (finalAngAcc.sqrMagnitude > 0.0001)
         {
-            scaledRigidbody.AddRelativeTorque(finalTorque, ForceMode.Force);
+            scaledRigidbody.AddRelativeTorque(finalAngAcc, ForceMode.Acceleration);
         }
-        fuel -= (CalculateFuelBurn(finalTorque.x, thrusterCombatTorque.x) 
-                + CalculateFuelBurn(finalTorque.y, thrusterCombatTorque.y) 
-                + CalculateFuelBurn(finalTorque.z, thrusterCombatTorque.z)) * Time.fixedDeltaTime;
+        fuel -= (CalculateFuelBurn(finalAngAcc.x, thrusterHighGAngAcc.x) 
+                + CalculateFuelBurn(finalAngAcc.y, thrusterHighGAngAcc.y) 
+                + CalculateFuelBurn(finalAngAcc.z, thrusterHighGAngAcc.z)) * Time.fixedDeltaTime;
 
         if (IsOwnerOrOffline)
         {
-            UpdateOwnerEffects(finalForce, desiredRotate, finalTorque);
+            UpdateOwnerEffects(finalAcc, desiredRotate, finalAngAcc);
         }
         else
         {
-            UpdateServerEffects(finalForce);
+            UpdateServerEffects(finalAcc);
         }
     }
 
     private void FixedUpdate()
     {
-        if (IsOwnerOrOffline)
-        {
-            ReadLocalInput();
-            if (!IsOffline)
-                SendInputToServer();
-        }
-
         if (!IsOwnerOrOffline && !IsServerInitialized)
             return;
+        
+        if (IsOwnerOrOffline)
+            ReadLocalInput();
 
         if (!isStarted)
         {
@@ -435,7 +424,8 @@ public class Ship : NetworkBehaviour
 
         if (engineStarted)
         {
-            ApplyForceAndTorque();
+            if (IsOwnerOrOffline)
+                ApplyForceAndTorque(); // NetworkScaledObject should handle syncing stuff to server
             fuel -= idleFuelConsumption * Time.fixedDeltaTime * 2f;
         }
         else
@@ -475,15 +465,15 @@ public class Ship : NetworkBehaviour
         rocketTrail.transform.localScale = scale * Vector3.one;
     }
 
-    private void UpdateServerEffects(Vector3d finalForce)
+    private void UpdateServerEffects(Vector3d finalAcc)
     {
         // Visual effects for force
-        bool hasForce = finalForce.sqrMagnitude > 0.0001;
+        bool hasForce = finalAcc.sqrMagnitude > 0.0001;
 
-        if (hasForce && finalForce.z > 0.0)
+        if (hasForce && finalAcc.z > 0.0)
         {
             // Main engine effects
-            float t = (float)finalForce.z / engineHighGForce;
+            float t = (float)finalAcc.z / engineHighGAcc;
             if (!rocketTrail.activeSelf)
             {
                 rocketTrail.SetActive(true);
@@ -500,7 +490,7 @@ public class Ship : NetworkBehaviour
         }
     }
 
-    private void UpdateOwnerEffects(Vector3d finalForce, Vector3d desiredRotate, Vector3d finalTorque)
+    private void UpdateOwnerEffects(Vector3d finalAcc, Vector3d desiredRotate, Vector3d finalAngAcc)
     {
         fuelIndicator.UpdateUI(fuel, maxFuel);
         if (alertSystem != null)
@@ -521,32 +511,32 @@ public class Ship : NetworkBehaviour
             }
         }
         // Visual effects for force
-        bool hasForce = finalForce.sqrMagnitude > 0.0001;
+        bool hasForce = finalAcc.sqrMagnitude > 0.0001;
         bool usingThrusters =
-                Math.Abs(finalForce.x) > 0.001 ||
-                Math.Abs(finalForce.y) > 0.001 ||
-                finalForce.z < 0.0;
+                Math.Abs(finalAcc.x) > 0.001 ||
+                Math.Abs(finalAcc.y) > 0.001 ||
+                finalAcc.z < 0.0;
         if (hasForce)
         {
-            bool usingMainEngine = finalForce.z > 0.0;
+            bool usingMainEngine = finalAcc.z > 0.0;
 
             // Thruster audio
             if (usingThrusters)
             {
-                double magnitude = finalForce.magnitude;
+                double magnitude = finalAcc.magnitude;
 
                 thrusterAudioSource.transform.localPosition = new Vector3(
-                    -(float)(finalForce.x / magnitude) * thrusterRadiusX,
-                    -(float)(finalForce.y / magnitude) * thrusterRadiusY,
-                    -(float)(finalForce.z / magnitude) * thrusterRadiusZ
+                    -(float)(finalAcc.x / magnitude) * thrusterRadiusX,
+                    -(float)(finalAcc.y / magnitude) * thrusterRadiusY,
+                    -(float)(finalAcc.z / magnitude) * thrusterRadiusZ
                 );
-                thrusterAudioSource.volume = (float)magnitude / thrusterHighGForce * thrusterVolumeScale;
+                thrusterAudioSource.volume = (float)magnitude / thrusterHighGAcc * thrusterVolumeScale;
             }
 
             // Main engine effects
             if (usingMainEngine)
             {
-                float t = (float)finalForce.z / engineHighGForce;
+                float t = (float)finalAcc.z / engineHighGAcc;
                 if (!rocketTrail.activeSelf)
                 {
                     rocketTrail.SetActive(true);
@@ -596,25 +586,7 @@ public class Ship : NetworkBehaviour
         // Update inertial effects
         if (inertialEffects != null)
         {
-            Rigidbody rb = scaledRigidbody.attachedRigidbody;
-
-            // Local-space linear acceleration: a = F/m (stays local, not TransformVector'd)
-            Vector3 localLinAcc = hasForce ? (finalForce / scaledRigidbody.mass).ToVector3() : Vector3.zero;
-
-            // Local-space angular acceleration: α = I⁻¹τ
-            // First rotate torque into the principal-axis frame, divide, then rotate back to local.
-            Vector3 localAngAcc = Vector3.zero;
-            if (hasTorque)
-            {
-                Vector3 principalTorque = Quaternion.Inverse(rb.inertiaTensorRotation) * finalTorque.ToVector3();
-                Vector3 principalAlpha = new Vector3(
-                    principalTorque.x / rb.inertiaTensor.x,
-                    principalTorque.y / rb.inertiaTensor.y,
-                    principalTorque.z / rb.inertiaTensor.z
-                );
-                localAngAcc = rb.inertiaTensorRotation * principalAlpha;
-            }
-            inertialEffects.UpdateEffects(localLinAcc, localAngAcc, transform.InverseTransformDirection(scaledRigidbody.angularVelocity));
+            inertialEffects.UpdateEffects(finalAcc.ToVector3(), finalAngAcc.ToVector3(), transform.InverseTransformDirection(scaledRigidbody.angularVelocity));
         }
     }
 
@@ -772,10 +744,30 @@ public class Ship : NetworkBehaviour
             SendRollYawToggleToServer(rollMode);
     }
 
+    private void UpdateNetworkMaxAcceleration()
+    {
+        Vector3 negativeMax;
+        Vector3 positiveMax;
+        if (highGMode)
+        {
+            negativeMax = Vector3.one * thrusterHighGAcc;
+            positiveMax = negativeMax;
+            positiveMax.z = engineHighGAcc;
+        }
+        else
+        {
+            negativeMax = Vector3.one * thrusterCruiseAcc;
+            positiveMax = negativeMax;
+            positiveMax.z = engineCruiseAcc;
+        }
+        networkScaledObject.SetMaxAcceleration(positiveMax, negativeMax);
+    }
+
     [ServerRpc]
     private void SetHighGModeServerRpc(bool highGMode)
     {
         this.highGMode = highGMode;
+        UpdateNetworkMaxAcceleration();
         UpdatePassiveEmission();
     }
 
@@ -963,13 +955,13 @@ public class Ship : NetworkBehaviour
             emissionRadius += shieldsEmission;
         if (emissionRadius <= 0)
         {
-            attachedRadarTarget.SetEmissionActive(false);
+            radarTarget.SetEmissionActive(false);
             Debug.Log(GameLog.ObjectLog(this, $"Disabled passive emission trigger."));
         }
         else
         {
-            attachedRadarTarget.SetEmissionActive(true);
-            attachedRadarTarget.SetEmissionTriggerRadius(emissionRadius);
+            radarTarget.SetEmissionActive(true);
+            radarTarget.SetEmissionTriggerRadius(emissionRadius);
             Debug.Log(GameLog.ObjectLog(this, $"Updated passive emission radius to {emissionRadius}."));
         }
     }
@@ -1167,9 +1159,17 @@ public class Ship : NetworkBehaviour
         if (fuel <= 0f)
             yield break;
         yield return new WaitUntil(() => isEngineOn);
-        startAudioSource.clip = engineStartClip;
-        startAudioSource.Play();
-        yield return new WaitWhile(() => startAudioSource.isPlaying);
+        engineAmbientAudioSource.PlayOneShot(engineStartClip, 0.9f);
+        float timer = 0f;
+        engineAmbientAudioSource.volume = 0f;
+        engineAmbientAudioSource.pitch = 1f;
+        engineAmbientAudioSource.Play();
+        while(timer < engineStartClip.length)
+        {
+            timer += Time.deltaTime;
+            engineAmbientAudioSource.volume = engineAmbientVolume * timer / engineStartClip.length;
+            yield return null;
+        }
         SetEngineStarted(true);
         engineStartupRoutine = null;
         OnEngineStart?.Invoke();
@@ -1182,6 +1182,20 @@ public class Ship : NetworkBehaviour
         StartCoroutine(EngineStartRoutine());
     }
 
+    private IEnumerator SlowDownEngineAudio()
+    {
+        float timer = 0f;
+        while(timer < engineAmbientShutdownTime)
+        {
+            timer += Time.deltaTime;
+            float t = 1f - timer / engineAmbientShutdownTime;
+            engineAmbientAudioSource.volume = engineAmbientVolume * t;
+            engineAmbientAudioSource.pitch = t;
+            yield return null;
+        }
+        engineAmbientAudioSource.Stop();
+    }
+
     private void ShutdownEngine()
     {
         if (!IsOwnerOrOffline || !engineStarted)
@@ -1191,6 +1205,7 @@ public class Ship : NetworkBehaviour
             StopCoroutine(engineStartupRoutine);
             engineStartupRoutine = null;
         }
+        StartCoroutine(SlowDownEngineAudio());
         SetEngineStarted(false);
         OnEngineStop?.Invoke();
     }

@@ -24,19 +24,26 @@ public class HUDSystem : NetworkBehaviour
     [SerializeField] private float targetDirMarkerDistance = 1.0f;
 
     private Dictionary<uint, HUDObject> radarIDHUDPair = new Dictionary<uint, HUDObject>();
+    private Camera _mainCamera;
 
     private void Awake()
     {
         if (!InstanceFinder.IsOffline)
-        {
             return;
-        }
 
         if (Instance != null)
         {
             Destroy(Instance.gameObject);
         }
         Instance = this;
+    }
+
+    private Camera GetMainCamera()
+    {
+        if (_mainCamera != null)
+            return _mainCamera;
+        _mainCamera = Camera.main;
+        return _mainCamera;
     }
 
     public override void OnStartClient()
@@ -67,20 +74,20 @@ public class HUDSystem : NetworkBehaviour
             "Ship" => 0.0f,
             _ => 0.05f,
         };
-        Vector3 position = Camera.main.transform.position + direction * (radarHUDDistance + distanceOffset);
+        Vector3 position = GetMainCamera().transform.position + direction * (radarHUDDistance + distanceOffset);
         return position;
     }
 
     private Vector3 CalculateHUDPosition(Vector3 renderPosition, string tag)
     {
-        Vector3 direction = (renderPosition - Camera.main.transform.position).normalized;
+        Vector3 direction = (renderPosition - GetMainCamera().transform.position).normalized;
         float distanceOffset = tag switch
         {
             "Projectile" => -0.05f, // Projectiles highest priority
             "Ship" => 0.0f,
             _ => 0.05f,
         };
-        Vector3 position = Camera.main.transform.position + direction * (radarHUDDistance + distanceOffset);
+        Vector3 position = GetMainCamera().transform.position + direction * (radarHUDDistance + distanceOffset);
         return position;
     }
 
@@ -88,7 +95,7 @@ public class HUDSystem : NetworkBehaviour
     {
         Vector3 position = CalculateHUDPosition(target.scaledRigidbody.scaledTransform.realPosition, target.tag);
         Vector3 prediction = CalculateHUDPosition(predictedPosition, target.tag);
-        float sqrDistanceToCenter = (Camera.main.transform.position + Camera.main.transform.forward * radarHUDDistance - position).sqrMagnitude;
+        float sqrDistanceToCenter = (GetMainCamera().transform.position + GetMainCamera().transform.forward * radarHUDDistance - position).sqrMagnitude;
         
         bool detailsActive = (targetingSystem.lockedTarget != null && targetingSystem.lockedTarget.GetID() == target.GetID())
                              || sqrDistanceToCenter < detailsDistance * detailsDistance;
@@ -105,7 +112,7 @@ public class HUDSystem : NetworkBehaviour
 
         Vector3 position = CalculateHUDPosition(target.scaledRigidbody.scaledTransform.realPosition, target.tag);
         Vector3 predicted = CalculateHUDPosition(predictedPosition, target.tag);
-        float sqrDistanceToCenter = (Camera.main.transform.position + Camera.main.transform.forward * radarHUDDistance - position).sqrMagnitude;
+        float sqrDistanceToCenter = (GetMainCamera().transform.position + GetMainCamera().transform.forward * radarHUDDistance - position).sqrMagnitude;
         HUDObject.sqrDistanceToCenter = sqrDistanceToCenter;
         bool isLockedTarget = targetingSystem.lockedTarget != null && targetingSystem.lockedTarget.GetID() == target.GetID();
         bool detailsActive = isLockedTarget || sqrDistanceToCenter < detailsDistance * detailsDistance;
@@ -121,12 +128,12 @@ public class HUDSystem : NetworkBehaviour
         {
             // Use ellipse based on lossy scale of target's transform and its rotation
 
-            quad = SpaceGeometry.GetEllipsoidBoundingBox(target.transform.position, target.transform.lossyScale, target.transform.rotation, Camera.main);
+            quad = SpaceGeometry.GetEllipsoidBoundingBox(target.transform.position, target.transform.lossyScale, target.transform.rotation, GetMainCamera());
         }
         else
         {
             // Calculate bounding box based on renderers
-            quad = SpaceGeometry.GetMinimumBoundingBox(target.boundsRenderers, Camera.main);
+            quad = SpaceGeometry.GetMinimumBoundingBox(target.boundsRenderers, GetMainCamera());
         }
 
         HUDObject.UpdateObject(position, quad, details, detailsActive, predicted);
@@ -141,12 +148,10 @@ public class HUDSystem : NetworkBehaviour
 
     public void UpdateTargetDirectionMarker(Vector3d targetPosition)
     {
-        Camera cam = Camera.main;
-
         Vector3d camRealPos = FloatingWorldOrigin.Instance.GetRealCameraPosition();
 
         Vector3 worldDirection = (targetPosition - camRealPos).normalized.ToVector3();
-        Vector3 localDirection = cam.transform.InverseTransformDirection(worldDirection);
+        Vector3 localDirection = GetMainCamera().transform.InverseTransformDirection(worldDirection);
         Vector2 screenDirection = new Vector2(localDirection.x, localDirection.y);
 
         if (localDirection.z >= 0f && screenDirection.sqrMagnitude < targetDirMarkerDistance * targetDirMarkerDistance)

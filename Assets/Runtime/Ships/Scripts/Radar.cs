@@ -228,7 +228,7 @@ public class Radar : NetworkBehaviour
 
     private bool AddValidTarget(RadarTarget radarTarget)
     {
-        if (radarTarget.GetID() == ship.attachedRadarTarget.GetID() || radarTarget.radarIndex >= 0)
+        if (radarTarget.GetID() == ship.radarTarget.GetID() || radarTarget.radarIndex >= 0)
             return false;
         radarTarget.radarIndex = validTargets.Count;
         validTargets.Add(radarTarget.GetID());

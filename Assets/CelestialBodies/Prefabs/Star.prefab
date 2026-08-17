@@ -19,8 +19,8 @@ GameObject:
   - component: {fileID: 448297595236042583}
   - component: {fileID: -3219646378955236575}
   - component: {fileID: 9185686016837872124}
-  - component: {fileID: 4553538610552094174}
   - component: {fileID: 5037673740273060479}
+  - component: {fileID: -7707620682968170954}
   m_Layer: 3
   m_Name: Star
   m_TagString: CelestialBody
@@ -212,6 +212,10 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
+  acceleration:
+    x: 0
+    y: 0
+    z: 0
   affectedByGravity: 1
   gravityAcceleration:
     x: 0
@@ -360,7 +364,7 @@ MonoBehaviour:
   <AssetPathHash>k__BackingField: 2388947794978707455
   SceneId: 0
   SerializedTransformProperties:
-    Position: {x: 0, y: 0.9999998, z: 14990}
+    Position: {x: 0, y: 0, z: 0}
     Rotation: {x: 0, y: 0, z: 0, w: 1}
     Scale: {x: 69.57, y: 69.57, z: 69.57}
     IsValid: 1
@@ -373,7 +377,7 @@ MonoBehaviour:
   NetworkBehaviours:
   - {fileID: 8241638172933148449}
   - {fileID: 448297595236042583}
-  - {fileID: 4553538610552094174}
+  - {fileID: -7707620682968170954}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -384,28 +388,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584156920786326910
---- !u!114 &4553538610552094174
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2675124551879334190}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 87f21fb26d74cb446adea6577efd64e9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbodySync
-  _componentIndexCache: 2
-  _addedNetworkObject: {fileID: 9185686016837872124}
-  _networkObjectCache: {fileID: 9185686016837872124}
-  snapshotRate: 10
-  interpolate: 0
-  interpolateSpeed: 1
-  controlType: 1
-  activeWhenOffline: 1
-  syncMass: 0
+  _initializedTimestamp: -8584147777438754353
 --- !u!114 &5037673740273060479
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -418,6 +401,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae8d01bf5d32f2e458a64a733b1508d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RelativisticObject
+--- !u!114 &-7707620682968170954
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2675124551879334190}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38e3ff3a613fbdc4fbbfe189a3dcc2a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkScaledTransform
+  _componentIndexCache: 2
+  _addedNetworkObject: {fileID: 9185686016837872124}
+  _networkObjectCache: {fileID: 9185686016837872124}
+  keepActiveWhenOffline: 1
+  clientAuthoritative: 0
+  sendRate: 10
+  interpolateTransform: 1
+  interpolateRigidbody: 0
+  interpolationSpeed: 1
+  maxAccelerationPositive: {x: 10, y: 10, z: 100}
+  maxAccelerationNegative: {x: 10, y: 10, z: 10}
+  leniency: 1.5
 --- !u!1 &7089161551974816913
 GameObject:
   m_ObjectHideFlags: 0

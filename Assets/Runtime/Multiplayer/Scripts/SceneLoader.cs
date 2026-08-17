@@ -28,20 +28,22 @@ public class SceneLoader : DefaultSceneProcessor
 
     public void BeginOfflineLoad(string sceneName, string message = null)
     {
-        Debug.Log($"[SceneLoader] Started loading scene offline: {sceneName}.");
         StartCoroutine(LoadOfflineSceneAsync(sceneName, message));
     }
 
     private IEnumerator LoadOfflineSceneAsync(string sceneName, string message = null)
     {
+        loadingPanel.SetActive(true);
+        Debug.Log(GameLog.ObjectLog(this, $"Started offline scene load for {sceneName}."));
+
         AsyncOperation op = UnitySceneManager.LoadSceneAsync(sceneName);
 
         manualOperation = op;
-        loadingPanel.SetActive(true);
         OnStartSceneLoad?.Invoke();
 
-        while (!IsPercentComplete())
+        while (manualOperation.progress < 1f) // 1f since we want to wait while scene activates
         {
+            progressIndicator.UpdateUI((manualOperation.progress / 0.9f) * 100f, 100f);
             yield return null;
         }
 
@@ -58,12 +60,13 @@ public class SceneLoader : DefaultSceneProcessor
         {
             LobbyManager.Instance.InvokeConnectionFail(message);
         }
+        Debug.Log(GameLog.ObjectLog(this, $"Ended offline scene load for {sceneName}."));
     }
 
     public override void LoadStart(LoadQueueData queueData)
     {
-        base.LoadStart(queueData);
         loadingPanel.SetActive(true);
+        base.LoadStart(queueData);
         OnStartSceneLoad?.Invoke();
         string sceneNames = "";
         for(int i = 0; i < queueData.SceneLoadData.SceneLookupDatas.Length; i++)
@@ -77,13 +80,13 @@ public class SceneLoader : DefaultSceneProcessor
                 sceneNames += queueData.SceneLoadData.SceneLookupDatas[i].Name + ", ";
             }
         }
-        Debug.Log($"[SceneLoader] Started scene load for {sceneNames}");
+        Debug.Log(GameLog.ObjectLog(this, $"Started online scene load for {sceneNames}."));
     }
 
     public override void LoadEnd(LoadQueueData queueData)
     {
-        base.LoadEnd(queueData);
         loadingPanel.SetActive(false);
+        base.LoadEnd(queueData);
         OnEndSceneLoad?.Invoke();
         string sceneNames = "";
         for(int i = 0; i < queueData.SceneLoadData.SceneLookupDatas.Length; i++)
@@ -97,7 +100,12 @@ public class SceneLoader : DefaultSceneProcessor
                 sceneNames += queueData.SceneLoadData.SceneLookupDatas[i].Name + ", ";
             }
         }
-        Debug.Log($"[SceneLoader] Ended scene load for {sceneNames}");
+        Debug.Log(GameLog.ObjectLog(this, $"Ended online scene load for {sceneNames}."));
+    }
+
+    public override bool IsPercentComplete()
+    {
+        return GetPercentComplete() >= 1f;;
     }
 
     /// <summary>
@@ -106,7 +114,7 @@ public class SceneLoader : DefaultSceneProcessor
     /// <returns></returns>
     public override float GetPercentComplete()
     {
-        float progress = CurrentAsyncOperation == null ? 1f : CurrentAsyncOperation.progress;
+        float progress = CurrentAsyncOperation == null ? 1f : (CurrentAsyncOperation.progress / 0.9f);
         progressIndicator.UpdateUI(progress * 100f, 100f);
         return progress;
     }

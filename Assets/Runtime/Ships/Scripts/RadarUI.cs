@@ -40,7 +40,7 @@ public class RadarUI : MonoBehaviour
         {
             RadarIcon newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
             newIcon.Init(iconParent.transform.position, transform.rotation, friendlyShipColor, friendlyShipEmission, "", true);
-            ship.attachedRadarTarget.radarIcon = newIcon;
+            ship.radarTarget.radarIcon = newIcon;
         }
     }
 
@@ -57,7 +57,7 @@ public class RadarUI : MonoBehaviour
             iconParent.SetActive(true);
         
         double radarRange = radar.GetCurrentRange();
-        double passiveEmissionRadius = ship.attachedRadarTarget.GetEmissionTriggerRadius();
+        double passiveEmissionRadius = ship.radarTarget.GetEmissionTriggerRadius();
         if (passiveEmissionRadius <= 0.0 && passiveEmissionIndicator.activeSelf)
         {
             passiveEmissionIndicator.SetActive(false);
@@ -128,7 +128,7 @@ public class RadarUI : MonoBehaviour
                     case "Ship":
                         iconText = radarTarget.transform.name + "\n" + SpaceMath.DistanceToFormattedString(distance, "F2");
                         newIcon = Instantiate(shipIcon, iconParent.transform).GetComponent<RadarIcon>();
-                        if (radarTarget.team == ship.attachedRadarTarget.team)
+                        if (radarTarget.team == ship.radarTarget.team)
                         {
                             iconColor = friendlyShipColor;
                             iconEmission = friendlyShipEmission;
@@ -142,7 +142,7 @@ public class RadarUI : MonoBehaviour
                     case "Projectile":
                         iconText = "PRJ\n" + SpaceMath.DistanceToFormattedString(distance, "F2");
                         newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                        if (radarTarget.team == ship.attachedRadarTarget.team)
+                        if (radarTarget.team == ship.radarTarget.team)
                         {
                             iconColor = friendlyProjectileColor;
                             iconEmission = friendlyProjectileEmission;
@@ -156,7 +156,7 @@ public class RadarUI : MonoBehaviour
                     case "Torpedo":
                         iconText = "TRP\n" + SpaceMath.DistanceToFormattedString(distance, "F2");
                         newIcon = Instantiate(pointIcon, iconParent.transform).GetComponent<RadarIcon>();
-                        if (radarTarget.team == ship.attachedRadarTarget.team)
+                        if (radarTarget.team == ship.radarTarget.team)
                         {
                             iconColor = friendlyProjectileColor;
                             iconEmission = friendlyProjectileEmission;
@@ -205,7 +205,7 @@ public class RadarUI : MonoBehaviour
 
             if (HUDSystem.Instance.radarHudActive)
             {
-                Vector3d relativeAcceleration = radarTarget.acceleration - ship.attachedRadarTarget.acceleration;
+                Vector3d relativeAcceleration = radarTarget.scaledRigidbody.acceleration - ship.scaledRigidbody.acceleration;
                 Vector3d relativeVelocity = radarTarget.scaledRigidbody.velocity - ship.scaledRigidbody.velocity;
                 // Negative closing => moving away, Positive closing => coming closer
                 double closingVelocity = -Vector3d.Dot(relativeVelocity, direction);
@@ -221,7 +221,9 @@ public class RadarUI : MonoBehaviour
                     "\nETA " + ETA;
 
                 double predictTime = arrivalTime < 0.0 ? distance * 0.0025f : arrivalTime;
-                Vector3d predictedPosition = radarTarget.scaledRigidbody.scaledTransform.realPosition + radarTarget.scaledRigidbody.velocity * predictTime + 0.5 * predictTime * predictTime * radarTarget.acceleration;
+                Vector3d predictedPosition = radarTarget.scaledRigidbody.scaledTransform.realPosition + 
+                                             radarTarget.scaledRigidbody.velocity * predictTime + 
+                                             0.5 * predictTime * predictTime * radarTarget.scaledRigidbody.acceleration;
 
                 if (!HUDSystem.Instance.UpdateObject(radarTarget, details, predictedPosition))
                 {
@@ -229,7 +231,7 @@ public class RadarUI : MonoBehaviour
                     switch (radarTarget.transform.tag)
                     {
                         case "Ship":
-                            if (radarTarget.team == ship.attachedRadarTarget.team)
+                            if (radarTarget.team == ship.radarTarget.team)
                             {
                                 newHUDObject.SetColor(friendlyShipColor);
                             }
@@ -239,7 +241,7 @@ public class RadarUI : MonoBehaviour
                             }
                             break;
                         case "Projectile":
-                            if (radarTarget.team == ship.attachedRadarTarget.team)
+                            if (radarTarget.team == ship.radarTarget.team)
                             {
                                 newHUDObject.SetColor(friendlyProjectileColor);
                             }
@@ -249,7 +251,7 @@ public class RadarUI : MonoBehaviour
                             }
                             break;
                         case "Torpedo":
-                            if (radarTarget.team == ship.attachedRadarTarget.team)
+                            if (radarTarget.team == ship.radarTarget.team)
                             {
                                 newHUDObject.SetColor(friendlyProjectileColor);
                             }
@@ -273,7 +275,7 @@ public class RadarUI : MonoBehaviour
     public void SetRange()
     {
         activeRadarIndicator.SetActive(radar.IsActive);
-        ship.attachedRadarTarget.radarIcon.model.gameObject.SetActive(radar.IsActive);
-        ship.attachedRadarTarget.radarIcon.model.localScale = 2 * iconRadii[radar.emitLevel] * Vector3.one;
+        ship.radarTarget.radarIcon.model.gameObject.SetActive(radar.IsActive);
+        ship.radarTarget.radarIcon.model.localScale = 2 * iconRadii[radar.emitLevel] * Vector3.one;
     }
 }

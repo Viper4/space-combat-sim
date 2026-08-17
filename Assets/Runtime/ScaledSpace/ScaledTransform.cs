@@ -315,7 +315,6 @@ public class ScaledTransform : MonoBehaviour
         if (visible)
             ScaledSpaceVisuals.Instance.UpdateScaleFactors();
         UpdateVisualComponents();
-        // UpdateInScaledSpace(FloatingWorldOrigin.Instance.scaledTransform.realPosition);
     }
 
     private void SwitchToWorldSpace()

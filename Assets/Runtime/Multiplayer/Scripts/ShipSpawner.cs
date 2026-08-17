@@ -5,7 +5,6 @@ using FishNet;
 using UnityEngine;
 using SpaceStuff;
 using FishNet.Managing.Scened;
-using System.Collections;
 
 public class ShipSpawner : MonoBehaviour
 {

@@ -22,10 +22,6 @@ public class RadarTarget : NetworkBehaviour
     [HideInInspector] public int collidersInActiveRadar = 0;
     [HideInInspector] public RadarIcon radarIcon;
     [HideInInspector] public int turretsTargeting;
-    public Vector3d acceleration {get; private set;}
-
-    private Vector3d lastVelocity;
-    private float inverseFixedDeltaTime;
 
     public bool useScaleForBounds;
     /// <summary>
@@ -48,21 +44,16 @@ public class RadarTarget : NetworkBehaviour
             boundsRenderers = scaledRigidbody.scaledTransform.CloneTrackedRenderers();
         }
 
-        inverseFixedDeltaTime = 1f / Time.fixedDeltaTime;
-
         id = RadarRegistry.Register(this);
-    }
-
-    private void FixedUpdate()
-    {
-        acceleration = (scaledRigidbody.velocity - lastVelocity) * inverseFixedDeltaTime;
-        lastVelocity = scaledRigidbody.velocity;
     }
 
     private void OnDestroy()
     {
-        scaledRigidbody.OnScaledTriggerEnter -= OnScaledTriggerEnter;
-        scaledRigidbody.OnScaledTriggerExit -= OnScaledTriggerExit;
+        if (scaledRigidbody != null)
+        {
+            scaledRigidbody.OnScaledTriggerEnter -= OnScaledTriggerEnter;
+            scaledRigidbody.OnScaledTriggerExit -= OnScaledTriggerExit;
+        }
         RadarRegistry.Unregister(id);
     }
 

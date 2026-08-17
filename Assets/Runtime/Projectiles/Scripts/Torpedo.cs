@@ -435,7 +435,7 @@ public class Torpedo : NetworkBehaviour
 
     private void OnScaledTrigger(ScaledCollider source, ScaledCollider other)
     {
-        if (target == null || source.id != detonateTrigger.id)
+        if (target == null || source.id != detonateTrigger.id || other.isTrigger)
             return;
         if (other.scaledRigidbody == target.scaledRigidbody || other.transform == target.transform)
         {
@@ -449,18 +449,22 @@ public class Torpedo : NetworkBehaviour
         bool rbIsNull = collision.rigidbody == null;
         ScaledRigidbody otherDoubleRB = rbIsNull ? collision.transform.GetComponent<ScaledRigidbody>() : collision.rigidbody.GetComponent<ScaledRigidbody>();
         Vector3d velocityB = Vector3d.zero;
-        bool isTarget;
-        if (otherDoubleRB == null)
+        bool isTarget = false;
+        if (target != null)
         {
-            if (!rbIsNull)
-                velocityB = collision.rigidbody.linearVelocity.ToVector3d();
-            isTarget = collision.transform == target.transform;
+            if (otherDoubleRB == null)
+            {
+                if (!rbIsNull)
+                    velocityB = collision.rigidbody.linearVelocity.ToVector3d();
+                isTarget = collision.transform == target.transform;
+            }
+            else
+            {
+                velocityB = otherDoubleRB.velocity;
+                isTarget = otherDoubleRB == target.scaledRigidbody;
+            }
         }
-        else
-        {
-            velocityB = otherDoubleRB.velocity;
-            isTarget = otherDoubleRB == target.scaledRigidbody;
-        }
+        
         Vector3d relativeVelocity = scaledRigidbody.velocity - velocityB;
         if (isTarget || relativeVelocity.sqrMagnitude > collideSpeedThreshold * collideSpeedThreshold)
         {

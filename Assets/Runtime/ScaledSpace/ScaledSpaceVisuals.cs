@@ -6,9 +6,15 @@ using System.Collections;
 
 public class ScaledSpaceVisuals : MonoBehaviour
 {
+    public static readonly string RelativeVelocityID = "_RelativeVelocity";
+    public static readonly string SpeedOfLightID = "_SpeedOfLight";
+    public static readonly string BaseColorID = "_BaseColor";
+
     public static ScaledSpaceVisuals Instance;
 
     private List<ScaledTransform> scaledTransforms = new List<ScaledTransform>();
+    private float lastUpdateTime;
+    private bool updating = false;
 
     [SerializeField] private bool dynamicScaleFactor;
     [SerializeField, ConditionalHide("dynamicScaleFactor"), Tooltip("Minimum distance from camera in render space (transform).")]
@@ -18,8 +24,6 @@ public class ScaledSpaceVisuals : MonoBehaviour
     [SerializeField] private float pollTime;
     [SerializeField] private bool nonlinearRemap = true;
     [SerializeField, ConditionalHide("nonlinearRemap"), Tooltip("k=1 logarithmic remapping, k>1 spreads nearby objects and bunches far ones, k<1 spreads far objects and bunches nearby ones")] private double power = 1.0;
-    private float lastUpdateTime;
-    private bool updating = false;
 
     private void Awake()
     {
@@ -43,6 +47,13 @@ public class ScaledSpaceVisuals : MonoBehaviour
         {
             UpdateScaleFactors();
         }
+    }
+
+    private void FixedUpdate()
+    {
+        if (FloatingWorldOrigin.Instance == null || RenderSettings.skybox == null)
+            return;
+        RenderSettings.skybox.SetVector(RelativeVelocityID, -FloatingWorldOrigin.Instance.scaledRigidbody.velocity.ToVector3());
     }
 
     public void RegisterScaledTransform(ScaledTransform scaledTransform)

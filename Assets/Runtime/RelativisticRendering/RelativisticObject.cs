@@ -5,8 +5,6 @@ using System;
 [RequireComponent(typeof(ScaledRigidbody))]
 public class RelativisticObject : MonoBehaviour
 {
-    private static readonly int RelativeVelocityID = Shader.PropertyToID("_RelativeVelocity");
-
     private ScaledRigidbody scaledRigidbody;
     private MaterialPropertyBlock block;
 
@@ -32,7 +30,7 @@ public class RelativisticObject : MonoBehaviour
         foreach (Renderer renderer in scaledRigidbody.scaledTransform.trackedRenderers)
         {
             renderer.GetPropertyBlock(block);
-            block.SetVector(RelativeVelocityID, relativeVelocity);
+            block.SetVector(ScaledSpaceVisuals.RelativeVelocityID, relativeVelocity);
             renderer.SetPropertyBlock(block);
         }
     }

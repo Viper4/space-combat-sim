@@ -60,7 +60,6 @@ public class Shields : MonoBehaviour
     {
         if (statSystem.health <= 0 || (ship != null && !ship.isStarted))
             return;
-        
         TrySetActive(state == 1);
     }
 
@@ -75,6 +74,7 @@ public class Shields : MonoBehaviour
             IsActive = true;
             colliderObject.SetActive(true);
             OnActivate?.Invoke();
+            return;
         }
         IsActive = false;
         colliderObject.SetActive(false);

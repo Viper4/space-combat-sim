@@ -9,7 +9,7 @@ public static class GameLog
 
     public static string OperationFailed(Object source, string operation)
     {
-        return ObjectLog(source, $"Failed to {operation}.");
+        return ObjectLog(source, $"Failed to {operation}");
     }
 
     public static string NetworkObjectNotFound(Object source, string operation, int objectId)

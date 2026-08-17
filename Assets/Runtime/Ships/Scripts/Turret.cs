@@ -160,7 +160,7 @@ public class Turret : NetworkBehaviour
             
             // Assume the bullet's acceleration after getting fired is only from gravity
             Vector3d projectileAcceleration = ship.scaledRigidbody.GetGravity();
-            Vector3d relativeAcceleration = currentTarget.acceleration - projectileAcceleration;
+            Vector3d relativeAcceleration = currentTarget.scaledRigidbody.acceleration - projectileAcceleration;
 
             // Maybe add noise or something to bulletTime
             double bulletTime = SpaceMath.CalculateProjectileTime(relativePosition, relativeVelocity, relativeAcceleration, projectileSpeed);
@@ -279,7 +279,7 @@ public class Turret : NetworkBehaviour
             // Use defensive strategy against target
             // Dont want to use closingVelocity and closingAcceleration since we only want to consider the intention of the target, not if the ship is moving towards it
             double incomingVelocity = -Vector3d.Dot(target.scaledRigidbody.velocity, direction);
-            double incomingAcceleration = -Vector3d.Dot(target.acceleration, direction);
+            double incomingAcceleration = -Vector3d.Dot(target.scaledRigidbody.acceleration, direction);
 
             double estimatedClosingTime = distance / (incomingVelocity + accelerationHeuristic * incomingAcceleration * distance);
             

@@ -31,7 +31,7 @@ Transform:
   m_GameObject: {fileID: 6854141528186018479}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -1, z: 10}
+  m_LocalPosition: {x: 10, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -157,6 +157,9 @@ MonoBehaviour:
     z: 1
   minScreenPixelSize: 3
   visible: 1
+  trackedColliders: []
+  trackedRenderers:
+  - {fileID: 3904004116624225602}
   scaledSpaceLayer: 3
   inScaledSpace: 0
   scaleFactor: 1000
@@ -188,6 +191,10 @@ MonoBehaviour:
   _mass: 0.0000001
   _isKinematic: 0
   _velocity:
+    x: 0
+    y: 0
+    z: 0
+  acceleration:
     x: 0
     y: 0
     z: 0

@@ -54,6 +54,11 @@ public class CelestialBody : NetworkBehaviour
 
         if (InstanceFinder.IsOffline)
             Init();
+        
+        if (gravitySettings != null && gravitySettings.applyGravity)
+        {
+            ScaledSpacePhysics.Instance.GravityStep += ApplyGravity;
+        }
     }
 
     public override void OnStartServer()
@@ -187,11 +192,6 @@ public class CelestialBody : NetworkBehaviour
         }
 
         scaledTransform.realScale = scale;
-
-        if (gravitySettings != null && gravitySettings.applyGravity)
-        {
-            ScaledSpacePhysics.Instance.GravityStep += ApplyGravity;
-        }
 
         Vector3 min = generationSettings.initialAngularVelocityRange[0];
         Vector3 max = generationSettings.initialAngularVelocityRange[1];

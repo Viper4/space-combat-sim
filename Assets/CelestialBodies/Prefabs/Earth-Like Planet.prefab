@@ -17,8 +17,8 @@ GameObject:
   - component: {fileID: 5997540040479759170}
   - component: {fileID: 5668315382189292086}
   - component: {fileID: 6971362235971961917}
-  - component: {fileID: 8848782723156057265}
   - component: {fileID: -7947424224973032535}
+  - component: {fileID: 6350126786128956518}
   m_Layer: 0
   m_Name: Earth-Like Planet
   m_TagString: CelestialBody
@@ -35,7 +35,7 @@ Transform:
   m_GameObject: {fileID: 4255873868048831807}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.000012145152, y: 0.9999986, z: -9.999929}
+  m_LocalPosition: {x: -9.999968, y: 0.00000059999974, z: 0.000050383263}
   m_LocalScale: {x: 6.371, y: 6.371, z: 6.371}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -176,6 +176,10 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
+  acceleration:
+    x: 0
+    y: 0
+    z: 0
   affectedByGravity: 1
   gravityAcceleration:
     x: 0
@@ -275,7 +279,7 @@ MonoBehaviour:
   <AssetPathHash>k__BackingField: 13522013495244798349
   SceneId: 0
   SerializedTransformProperties:
-    Position: {x: 0.000012145152, y: 0.9999986, z: -9.999929}
+    Position: {x: -9.999968, y: 0.00000059999974, z: 0.000050383263}
     Rotation: {x: 0, y: 0, z: 0, w: 1}
     Scale: {x: 6.371, y: 6.371, z: 6.371}
     IsValid: 1
@@ -288,7 +292,7 @@ MonoBehaviour:
   NetworkBehaviours:
   - {fileID: 6135734291481996254}
   - {fileID: 5997540040479759170}
-  - {fileID: 8848782723156057265}
+  - {fileID: 6350126786128956518}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -299,28 +303,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584157749340765572
---- !u!114 &8848782723156057265
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4255873868048831807}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 87f21fb26d74cb446adea6577efd64e9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ScaledRigidbodySync
-  _componentIndexCache: 2
-  _addedNetworkObject: {fileID: 6971362235971961917}
-  _networkObjectCache: {fileID: 6971362235971961917}
-  snapshotRate: 10
-  interpolate: 0
-  interpolateSpeed: 1
-  controlType: 1
-  activeWhenOffline: 1
-  syncMass: 0
+  _initializedTimestamp: -8584149119425471680
 --- !u!114 &-7947424224973032535
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -333,6 +316,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae8d01bf5d32f2e458a64a733b1508d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RelativisticObject
+--- !u!114 &6350126786128956518
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4255873868048831807}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38e3ff3a613fbdc4fbbfe189a3dcc2a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkScaledTransform
+  _componentIndexCache: 2
+  _addedNetworkObject: {fileID: 6971362235971961917}
+  _networkObjectCache: {fileID: 6971362235971961917}
+  keepActiveWhenOffline: 1
+  clientAuthoritative: 0
+  sendRate: 10
+  interpolateTransform: 1
+  interpolateRigidbody: 0
+  interpolationSpeed: 1
+  maxAccelerationPositive: {x: 10, y: 10, z: 100}
+  maxAccelerationNegative: {x: 10, y: 10, z: 10}
+  leniency: 1.5
 --- !u!1001 &6213586387416295118
 PrefabInstance:
   m_ObjectHideFlags: 0

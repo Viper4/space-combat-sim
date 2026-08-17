@@ -5173,6 +5173,135 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!1 &1725261151041637508
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6278175460437030657}
+  - component: {fileID: 4081959272408988998}
+  m_Layer: 0
+  m_Name: EngineAmbientAudio
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6278175460437030657
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1725261151041637508}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0, y: 0, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1195093433454175124}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!82 &4081959272408988998
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1725261151041637508}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 8300000, guid: 060cbadd02107e74c9ef5c569c1236a5, type: 3}
+  m_PlayOnAwake: 0
+  m_Volume: 0.5
+  m_Pitch: 1
+  Loop: 1
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 50
+  Pan2D: 0
+  rolloffMode: 1
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: -2.997635
+      outSlope: -2.997635
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.15491974
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &1796393193034296026
 GameObject:
   m_ObjectHideFlags: 0
@@ -16287,9 +16416,9 @@ GameObject:
   - component: {fileID: 6790381847478681157}
   - component: {fileID: 1100063691427865260}
   - component: {fileID: 4653574857950573837}
-  - component: {fileID: 926126285268992676}
   - component: {fileID: 6405785138056314664}
   - component: {fileID: 2994738668997830039}
+  - component: {fileID: 3629996082069962771}
   m_Layer: 0
   m_Name: Gunship
   m_TagString: Ship
@@ -16306,7 +16435,7 @@ Transform:
   m_GameObject: {fileID: 6840926926157260148}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.39999998, z: 16.6}
+  m_LocalPosition: {x: 10, y: 0.6, z: 6.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -16572,7 +16701,7 @@ MonoBehaviour:
   scaleFactor: 10
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
-  realRadius: 13.799999237060547
+  realRadius: 10.999999046325684
   useRealScaleForRadius: 0
   index: -1
   worldSpaceOnlyRenderers: []
@@ -16601,6 +16730,10 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 0
+  acceleration:
+    x: 0
+    y: 0
+    z: 0
   affectedByGravity: 1
   gravityAcceleration:
     x: 0
@@ -16623,9 +16756,10 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 4653574857950573837}
   _networkObjectCache: {fileID: 4653574857950573837}
   scaledRigidbody: {fileID: 3052160782091800514}
-  attachedRadarTarget: {fileID: 5330436941350829744}
+  radarTarget: {fileID: 5330436941350829744}
   statSystem: {fileID: 3428883828137111660}
   shields: {fileID: 7062523681545924001}
+  networkScaledObject: {fileID: 3629996082069962771}
   alertSystem: {fileID: 7003917555558167796}
   minImpulse: 100
   unityCollideImpulseScale: 0.00001
@@ -16640,8 +16774,9 @@ MonoBehaviour:
   APUStartClip: {fileID: 8300000, guid: e7febbabf429d844f9648fbf05be8831, type: 3}
   shutdownClip: {fileID: 8300000, guid: 53563d060bdb3394080bd9450c020ae6, type: 3}
   engineOnClip: {fileID: 8300000, guid: 8014dfb3684765642b85f2b71f972b29, type: 3}
-  engineStartClip: {fileID: 8300000, guid: c0c500a1d7dce7a4e9c9217382a47b6d, type: 3}
-  APUOnTimeRange: {x: 0.5, y: 1.5}
+  engineStartClip: {fileID: 8300000, guid: c231efb9820473041bfec555cb3881ea, type: 3}
+  engineAmbientVolume: 0.1
+  APUOnTimeRange: {x: 0.4, y: 0.6}
   batteryOnEmission: 50
   APUStartedEmission: 500
   engineCruiseEmission: 750
@@ -16885,26 +17020,29 @@ MonoBehaviour:
   inertialEffects: {fileID: 8891298326311547048}
   thrusterAudioSource: {fileID: 7407530069874418654}
   thrusterVolumeScale: 1
+  engineAmbientAudioSource: {fileID: 4081959272408988998}
+  engineAmbientShutdownTime: 1.5
   engineAudioSource: {fileID: 6715260410510076291}
   engineVolumeScale: 0.6
   rocketTrail: {fileID: 5618600448920928089}
   engineTrailScale: 1
   normalEngineClip: {fileID: 8300000, guid: d591c786e62c4144a85c2b5101da5552, type: 3}
   launchEngineClip: {fileID: 8300000, guid: 1d5350cbb21fe5349a1c07caa04945e2, type: 3}
-  engineCruiseForce: 980000
-  engineHighGForce: 3675000
-  thrusterCruiseForce: 245000
-  thrusterHighGForce: 980000
-  thrusterRadiusX: 6
-  thrusterRadiusY: 6
+  engineCruiseAcc: 39
+  engineHighGAcc: 117
+  thrusterCruiseAcc: 9.8
+  thrusterHighGAcc: 29
+  thrusterRadiusX: 5
+  thrusterRadiusY: 5
   thrusterRadiusZ: 2
+  thrusterCruiseAngAcc: {x: 0, y: 0, z: 0}
+  thrusterHighGAngAcc: {x: 0, y: 0, z: 0}
   autoP: 1
   autoI: 0
   autoD: 0
   matchDistanceP: 5
   matchDistanceI: 0
   matchDistanceD: 0
-  inputSendRate: 20
   idleFuelConsumption: 0.5
   maxFuelConsumption: 100
   fuelConsumptionFactor: 1.6
@@ -17301,7 +17439,7 @@ MonoBehaviour:
   <AssetPathHash>k__BackingField: 2005364217364234630
   SceneId: 0
   SerializedTransformProperties:
-    Position: {x: 0, y: -0.39999998, z: 16.6}
+    Position: {x: 10, y: 0.6, z: 6.6}
     Rotation: {x: 0, y: 0, z: 0, w: 1}
     Scale: {x: 1, y: 1, z: 1}
     IsValid: 1
@@ -17317,8 +17455,8 @@ MonoBehaviour:
   - {fileID: 5330436941350829744}
   - {fileID: 2500968467743906637}
   - {fileID: 5661573249483558542}
-  - {fileID: 926126285268992676}
   - {fileID: 6405785138056314664}
+  - {fileID: 3629996082069962771}
   - {fileID: 7292164829124766721}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects:
@@ -17338,28 +17476,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584159919886381935
---- !u!114 &926126285268992676
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6840926926157260148}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 87f21fb26d74cb446adea6577efd64e9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NetworkDoubleRigidbody
-  _componentIndexCache: 5
-  _addedNetworkObject: {fileID: 4653574857950573837}
-  _networkObjectCache: {fileID: 4653574857950573837}
-  snapshotRate: 20
-  interpolate: 0
-  interpolateSpeed: 1
-  controlType: 0
-  activeWhenOffline: 1
-  syncMass: 0
+  _initializedTimestamp: -8584149119425471680
 --- !u!114 &6405785138056314664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17372,7 +17489,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d7d320e38f6226f47be69104d9185400, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OwnerObjectManager
-  _componentIndexCache: 6
+  _componentIndexCache: 5
   _addedNetworkObject: {fileID: 4653574857950573837}
   _networkObjectCache: {fileID: 4653574857950573837}
   nonOwnerGOsToDestroy:
@@ -17409,6 +17526,30 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &3629996082069962771
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6840926926157260148}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38e3ff3a613fbdc4fbbfe189a3dcc2a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkScaledTransform
+  _componentIndexCache: 6
+  _addedNetworkObject: {fileID: 4653574857950573837}
+  _networkObjectCache: {fileID: 4653574857950573837}
+  keepActiveWhenOffline: 1
+  clientAuthoritative: 1
+  sendRate: 20
+  interpolateTransform: 1
+  interpolateRigidbody: 0
+  interpolationSpeed: 1
+  maxAccelerationPositive: {x: 10, y: 10, z: 100}
+  maxAccelerationNegative: {x: 10, y: 10, z: 10}
+  leniency: 1.5
 --- !u!1 &6940557342393837597
 GameObject:
   m_ObjectHideFlags: 0
@@ -21160,6 +21301,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5222114438036522464}
+  - {fileID: 6278175460437030657}
   m_Father: {fileID: 6661992554791867068}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &59318682850191019
@@ -21264,7 +21406,7 @@ AudioSource:
   Priority: 128
   DopplerLevel: 0
   MinDistance: 1
-  MaxDistance: 500
+  MaxDistance: 50
   Pan2D: 0
   rolloffMode: 1
   BypassEffects: 0
@@ -24896,7 +25038,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584159919886381935
+      value: -8584149119425471680
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -25175,7 +25317,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584159919886381935
+      value: -8584149119425471680
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -27968,7 +28110,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584159919886381935
+      value: -8584149119425471680
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -28482,7 +28624,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584159919886381935
+      value: -8584149119425471680
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -30039,7 +30181,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584159919886381935
+      value: -8584149119425471680
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -30601,7 +30743,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584159919886381935
+      value: -8584149119425471680
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -30814,7 +30956,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584159919886381935
+      value: -8584149119425471680
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -31857,7 +31999,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584159919886381935
+      value: -8584149119425471680
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField

@@ -87,8 +87,10 @@ public class PlayerInfoRelay : NetworkBehaviour
         List<PlayerInfo> infos = new();
 
         foreach (var pair in PlayerRegistry.Players)
+        {
             infos.Add(pair.Value);
-
+            Debug.Log(GameLog.ObjectLog(this, $"Server is sending {pair.Value.ClientId} {pair.Value.Username} to {sender.ClientId}"));
+        }
         SendInitialDataTargetRpc(sender, infos.ToArray());
     }
 
@@ -101,7 +103,7 @@ public class PlayerInfoRelay : NetworkBehaviour
     {
         PlayerRegistry.SetPlayer(info);
         OnPlayerInfoChanged?.Invoke();
-        Debug.Log(GameLog.ObjectLog(this, $"Updated PlayerInfo ({info.Username}) for client {info.ClientId} for the local client."));
+        Debug.Log(GameLog.ObjectLog(this, $"Updated PlayerInfo {info.ClientId} {info.Username} for the local client."));
     }
 
     [ObserversRpc]
@@ -117,10 +119,13 @@ public class PlayerInfoRelay : NetworkBehaviour
     [TargetRpc]
     private void SendInitialDataTargetRpc(NetworkConnection conn, PlayerInfo[] infos)
     {
+        PlayerRegistry.Clear();
         foreach (PlayerInfo info in infos)
+        {
+            Debug.Log(GameLog.ObjectLog(this, $"Received {info.ClientId} {info.Username} from server."));
             PlayerRegistry.SetPlayer(info);
+        }
         OnPlayerInfoChanged?.Invoke();
-        Debug.Log(GameLog.ObjectLog(this, "Received all PlayerInfos from Server for the local client."));
     }
 
     // ---------------------------------------------------------

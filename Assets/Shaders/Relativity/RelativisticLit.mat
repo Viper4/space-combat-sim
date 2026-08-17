@@ -1,5 +1,18 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-2939013720654882381
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
+  version: 10
 --- !u!21 &2100000
 Material:
   serializedVersion: 8
@@ -8,19 +21,21 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: RelativisticLit
-  m_Shader: {fileID: -6465566751694194690, guid: a3129f61f2112dd43a0a2a448a5c9a97, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 48672a7e5b814cf4e99f222c4980f1ba, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _SURFACE_TYPE_TRANSPARENT
   m_InvalidKeywords: []
-  m_LightmapFlags: 0
+  m_LightmapFlags: 2
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 2000
+  m_CustomRenderQueue: 3000
   stringTagMap:
-    RenderType: Opaque
+    RenderType: Transparent
   disabledShaderPasses:
   - MOTIONVECTORS
+  - DepthOnly
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -29,47 +44,11 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _BumpMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailAlbedoMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailMask:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailNormalMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     - _EmissionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MetallicGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     - _NormalMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _OcclusionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _ParallaxMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _SpecGlossMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -87,80 +66,41 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
+    - _BeamingFactor: 4
     - _Blend: 0
-    - _BlendModePreserveSpecular: 1
-    - _BumpScale: 1
-    - _CameraDistance: 13.18
+    - _BlendModePreserveSpecular: 0
+    - _BlueStd: 40
     - _CastShadows: 1
-    - _ClearCoatMask: 0
-    - _ClearCoatSmoothness: 0
     - _Cull: 2
-    - _Cutoff: 0.5
-    - _DetailAlbedoMapScale: 1
-    - _DetailNormalMapScale: 1
-    - _DopplerColorIntensity: 1
-    - _DopplerIntensityPower: 4
-    - _DopplerShiftSpeed: 1
-    - _DstBlend: 0
-    - _DstBlendAlpha: 0
+    - _DstBlend: 10
+    - _DstBlendAlpha: 10
     - _Emission: 0
-    - _EnvironmentReflections: 1
-    - _GlossMapScale: 0
-    - _Glossiness: 0
-    - _GlossyReflections: 0
-    - _HueShiftStrength: 0
+    - _GreenStd: 35
     - _Metallic: 0
-    - _OcclusionStrength: 1
-    - _Parallax: 0.005
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _RadialBeta: -0.1
-    - _RadialVelocity: 20
     - _ReceiveShadows: 1
-    - _RelSpeed: 299843680
-    - _SearchLightPower: 1
-    - _SearchlightIntensityPower: 4
-    - _Smoothness: 0
-    - _SmoothnessTextureChannel: 0
-    - _SpecularHighlights: 1
+    - _RedStd: 40
+    - _Smoothness: 0.5
     - _SpeedOfLight: 100
-    - _SrcBlend: 1
+    - _SrcBlend: 5
     - _SrcBlendAlpha: 1
-    - _Surface: 0
+    - _Surface: 1
+    - _VioletStd: 20
     - _WorkflowMode: 1
-    - _XRMotionVectorsPass: 1
     - _ZTest: 4
-    - _ZWrite: 1
+    - _ZWrite: 0
     - _ZWriteControl: 0
-    - _c: 100
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _BaseOffset: {r: 0, g: 0, b: 0, a: 0}
     - _BaseTiling: {r: 1, g: 1, b: 0, a: 0}
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _Emission: {r: 0, g: 0, b: 0, a: 1}
-    - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
-    - _MainColor: {r: 1, g: 1, b: 1, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _NormalOffset: {r: 0, g: 0, b: 0, a: 0}
     - _NormalTiling: {r: 1, g: 1, b: 0, a: 0}
-    - _RelVelocity: {r: 0, g: 0, b: 1, a: 0}
-    - _RelativeVelocity: {r: 0, g: 0, b: 69.7, a: 0}
-    - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+    - _ObserverVelocity: {r: 0, g: 0, b: 0, a: 0}
+    - _SourceVelocity: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &6036906601826063118
-MonoBehaviour:
-  m_ObjectHideFlags: 11
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
-  version: 10

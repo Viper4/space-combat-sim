@@ -10,29 +10,8 @@ using FishNet.Object;
 using FishNet.Transporting;
 using UnityEngine;
 using UnityEngine.Networking;
-using UnityEngine.Rendering.Universal;
 using UnitySceneManager = UnityEngine.SceneManagement.SceneManager;
 
-/// <summary>
-/// Central lobby system. Manages the always-on main server connection,
-/// hosting private lobbies, and joining via invite code or direct IP.
-///
-/// Setup:
-///   1. Attach to a persistent (DontDestroyOnLoad) GameObject in the bootstrap scene.
-///   2. Set mainServerAddress / mainServerPort to the dedicated server.
-///   3. Set privateServerPort to any open port for player-hosted lobbies (default 7771).
-///   4. Set connectionTimeoutSeconds to match Tugboat's ClientConnectTimeout / 1000 (default 5).
-///   5. LobbyUI wires its buttons to the public methods here.
-///
-/// Failure message taxonomy:
-///   - Unknown host:    DNS resolution failed before a connection was even attempted.
-///   - Timed out:       We never reached LocalConnectionState.Started and the full
-///                      timeout elapsed — server offline, wrong port, or firewalled.
-///   - Unreachable:     Failed faster than the timeout (rare on UDP; ICMP unreachable).
-///   - Server full:     We briefly reached Started then were immediately kicked — the
-///                      server enforced its max-player cap.
-///   - Lost connection: We were in Connected/Hosting state and got an unexpected Stopped.
-/// </summary>
 public class LobbyManager : MonoBehaviour
 {
     public static LobbyManager Instance { get; private set; }

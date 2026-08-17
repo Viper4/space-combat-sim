@@ -20,23 +20,29 @@ public class HUDObject : MonoBehaviour
     [SerializeField] private TextMeshProUGUI detailsText;
     [SerializeField] private TextMeshProUGUI targetText;
 
-    private Image bottomLeftImage;
-    private Image topLeftImage;
-    private Image topRightImage;
-    private Image bottomRightImage;
-    private Image centerOfMassImage;
-    private Image predictedCenterImage;
+    private Camera _mainCamera;
+    private Image _bottomLeftImage;
+    private Image _topLeftImage;
+    private Image _topRightImage;
+    private Image _bottomRightImage;
+    private Image _centerOfMassImage;
+    private Image _predictedCenterImage;
 
     [SerializeField] private float killTime = 0.5f;
-    private float killTimer;
-    private float originalSize;
+    private float _killTimer;
+    private float _originalSize;
 
     public float sqrDistanceToCenter;
 
+    private void Start()
+    {
+        
+    }
+
     private void Update()
     {
-        killTimer -= Time.deltaTime;
-        if (killTimer <= 0)
+        _killTimer -= Time.deltaTime;
+        if (_killTimer <= 0)
         {
             _HUDSystem.Remove(id);
             Destroy(gameObject);
@@ -48,30 +54,30 @@ public class HUDObject : MonoBehaviour
         this._HUDSystem = _HUDSystem;
         this.id = id;
         _HUDSystem.Add(id, this);
-        bottomLeftImage = bottomLeftCorner.GetChild(0).GetComponent<Image>();
-        topLeftImage = topLeftCorner.GetChild(0).GetComponent<Image>();
-        topRightImage = topRightCorner.GetChild(0).GetComponent<Image>();
-        bottomRightImage = bottomRightCorner.GetChild(0).GetComponent<Image>();
-        centerOfMassImage = centerOfMass.GetChild(0).GetComponent<Image>();
-        predictedCenterImage = predictedCenter.GetChild(0).GetComponent<Image>();
-        originalSize = bottomLeftCorner.sizeDelta.x;
+        _bottomLeftImage = bottomLeftCorner.GetChild(0).GetComponent<Image>();
+        _topLeftImage = topLeftCorner.GetChild(0).GetComponent<Image>();
+        _topRightImage = topRightCorner.GetChild(0).GetComponent<Image>();
+        _bottomRightImage = bottomRightCorner.GetChild(0).GetComponent<Image>();
+        _centerOfMassImage = centerOfMass.GetChild(0).GetComponent<Image>();
+        _predictedCenterImage = predictedCenter.GetChild(0).GetComponent<Image>();
+        _originalSize = bottomLeftCorner.sizeDelta.x;
         UpdateObject(position, details, detailsActive, predictedPosition);
     }
 
     public Color GetColor()
     {
-        return predictedCenterImage.color;
+        return _predictedCenterImage.color;
     }
 
     public void SetColor(Color color)
     {
         color.a = 0.8f;
-        bottomLeftImage.color = color;
-        topLeftImage.color = color;
-        topRightImage.color = color;
-        bottomRightImage.color = color;
-        centerOfMassImage.color = color;
-        predictedCenterImage.color = color;
+        _bottomLeftImage.color = color;
+        _topLeftImage.color = color;
+        _topRightImage.color = color;
+        _bottomRightImage.color = color;
+        _centerOfMassImage.color = color;
+        _predictedCenterImage.color = color;
         predictedLineRenderer.startColor = color;
         predictedLineRenderer.endColor = color;
         detailsText.color = color;
@@ -112,7 +118,7 @@ public class HUDObject : MonoBehaviour
                 predictedCenter.gameObject.SetActive(false);
         }
 
-        killTimer = killTime;
+        _killTimer = killTime;
         Vector3 lookVector = transform.position - Camera.main.transform.position;
         if (lookVector.sqrMagnitude < 0.0001)
         {
@@ -170,7 +176,7 @@ public class HUDObject : MonoBehaviour
                 predictedCenter.gameObject.SetActive(false);
         }
 
-        killTimer = killTime;
+        _killTimer = killTime;
         transform.SetPositionAndRotation(position, Quaternion.LookRotation(transform.position - Camera.main.transform.position, Camera.main.transform.up));
 
         bool bottomLeftVisible = RectTransformUtility.ScreenPointToWorldPointInRectangle(canvasRectangle, quad.p1, Camera.main, out Vector3 bottomLeftPos);
@@ -193,7 +199,7 @@ public class HUDObject : MonoBehaviour
         // If corners are too close together, scale them down
         float dx = Mathf.Abs(bottomLeftCorner.localPosition.x - bottomRightCorner.localPosition.x);
         float dy = Mathf.Abs(bottomLeftCorner.localPosition.y - topLeftCorner.localPosition.y);
-        float minSize = Mathf.Min(originalSize, dx);
+        float minSize = Mathf.Min(_originalSize, dx);
         minSize = Mathf.Min(minSize, dy);
 
         Vector2 newSizeVector = new Vector2(minSize, minSize);
