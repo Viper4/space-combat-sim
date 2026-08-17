@@ -1,16 +1,17 @@
-#ifndef CALCULATE_ABERRATED_POSITION_INCLUDED
-#define CALCULATE_ABERRATED_POSITION_INCLUDED
+#ifndef CALCULATE_ABERRATION_INCLUDED
+#define CALCULATE_ABERRATION_INCLUDED
 
-// Calculates the apparent position of a world-space point for a moving
+// Calculates the apparent position of a moving world-space point for a moving
 // observer using the same retarded-position + Lorentz-transform approach used by A Slower Speed of Light / OpenRelativity.
-void CalculateAberratedPosition_float(
+// Also calculates and returns the relative velocity accounting for relativity.
+void CalculateAberration_float(
     float3 AbsWorldPos,
     float3 CameraPos,
     float3 ObserverVel,
     float3 SourceVel,
     float SpeedOfLight,
-    float gamma,
-    out float3 AberratedPosition)
+    out float3 AberratedPosition,
+    out float3 RelativeVelocity)
 {
     const float EPSILON = 1e-6;
 
@@ -20,6 +21,7 @@ void CalculateAberratedPosition_float(
     if (distanceSquared <= EPSILON * EPSILON)
     {
         AberratedPosition = AbsWorldPos;
+        RelativeVelocity = SourceVel - ObserverVel;
         return;
     }
 
@@ -45,35 +47,50 @@ void CalculateAberratedPosition_float(
     float tPast = (-rDotV + sqrt(discriminant)) / denominator;
 
     // Position of the source when it emitted the light, still expressed in the original/common inertial frame.
-    float3 retardedPosition = AbsWorldPos - SourceVel * tPast; // Negated SourceVel so +
+    float3 retardedPosition = AbsWorldPos - SourceVel * tPast;
 
     // Lorentz-transform the emission event into the observer's instantaneous rest frame.
     float observerSpeedSquared = dot(ObserverVel, ObserverVel);
-
-    // beta^2 = v^2 / c^2
-    // float betaSquared = observerSpeedSquared / cSquared;
-    // betaSquared = min(betaSquared, 1.0 - EPSILON);
-    // gamma = rsqrt(max(1.0 - betaSquared, EPSILON));
 
     if (observerSpeedSquared <= EPSILON * EPSILON)
     {
         // Observer is stationary, so there is no spatial Lorentz transform.
         AberratedPosition = retardedPosition;
+        RelativeVelocity = SourceVel;
     }
     else
     {
         // Decompose the retarded position into components parallel and perpendicular to the observer's velocity.
         float3 observerVelocityDir = normalize(ObserverVel);
-        float parallelScalar = dot(retardedPosition, observerVelocityDir);
-        float3 parallel = parallelScalar * observerVelocityDir;
-        float3 perpendicular = retardedPosition - parallel;
+        float posParallelScalar = dot(retardedPosition, observerVelocityDir);
+        float3 posParallel = posParallelScalar * observerVelocityDir;
+        float3 posPerpendicular = retardedPosition - posParallel;
 
         // Lorentz transformation of the spatial position at emission time.
         // In the observer frame:
-        //
         //   r'_perp     = r_perp
-        //   r'_parallel = gamma * (r_parallel - v_observer * tPast)
-        AberratedPosition = perpendicular + gamma * (parallel - ObserverVel * tPast);
+        //   r'_parallel = gamma * (r_parallel + v_observer * tPast)
+        // 
+        // tPast is positive so + not -
+
+        float betaSquared = observerSpeedSquared / cSquared;
+        betaSquared = min(betaSquared, 1.0 - EPSILON);
+        float gamma = rsqrt(max(1.0 - betaSquared, EPSILON));
+        AberratedPosition = posPerpendicular + gamma * (posParallel + ObserverVel * tPast);
+
+        // Calculate relative velocity for future calculations like doppler shift
+        // Decompose SourceVel into components parallel and perpendicular to the observer's velocity
+        // v_r = (v_s - v_o) / (1 - (v_s*v_o)/c^2) when v_s and v_o are collinear
+        float relVelDenominator = max(1.0 - dot(SourceVel, ObserverVel) / cSquared, EPSILON);
+
+        float sourceParallelScalar = dot(SourceVel, observerVelocityDir);
+        float3 sourceParallel = sourceParallelScalar * observerVelocityDir;
+        float3 sourcePerpendicular = SourceVel - sourceParallel;
+
+        float3 transformedParallel = (sourceParallel - ObserverVel) / relVelDenominator;
+        float3 transformedPerpendicular = sourcePerpendicular / (gamma * relVelDenominator);
+
+        RelativeVelocity = transformedParallel + transformedPerpendicular;
     }
 }
 

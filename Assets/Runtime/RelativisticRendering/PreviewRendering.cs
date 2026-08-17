@@ -95,12 +95,12 @@ public class PreviewRendering : MonoBehaviour
                 Vector3.Lerp(start.position, end.position, childT),
                 Quaternion.Slerp(start.rotation, end.rotation, childT));
 
-            childMaterials[i].SetVector(ScaledSpaceVisuals.RelativeVelocityID, velocityDir * signedVelocity);
+            childMaterials[i].SetVector(ScaledSpaceVisuals.ObserverVelocityID, velocityDir * signedVelocity);
         }
         if (changeSkyboxMaterial)
         {
             _skyboxMaterial.SetFloat(ScaledSpaceVisuals.SpeedOfLightID, speedOfLight);
-            _skyboxMaterial.SetVector(ScaledSpaceVisuals.RelativeVelocityID, velocityDir * signedVelocity);
+            _skyboxMaterial.SetVector(ScaledSpaceVisuals.ObserverVelocityID, velocityDir * signedVelocity);
         }
     }
 }

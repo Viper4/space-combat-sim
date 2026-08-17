@@ -6,7 +6,8 @@ using System.Collections;
 
 public class ScaledSpaceVisuals : MonoBehaviour
 {
-    public static readonly string RelativeVelocityID = "_RelativeVelocity";
+    public static readonly string ObserverVelocityID = "_ObserverVelocity";
+    public static readonly string SourceVelocityID = "_SourceVelocity";
     public static readonly string SpeedOfLightID = "_SpeedOfLight";
     public static readonly string BaseColorID = "_BaseColor";
 
@@ -53,7 +54,7 @@ public class ScaledSpaceVisuals : MonoBehaviour
     {
         if (FloatingWorldOrigin.Instance == null || RenderSettings.skybox == null)
             return;
-        RenderSettings.skybox.SetVector(RelativeVelocityID, -FloatingWorldOrigin.Instance.scaledRigidbody.velocity.ToVector3());
+        RenderSettings.skybox.SetVector(ObserverVelocityID, FloatingWorldOrigin.Instance.scaledRigidbody.velocity.ToVector3());
     }
 
     public void RegisterScaledTransform(ScaledTransform scaledTransform)
