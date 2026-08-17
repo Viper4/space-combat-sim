@@ -14,6 +14,7 @@ public class ShapeSettings : ScriptableObject
     public int levelOfDetail = 1;
     [Range(0, 256)]
     public int meshColliderResolution = 0; // 0 => No MeshCollider
+    public bool fullBodyCollider;
     public FilterLayer[] filterLayers;
 
     [System.Serializable]

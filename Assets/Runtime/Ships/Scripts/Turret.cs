@@ -35,7 +35,6 @@ public class Turret : NetworkBehaviour
     [SerializeField] private float maxShootDelta = 0.05f;
     [SerializeField, Tooltip("One bullet per fireRate seconds.")] private float fireRate = 0.15f;
     private float nextFireTime = 0f;
-    private float fireTimeOffset = 0f;
     [SerializeField] protected GameObject projectilePrefab;
     [SerializeField] private GameObject shootParticles;
     [SerializeField] protected float projectileSpeed = 50;

@@ -7,8 +7,6 @@ public class TerrainChunk
     private ShapeGenerator shapeGenerator;
     private Vector3 localPosition;
     private float width;
-    // This terrain chunk will be visible below max screen size, anything above will generate higher LOD
-    private float sqrMaxScreenSize;
     private int maxLOD;
     private int detailLevel;
     private int filterResolution;
@@ -19,13 +17,12 @@ public class TerrainChunk
     private TerrainChunkObject chunkObject;
     private Vector3[] vertices;
 
-    public TerrainChunk(ShapeGenerator shapeGenerator, ShapeSettings settings, float maxScreenSize, Vector3 localUp, int row, int col, int rootLOD)
+    public TerrainChunk(ShapeGenerator shapeGenerator, ShapeSettings settings, Vector3 localUp, int row, int col, int rootLOD)
     {
         this.shapeGenerator = shapeGenerator;
         filterResolution = settings.meshFilterResolution;
         colliderResolution = settings.meshColliderResolution;
         width = 1f / rootLOD;
-        sqrMaxScreenSize = maxScreenSize * maxScreenSize;
         maxLOD = settings.levelOfDetail;
         detailLevel = 0;
         this.localUp = localUp;
@@ -36,12 +33,11 @@ public class TerrainChunk
         localForward /= rootLOD;
     }
 
-    public TerrainChunk(ShapeGenerator shapeGenerator, Vector3 localPosition, float width, float sqrMaxScreenSize, int filterResolution, int colliderResolution, int maxLOD, int detailLevel, Vector3 localUp, Vector3 localRight, Vector3 localForward)
+    public TerrainChunk(ShapeGenerator shapeGenerator, Vector3 localPosition, float width, int filterResolution, int colliderResolution, int maxLOD, int detailLevel, Vector3 localUp, Vector3 localRight, Vector3 localForward)
     {
         this.shapeGenerator = shapeGenerator;
         this.localPosition = localPosition;
         this.width = width;
-        this.sqrMaxScreenSize = sqrMaxScreenSize;
         this.filterResolution = filterResolution;
         this.colliderResolution = colliderResolution;
         this.maxLOD = maxLOD;
@@ -112,6 +108,8 @@ public class TerrainChunk
 
     public void ConstructMeshCollider()
     {
+        if (colliderResolution <= 0 || shapeGenerator.settings.fullBodyCollider)
+            return;
         if(chunkObject.meshCollider == null)
         {
             chunkObject.meshCollider = chunkObject.meshFilter.gameObject.AddComponent<MeshCollider>();
@@ -264,31 +262,30 @@ public class TerrainChunk
         {
             children = new TerrainChunk[4];
             float nextWidth = width * 0.5f;
-            float nextSqrMaxScreenSize = sqrMaxScreenSize * 4f;
             Vector3 nextLocalRight = localRight * 0.5f;
             Vector3 nextLocalForward = localForward * 0.5f;
             children[0] = new TerrainChunk(
                 shapeGenerator, 
                 localPosition + nextLocalRight - nextLocalForward, 
-                nextWidth, nextSqrMaxScreenSize, 
+                nextWidth,
                 filterResolution, colliderResolution, maxLOD, detailLevel + 1, 
                 localUp, nextLocalRight, nextLocalForward); // Top left
             children[1] = new TerrainChunk(
                 shapeGenerator, 
                 localPosition + nextLocalRight + nextLocalForward, 
-                nextWidth, nextSqrMaxScreenSize, 
+                nextWidth,
                 filterResolution, colliderResolution, maxLOD, detailLevel + 1, 
                 localUp, nextLocalRight, nextLocalForward); // Top right
             children[2] = new TerrainChunk(
                 shapeGenerator, 
                 localPosition - nextLocalRight + nextLocalForward, 
-                nextWidth, nextSqrMaxScreenSize, 
+                nextWidth,
                 filterResolution, colliderResolution, maxLOD, detailLevel + 1, 
                 localUp, nextLocalRight, nextLocalForward); // Bottom right
             children[3] = new TerrainChunk(
                 shapeGenerator, 
                 localPosition - nextLocalRight - nextLocalForward, 
-                nextWidth, nextSqrMaxScreenSize, 
+                nextWidth,
                 filterResolution, colliderResolution, maxLOD, detailLevel + 1, 
                 localUp, nextLocalRight, nextLocalForward); // Bottom left
         }
@@ -328,8 +325,7 @@ public class TerrainChunk
             chunkObject.meshRenderer.sharedMaterial = colorGenerator.materialInstance;
             chunkObject.meshFilter.sharedMesh = new Mesh();
             ConstructMesh();
-            if (colliderResolution > 0)
-                ConstructMeshCollider();
+            ConstructMeshCollider();
             UpdateUVs(colorGenerator);
         }
     }
@@ -386,8 +382,7 @@ public class TerrainChunk
                 chunkObject.meshFilter.sharedMesh = new Mesh();
                 chunkObject.meshRenderer.sharedMaterial = colorGenerator.materialInstance;
                 ConstructMesh();
-                if (colliderResolution > 0)
-                    ConstructMeshCollider();
+                ConstructMeshCollider();
                 UpdateUVs(colorGenerator);
                 return true;
             }

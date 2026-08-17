@@ -253,10 +253,13 @@ public class NetworkScaledObject : NetworkBehaviour
         Vector3d gravityDelta = 0.5f * timeSinceLastUpdate * timeSinceLastUpdate * scaledRigidbody.GetGravity();
         Vector3d localPositionDelta = WorldToLocal(reported.RealPosition - previous.RealPosition - gravityDelta, previous.Rotation);
         // Allow position deltas where the object accelerated with max acceleration in any direction between the previous state and reported state
-        Debug.Log(GameLog.ObjectLog(this, $"localPosDelta: {localPositionDelta} maxs: {maxDeltaX} {maxDeltaY} {maxDeltaZ}"));
-        return System.Math.Abs(localPositionDelta.x) <= maxDeltaX 
+        bool plausible = System.Math.Abs(localPositionDelta.x) <= maxDeltaX 
             && System.Math.Abs(localPositionDelta.y) <= maxDeltaY 
             && System.Math.Abs(localPositionDelta.z) <= maxDeltaZ;
+        if (!plausible)
+            Debug.Log(GameLog.ObjectLog(this, $"localPosDelta: {localPositionDelta} maxs: {maxDeltaX} {maxDeltaY} {maxDeltaZ}"));
+
+        return plausible;
     }
 
     private float GetMaxPositionDelta(float localVelocity, float maxPositiveAcceleration, float maxNegativeAcceleration, float time)

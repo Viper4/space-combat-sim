@@ -1,5 +1,6 @@
 using System;
 using SpaceStuff;
+using System.Collections.Generic;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -28,8 +29,6 @@ public class CelestialBodyGenerator : MonoBehaviour
     [HideInInspector] public bool shapeSettingsFoldout;
     [HideInInspector] public bool colorSettingsFoldout;
 
-    [SerializeField, Tooltip("Base LOD will be displayed at screen sizes below this.")] private float baseMaxScreenSize;
-
     private ShapeGenerator shapeGenerator;
     private ColorGenerator colorGenerator;
 
@@ -40,6 +39,9 @@ public class CelestialBodyGenerator : MonoBehaviour
     [SerializeField] private Vector2 seedRange = new Vector2(-999, 999);
 
     public bool generated {get; private set;} = false;
+
+    // runtime reference to the generated single-body collider GameObject (if used)
+    private GameObject fullBodyColliderObject = null;
 
     private ScaledTransform scaledTransform;
 
@@ -58,7 +60,7 @@ public class CelestialBodyGenerator : MonoBehaviour
             {
                 for (int c = 0; c < rootLOD; c++)
                 {
-                    rootChunks[arrayIndex] = new TerrainChunk(shapeGenerator, shapeSettings, baseMaxScreenSize, directions[i], r, c, rootLOD);
+                    rootChunks[arrayIndex] = new TerrainChunk(shapeGenerator, shapeSettings, directions[i], r, c, rootLOD);
                     if (renderMask == FaceRenderMask.All || (int)renderMask - 1 == i)
                         rootChunks[arrayIndex].GenerateEmptyTree(transform, colorGenerator);
                     arrayIndex++;
@@ -153,6 +155,7 @@ public class CelestialBodyGenerator : MonoBehaviour
 
     public void DestroyGeneratedChunks()
     {
+        // Destroy any generated mesh children (chunk mesh objects)
         for (int i = transform.childCount - 1; i >= 0; i--)
         {
             Transform child = transform.GetChild(i);
@@ -164,6 +167,9 @@ public class CelestialBodyGenerator : MonoBehaviour
                     Destroy(child.gameObject);
             }
         }
+        // Remove any full-body collider object if present
+        RemoveFullBodyCollider();
+
         generated = false;
         rootChunks = null;
     }
@@ -263,14 +269,38 @@ public class CelestialBodyGenerator : MonoBehaviour
 
     private void GenerateMeshes()
     {
+        // Always construct visual meshes for each root chunk as before.
         for (int i = 0; i < 6 * rootLOD * rootLOD; i++)
         {
             int faceIndex = i / (rootLOD * rootLOD);
             if (renderMask == FaceRenderMask.All || (int)renderMask - 1 == faceIndex)
                 rootChunks[i].ConstructMesh();
-            if (shapeSettings.meshColliderResolution > 0)
-                rootChunks[i].ConstructMeshCollider();
         }
+
+        // Handle colliders according to settings and the new toggle.
+        if (shapeSettings.meshColliderResolution > 0)
+        {
+            if (shapeSettings.fullBodyCollider)
+            {
+                BuildFullBodyCollider();
+            }
+            else
+            {
+                // Legacy per-chunk collider generation (unchanged)
+                for (int i = 0; i < 6 * rootLOD * rootLOD; i++)
+                {
+                    int faceIndex = i / (rootLOD * rootLOD);
+                    if (renderMask == FaceRenderMask.All || (int)renderMask - 1 == faceIndex)
+                        rootChunks[i].ConstructMeshCollider();
+                }
+            }
+        }
+        else
+        {
+            // No colliders requested: ensure any full-body collider is removed when resolution is zero
+            RemoveFullBodyCollider();
+        }
+
         colorGenerator.UpdateElevation(shapeGenerator.elevationMinMax);
     }
 
@@ -286,6 +316,92 @@ public class CelestialBodyGenerator : MonoBehaviour
             if (renderMask == FaceRenderMask.All || (int)renderMask - 1 == faceIndex)
                 rootChunks[i].UpdateUVs(colorGenerator);
         }
+    }
+
+    /// <summary>
+    /// Build a single MeshCollider for the entire celestial body using the cube-to-sphere sampling
+    /// driven by shapeSettings.meshColliderResolution. This replaces per-chunk colliders when enabled.
+    /// </summary>
+    private void BuildFullBodyCollider()
+    {
+        // Clean up any existing one first
+        RemoveFullBodyCollider();
+
+        int res = shapeSettings.meshColliderResolution;
+        if (res <= 0 || shapeGenerator == null || shapeSettings == null)
+            return;
+
+        List<Vector3> verts = new List<Vector3>(6 * res * res);
+        List<int> tris = new List<int>();
+
+        Vector3[] directions = new Vector3[] { Vector3.up, Vector3.down, Vector3.right, Vector3.left, Vector3.forward, Vector3.back };
+
+        for (int f = 0; f < 6; f++)
+        {
+            Vector3 localUp = directions[f];
+            Vector3 localRight = new Vector3(localUp.y, localUp.z, localUp.x);
+            Vector3 localForward = Vector3.Cross(localUp, localRight);
+
+            int faceVertexStart = verts.Count;
+
+            // build vertices for this face (row-major as in TerrainChunk)
+            for (int y = 0; y < res; y++)
+            {
+                for (int x = 0; x < res; x++)
+                {
+                    Vector2 percent = new Vector2((float)x / (res - 1), (float)y / (res - 1));
+                    Vector3 pointOnUnitCube = localUp + (2f * (percent.x - 0.5f) * localRight + 2f * (percent.y - 0.5f) * localForward);
+                    Vector3 pointOnUnitSphere = pointOnUnitCube.normalized;
+                    Vector3 vertex = shapeGenerator.EvaluatePointOnSphere(pointOnUnitSphere);
+                    verts.Add(vertex);
+                }
+            }
+
+            // build triangles for this face using the vertices just added
+            for (int y = 0; y < res - 1; y++)
+            {
+                for (int x = 0; x < res - 1; x++)
+                {
+                    int i = faceVertexStart + y * res + x;
+                    // triangle 1
+                    tris.Add(i);
+                    tris.Add(i + res + 1);
+                    tris.Add(i + res);
+                    // triangle 2
+                    tris.Add(i);
+                    tris.Add(i + 1);
+                    tris.Add(i + res + 1);
+                }
+            }
+        }
+
+        Mesh colliderMesh = new Mesh
+        {
+            indexFormat = verts.Count > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16
+        };
+        colliderMesh.SetVertices(verts);
+        colliderMesh.SetTriangles(tris, 0);
+        colliderMesh.RecalculateNormals();
+
+        // Create a child object to hold the collider so it can be cleaned up easily
+        
+        fullBodyColliderObject = new GameObject("FullBodyCollider");
+        fullBodyColliderObject.transform.SetParent(transform, false);
+        fullBodyColliderObject.layer = gameObject.layer;
+        MeshCollider mc = fullBodyColliderObject.AddComponent<MeshCollider>();
+        mc.sharedMesh = colliderMesh;
+        mc.convex = true;
+    }
+
+    private void RemoveFullBodyCollider()
+    {
+        if (fullBodyColliderObject == null)
+            return;
+        if (Application.isEditor)
+            DestroyImmediate(fullBodyColliderObject);
+        else
+            Destroy(fullBodyColliderObject);
+        fullBodyColliderObject = null;
     }
 
     public Vector3[] GetSeeds()

@@ -16761,8 +16761,8 @@ MonoBehaviour:
   shields: {fileID: 7062523681545924001}
   networkScaledObject: {fileID: 3629996082069962771}
   alertSystem: {fileID: 7003917555558167796}
-  minImpulse: 100
-  unityCollideImpulseScale: 0.00001
+  minImpulse: 50
+  unityCollideImpulseScale: 100
   scaledCollideImpulseScale: 0.3
   maxLocalZ: 7.5
   minRamAttenuation: 0.5
@@ -17476,7 +17476,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584149119425471680
+  _initializedTimestamp: -8584146114211317305
 --- !u!114 &6405785138056314664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -25038,7 +25038,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584149119425471680
+      value: -8584146114211317305
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -25317,7 +25317,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584149119425471680
+      value: -8584146114211317305
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -28110,7 +28110,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584149119425471680
+      value: -8584146114211317305
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -28624,7 +28624,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584149119425471680
+      value: -8584146114211317305
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -30181,7 +30181,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584149119425471680
+      value: -8584146114211317305
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -30743,7 +30743,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584149119425471680
+      value: -8584146114211317305
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -30956,7 +30956,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584149119425471680
+      value: -8584146114211317305
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField
@@ -31999,7 +31999,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: _initializedTimestamp
-      value: -8584149119425471680
+      value: -8584146114211317305
       objectReference: {fileID: 0}
     - target: {fileID: 1172940210611663231, guid: 437cdcea725f9584296753957e1f2c86, type: 3}
       propertyPath: <IsNested>k__BackingField

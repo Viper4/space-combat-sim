@@ -490,10 +490,9 @@ public class ScaledRigidbody : MonoBehaviour
         if (contact.separation < 0)
         {
             Vector3d correctionDirection = scaledTransform.realPosition - realContactPoint;
-            scaledTransform.realPosition += correctionDirection.normalized * (-contact.separation * 2.0f);
+            scaledTransform.realPosition += correctionDirection.normalized * (contact.separation * 2.0f);
         }
 
-        // AddForce(collision.impulse.ToVector3d() / mass, ForceMode.Impulse);
-        AddForceAtPosition(collision.impulse.ToVector3d() / mass, realContactPoint, ForceMode.Impulse);
+        AddForceAtPosition(collision.impulse.ToVector3d(), realContactPoint, ForceMode.Impulse);
     }
 }
