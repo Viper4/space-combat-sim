@@ -96,7 +96,6 @@ MonoBehaviour:
   rootLOD: 1
   randomSeed: 1
   seedRange: {x: -10000, y: 10000}
-  useSingleBodyCollider: 1
 --- !u!114 &1673852074928851070
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -301,7 +300,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584146134346056760
+  _initializedTimestamp: -8584145743242545083
 --- !u!114 &8419449798854834267
 MonoBehaviour:
   m_ObjectHideFlags: 0

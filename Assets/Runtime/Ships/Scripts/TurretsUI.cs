@@ -1,163 +1,81 @@
-using System;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 using System.Collections;
 
 public class TurretsUI : MonoBehaviour
 {
-    private struct TurretPanel
-    {
-        public GameObject gameObject;
-        public TextMeshProUGUI title;
-        public TextMeshProUGUI statusText;
-        public TextMeshProUGUI targetText;
-        public Transform modelPlatform;
-        public Transform modelRotatingObject;
-    }
-
     [SerializeField] private TurretSystem turretSystem;
-
-    [SerializeField] private Transform buttonParent;
+    [SerializeField] private Transform shipModel;
+    [SerializeField] private GameObject panelUI;
     [SerializeField] private Transform panelParent;
-
-    [SerializeField] private GameObject buttonPrefab;
-    [SerializeField] private GameObject panelPrefab;
-
-    [SerializeField] private GameObject enableTurretButton;
-    [SerializeField] private GameObject disableTurretButton;
-
-    private TurretPanel[] turretPanels;
-    private int selectedTurret = -1;
-
-    private void AddButtonListener(Button button, int index)
-    {
-        button.onClick.AddListener(() => SelectTurretPanel(index));
-    }
+    [SerializeField] private TurretPanel panelPrefab;
 
     private IEnumerator Start()
     {
         yield return new WaitWhile(() => !turretSystem.initialized);
         
-        turretPanels = new TurretPanel[turretSystem.turrets.Length];
         for (int i = 0; i < turretSystem.turrets.Length; i++)
         {
             Turret turret = turretSystem.turrets[i];
-            GameObject turretButton = Instantiate(buttonPrefab, buttonParent);
-            turretButton.name = "Turret Button " + i;
-            GameObject turretPanel = Instantiate(panelPrefab, panelParent);
+
+            TurretPanel turretPanel = Instantiate(panelPrefab, panelParent);
+            turretPanel.Initialize(turret);
             turretPanel.name = "Turret Panel " + i;
-            Transform modelPlatform = Instantiate(turretSystem.turrets[i].UIModel, turretPanel.transform.Find("Model Parent")).transform.Find("Platform");
-            turretPanels[i] = new TurretPanel()
-            {
-                gameObject = turretPanel,
-                title = turretPanel.transform.Find("Title").GetComponent<TextMeshProUGUI>(),
-                statusText = turretPanel.transform.Find("Status Text").GetComponent<TextMeshProUGUI>(),
-                targetText = turretPanel.transform.Find("Target Text").GetComponent<TextMeshProUGUI>(),
-                modelPlatform = modelPlatform,
-                modelRotatingObject = modelPlatform.Find("Rotating Object")
-            };
-            AddButtonListener(turretButton.GetComponent<Button>(), i); // Do this so the event doesn't just reference int i and instead creates a new integer
 
-            TextMeshProUGUI turretButtonText = turretButton.transform.Find("Button Front").Find("Text").GetComponent<TextMeshProUGUI>();
+            GameObject panelTurretModel = Instantiate(turretSystem.turrets[i].UIModel, turretPanel.modelParent);
+            panelTurretModel.transform.localScale = Vector3.one * 5f;
+            Transform panelPlatformModel = panelTurretModel.transform.Find("Platform");
 
+            GameObject shipTurretModel = Instantiate(turretSystem.turrets[i].UIModel, shipModel);
+            Vector3 localPos = turretSystem.transform.InverseTransformPoint(turretSystem.turrets[i].transform.position);
+            float inverseScaleX = 1f / shipModel.localScale.x;
+            float inverseScaleY = 1f / shipModel.localScale.x;
+            float inverseScaleZ = 1f / shipModel.localScale.x;
+            // offset.x *= inverseScaleX;
+            // offset.y *= inverseScaleY;
+            // offset.z *= inverseScaleZ;
+            
+            shipTurretModel.transform.localPosition = localPos;
+            shipTurretModel.transform.localScale = new Vector3(inverseScaleX, inverseScaleY, inverseScaleZ);
+
+            Transform shipPlatformModel = shipTurretModel.transform.Find("Platform");
+
+            turretPanel.platformModels = new Transform[] {panelPlatformModel, shipPlatformModel};
+            turretPanel.rotatingObjectModels = new Transform[] {panelPlatformModel.Find("Rotating Object"), shipPlatformModel.Find("Rotating Object")};
+            turretPanel.GetMaterials(new GameObject[] {panelTurretModel, shipTurretModel});
+            
             switch (turret.GetType().Name)
             {
                 case "Turret":
-                    turretButtonText.text = "GUN" + (i + 1);
-
-                    turretPanels[i].title.text = "GUN" + (i + 1) + " INFO";
+                    turretPanel.title.text = "GUN" + (i + 1) + " INFO";
                     break;
                 case "LaserTurret":
-                    turretButtonText.text = "LSR" + (i + 1);
-
-                    turretPanels[i].title.text = "LSR" + (i + 1) + " INFO";
+                    turretPanel.title.text = "LSR" + (i + 1) + " INFO";
                     break;
                 case "RailGun":
-                    turretButtonText.text = "RLG" + (i + 1);
-
-                    turretPanels[i].title.text = "RLG" + (i + 1) + " INFO";
+                    turretPanel.title.text = "RLG" + (i + 1) + " INFO";
                     break;
             }
-
-            turret.statSystem.healthIndicator = turretPanel.GetComponent<SliderIndicator>();
-            turret.statSystem.healthIndicator.AddText(turretPanel.transform.Find("Health Text").GetComponent<TextMeshProUGUI>());
-            // turret.statSystem.healthIndicator.UpdateUI(turret.statSystem.health, turret.statSystem.maxHealth);
         }
     }
 
-    void Update()
+    public void EnableTurrets()
     {
-        if(selectedTurret >= 0)
+        for (int i = 0; i < turretSystem.turrets.Length; i++)
         {
-            TurretPanel panel = turretPanels[selectedTurret];
-            Turret turret = turretSystem.turrets[selectedTurret];
-            if (turret.destroyed)
-            {
-                panel.statusText.text = "<color=red>Destroyed</color>";
-            }
-            else
-            {
-                if (turret.active)
-                {
-                    panel.statusText.text = "Active";
-                }
-                else
-                {
-                    panel.statusText.text = "<color=yellow>Inactive</color>";
-                }
-            }
-            
-            string targetColor = turret.shoot ? "red" : "yellow";
-            if (turret.currentTarget != null)
-            {
-                panel.targetText.text = $"<color={targetColor}>" + turret.currentTarget.name + "</color>";
-            }
-            else if (turretSystem.manualControl)
-            {
-                panel.targetText.text = $"<color={targetColor}>MANUAL CONTROL</color>";
-            }
-            else
-            {
-                panel.targetText.text = "<color=grey>None</color>";
-            }
-            
-            panel.modelPlatform.rotation = turret.platform.rotation;
-            panel.modelRotatingObject.rotation = turret.barrel.rotation;
+            turretSystem.turrets[i].SetActive(true);
         }
     }
 
-    public void SelectTurretPanel(int i)
+    public void DisableTurrets()
     {
-        buttonParent.parent.gameObject.SetActive(false);
-        panelParent.parent.gameObject.SetActive(true);
-        for(int j = 0; j < turretPanels.Length; j++)
+        for (int i = 0; i < turretSystem.turrets.Length; i++)
         {
-            turretPanels[j].gameObject.SetActive(false);
-        }
-        turretPanels[i].gameObject.SetActive(true);
-        selectedTurret = i;
-        enableTurretButton.SetActive(!turretSystem.turrets[i].active);
-        disableTurretButton.SetActive(turretSystem.turrets[i].active);
-    }
-
-    public void EnableTurret()
-    {
-        if (selectedTurret >= 0)
-        {
-            turretSystem.turrets[selectedTurret].active = true;
-            enableTurretButton.SetActive(false);
-            disableTurretButton.SetActive(true);
+            turretSystem.turrets[i].SetActive(false);
         }
     }
 
-    public void DisableTurret()
+    public void TogglePanels()
     {
-        if (selectedTurret >= 0)
-        {
-            turretSystem.turrets[selectedTurret].active = false;
-            enableTurretButton.SetActive(true);
-            disableTurretButton.SetActive(false);
-        }
+        panelUI.SetActive(!panelUI.activeSelf);
     }
 }

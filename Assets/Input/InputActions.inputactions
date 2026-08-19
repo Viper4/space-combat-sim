@@ -52,6 +52,24 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "GUILeft",
+                    "type": "Button",
+                    "id": "8db71f88-d0c3-4bb5-8e6d-78fd3d84326a",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "GUIRight",
+                    "type": "Button",
+                    "id": "a998d86e-f43d-4465-928f-7635fe275355",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "RotStableToggle",
                     "type": "Button",
                     "id": "3082f3f8-4d41-4b7d-872c-9c8a329a3952",
@@ -681,6 +699,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "EngineToggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1b41d7fe-a829-466e-85c5-1307de48bb76",
+                    "path": "<Keyboard>/1",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "GUILeft",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7523f92d-d06f-4d13-be9a-475253ec0a62",
+                    "path": "<Keyboard>/2",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "GUIRight",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

@@ -143,11 +143,6 @@ public class ScaledSpacePhysics : MonoBehaviour
                     // double combinedRadius = collider.GetRadius() + candidate.GetRadius();
                     double sqrTravelDistance = relativeVelocity.sqrMagnitude * Time.fixedDeltaTime * Time.fixedDeltaTime;
                     deferToUnity &= sqrTravelDistance <= 4.0 * combinedRadius * combinedRadius;
-
-                    // if (collider.CompareTag("Torpedo") || candidate.CompareTag("Torpedo"))
-                    // {
-                    //     Debug.Log(GameLog.ObjectLog(this, $"Checking {collider.name} with {candidate.name}. Defer to Unity: {deferToUnity}\nrelSpeed: {relativeVelocity.magnitude} travelDistance: {Math.Sqrt(sqrTravelDistance)} combinedRad: {combinedRadius}"));
-                    // }
                 }
                 
                 if (deferToUnity)

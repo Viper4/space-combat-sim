@@ -5518,7 +5518,6 @@ MonoBehaviour:
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 1172940210611663231}
   _networkObjectCache: {fileID: 0}
-  active: 1
   statSystem: {fileID: 239452514770276629}
   turretSystem: {fileID: 0}
   ship: {fileID: 0}
@@ -5535,22 +5534,23 @@ MonoBehaviour:
   maxAmmo: 1000
   maxShootDelta: 0.025
   fireRate: 0.15
+  ammoSyncRate: 2
   projectilePrefab: {fileID: 1854897518929172335, guid: 6e8b419a39dc4244c9bcae8a86f97bee, type: 3}
   shootParticles: {fileID: 3610617624835580716, guid: 71b07424ffcb49a41830ab0761db5c07, type: 3}
   projectileSpeed: 2000
-  tracerInterval: 2
+  tracerInterval: 0
   casingPoint: {fileID: 8319394280526272228}
   casingRandomness: 0.1
   casingPrefab: {fileID: 6854141528186018479, guid: 57ebb8e7e88aee44f98160a192eea584, type: 3}
   casingSpeed: 5
   currentTarget: {fileID: 0}
+  turnIndex: 0
   accelerationHeuristic: 0.5
   explosiveTag: Torpedo
   explosionRadius: 20
   aimDirection: {x: 0, y: 0, z: 0}
   showLines: 0
   UIModel: {fileID: 5023568637530256429, guid: 6c30e974dde26da4b9198123ea22637f, type: 3}
-  destroyed: 0
   damagedThreshold: 0.5
   damagedParticles: {fileID: 7945612027888559361}
   aliveGameObject: {fileID: 3410632779327792015}
@@ -5575,39 +5575,12 @@ MonoBehaviour:
   damageAnimation: {fileID: 0}
   healthIndicator: {fileID: 0}
   damageParticles: {fileID: 7945612027888559361}
-  onDamage:
-    m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 7214587638897084103}
-        m_TargetAssemblyTypeName: Turret, Assembly-CSharp
-        m_MethodName: TryPlayDamagedParticles
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
-  onHeal:
+  OnHealthChanged:
     m_PersistentCalls:
       m_Calls: []
-  onDeath:
+  OnDeath:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 7214587638897084103}
-        m_TargetAssemblyTypeName: Turret, Assembly-CSharp
-        m_MethodName: OnDeath
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
   damageCooldown: 0.5
 --- !u!114 &1172940210611663231
 MonoBehaviour:

@@ -102,7 +102,7 @@ public class TorpedoSystem : NetworkBehaviour
         launchAudio.ResetPlay(true);
 
         if (IsOffline || IsServerInitialized)
-            launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(ship.scaledRigidbody.scaledTransform, ship.scaledRigidbody.velocity, ship.scaledRigidbody.angularVelocity, lockedTarget, i, ship.radarTarget.team);
+            launchedTorpedoes[i] = torpedoPoints[i].LaunchTorpedo(ship.scaledRigidbody.velocity, ship.scaledRigidbody.angularVelocity, lockedTarget, i, ship.radarTarget.team);
         UpdateTorpedoUI(i, false);
         if (lockedTarget == null)
             Debug.Log(GameLog.ObjectLog(this, "Launched torpedo with no target."));

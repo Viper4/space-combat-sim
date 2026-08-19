@@ -36,7 +36,7 @@ public class Shields : MonoBehaviour
     void Start()
     {
         statSystem = GetComponent<StatSystem>();
-        statSystem.onDeath.AddListener(OnDeath);
+        statSystem.OnDeath.AddListener(OnDeath);
         shieldRenderer = colliderObject.GetComponent<MeshRenderer>();
         shieldMaterial = shieldRenderer.material; // Clone material
         shieldCollider = colliderObject.GetComponent<Collider>();

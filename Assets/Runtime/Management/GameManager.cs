@@ -9,11 +9,6 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    public static readonly string findNetworkObjectFailPattern = "[{0}] Failed to {1} with ID: {2}; Cannot find NetworkObject.";
-    public static readonly string getComponentFailPattern = "[{0}] Failed to {1} for {2}; Cannot get attached {3} component.";
-
-    //public Dictionary<ulong, NetworkObject> trackedNetworkObjects = new Dictionary<ulong, NetworkObject>();
-
     public InputActions inputActions;
     public GameSettings gameSettings;
     public float sensitivityScale = 0.02f;

@@ -36,7 +36,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -9.99998, y: 0.0000006, z: 0.0000066}
-  m_LocalScale: {x: 0.000001, y: 0.000001, z: 0.000001}
+  m_LocalScale: {x: 7, y: 7, z: 7}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -58,9 +58,9 @@ MonoBehaviour:
     y: 0.6000000238418579
     z: 6.599999904632568
   _realScale:
-    x: 1
-    y: 1
-    z: 1
+    x: 7000000
+    y: 7000000
+    z: 7000000
   minScreenPixelSize: 3
   visible: 1
   trackedColliders: []
@@ -70,7 +70,7 @@ MonoBehaviour:
   scaleFactor: 1000000
   worldSpaceThreshold: 79950
   scaledSpaceThreshold: 80050
-  realRadius: 0.5
+  realRadius: 3500000
   useRealScaleForRadius: 0
   index: -1
   worldSpaceOnlyRenderers: []
@@ -114,7 +114,7 @@ MonoBehaviour:
   scaledTransform: {fileID: 0}
   originalLayer: 0
   generationSettings: {fileID: 11400000, guid: 07cae02a88077744eae9964f1cf2f7b5, type: 2}
-  generationSettingsFoldout: 0
+  generationSettingsFoldout: 1
   gravitySettings: {fileID: 11400000, guid: 282c9ce6c1e554c4a9d700327d969abd, type: 2}
   gravitySettingsFoldout: 0
   orbitTarget: {fileID: 0}
@@ -276,7 +276,7 @@ MonoBehaviour:
   <AssetPathHash>k__BackingField: 3982375770557871847
   SceneId: 0
   SerializedTransformProperties:
-    Position: {x: 0, y: 0, z: 0}
+    Position: {x: -9.99998, y: 0.0000006, z: 0.0000066}
     Rotation: {x: 0, y: 0, z: 0, w: 1}
     Scale: {x: 0.000001, y: 0.000001, z: 0.000001}
     IsValid: 1
@@ -300,7 +300,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584146117209967932
+  _initializedTimestamp: -8584145741735782196
 --- !u!114 &8267816903761195186
 MonoBehaviour:
   m_ObjectHideFlags: 0

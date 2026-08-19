@@ -120,7 +120,7 @@ public class ScaledSpaceVisuals : MonoBehaviour
         {
             foreach(ScaledTransform scaledTransform in scaledTransforms)
             {
-                scaledTransform.scaleFactor = globalScaleFactor;
+                scaledTransform.SetScaleFactor(globalScaleFactor);
             }
             yield break;
         }
@@ -139,7 +139,7 @@ public class ScaledSpaceVisuals : MonoBehaviour
                 double t = Math.Pow((Math.Log(distance) - logMin) / (logMax - logMin), power);
                 double renderDistance = minRenderDistance + (maxRenderDistance - minRenderDistance) * t;
 
-                scaledTransform.scaleFactor = distance / renderDistance;
+                scaledTransform.SetScaleFactor(distance / renderDistance);
             }
         }
         else
@@ -151,7 +151,7 @@ public class ScaledSpaceVisuals : MonoBehaviour
                 double distance = (scaledTransform.realPosition - realCamPos).magnitude;
                 double t = (distance - minSqrDistance) / (maxSqrDistance - minSqrDistance);
                 double renderDistance = minRenderDistance + (maxRenderDistance - minRenderDistance) * t;
-                scaledTransform.scaleFactor = distance / renderDistance;
+                scaledTransform.SetScaleFactor(distance / renderDistance);
             }
         }
         updating = false;

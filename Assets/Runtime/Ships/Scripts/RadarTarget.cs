@@ -59,7 +59,7 @@ public class RadarTarget : NetworkBehaviour
 
     private void OnScaledTriggerEnter(ScaledCollider source, ScaledCollider other)
     {
-        if (!IsServerOrOffline || emissionTrigger == null || source.id != emissionTrigger.id)
+        if (!IsServerOrOffline || emissionTrigger == null || source.id != emissionTrigger.id || other.isTrigger)
             return;
         if (other.scaledRigidbody.TryGetComponent<Radar>(out var otherRadar))
         {
@@ -76,7 +76,7 @@ public class RadarTarget : NetworkBehaviour
 
     private void OnScaledTriggerExit(ScaledCollider source, ScaledCollider other)
     {
-        if (!IsServerOrOffline || emissionTrigger == null || source.id != emissionTrigger.id)
+        if (!IsServerOrOffline || emissionTrigger == null || source.id != emissionTrigger.id || other.isTrigger)
             return;
         if (other.scaledRigidbody.TryGetComponent<Radar>(out var otherRadar))
         {

@@ -12,10 +12,15 @@ using FishNet.Object;
 public class TorpedoPoint : MonoBehaviour
 {
     private MeshRenderer staticMesh;
+
+    [SerializeField] private ScaledTransform parent;
+    [SerializeField] private ScaledRigidbody parentRB;
+    [SerializeField] private Collider[] parentColliders;
     [SerializeField] private GameObject torpedoPrefab;
     [SerializeField] private Vector3d launchVelocity;
-    public bool hasTorpedo = true;
     [SerializeField] private float activateDelay;
+
+    public bool hasTorpedo = true;
 
     void Start()
     {
@@ -28,19 +33,16 @@ public class TorpedoPoint : MonoBehaviour
         staticMesh.enabled = true;
     }
 
-    public Torpedo LaunchTorpedo(ScaledTransform parent, Vector3d initialVelocity, Vector3 initialAngularVelocity, RadarTarget target, int index, string team)
+    public Torpedo LaunchTorpedo(Vector3d initialVelocity, Vector3 initialAngularVelocity, RadarTarget target, int index, string team)
     {
         hasTorpedo = false;
         staticMesh.enabled = false;
         GameObject torpedoGO = Instantiate(torpedoPrefab);
         torpedoGO.transform.rotation = transform.rotation;
         Torpedo torpedo = torpedoGO.GetComponent<Torpedo>();
-
         torpedo.GetComponent<ScaledTransform>().realPosition = parent.TransformRenderPoint(transform.position);
-        // torpedo.GetComponent<Collider>().enabled = false;
 
         ScaledRigidbody torpedoRB = torpedo.GetComponent<ScaledRigidbody>();
-        // torpedoRB.EnableScaledColliders(false);
         double globalX = transform.right.x * launchVelocity.x + transform.up.x * launchVelocity.y + transform.forward.x * launchVelocity.z;
         double globalY = transform.right.y * launchVelocity.x + transform.up.y * launchVelocity.y + transform.forward.y * launchVelocity.z;
         double globalZ = transform.right.z * launchVelocity.x + transform.up.z * launchVelocity.y + transform.forward.z * launchVelocity.z;
@@ -53,7 +55,7 @@ public class TorpedoPoint : MonoBehaviour
         if (InstanceFinder.ServerManager != null && !InstanceFinder.IsOffline)
             InstanceFinder.ServerManager.Spawn(torpedoGO.GetComponent<NetworkObject>()); // ScaledRigidbodySync handles the ScaledRB for us
 
-        torpedo.Activate(target, activateDelay);
+        torpedo.Activate(target, activateDelay, parentRB, parentColliders);
         return torpedo;
     }
 }

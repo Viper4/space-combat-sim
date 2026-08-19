@@ -138,6 +138,24 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
+                    ""name"": ""GUILeft"",
+                    ""type"": ""Button"",
+                    ""id"": ""8db71f88-d0c3-4bb5-8e6d-78fd3d84326a"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""GUIRight"",
+                    ""type"": ""Button"",
+                    ""id"": ""a998d86e-f43d-4465-928f-7635fe275355"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
                     ""name"": ""RotStableToggle"",
                     ""type"": ""Button"",
                     ""id"": ""3082f3f8-4d41-4b7d-872c-9c8a329a3952"",
@@ -767,6 +785,28 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""EngineToggle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""1b41d7fe-a829-466e-85c5-1307de48bb76"",
+                    ""path"": ""<Keyboard>/1"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""GUILeft"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""7523f92d-d06f-4d13-be9a-475253ec0a62"",
+                    ""path"": ""<Keyboard>/2"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""GUIRight"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -1419,6 +1459,8 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         m_Player_Primary = m_Player.FindAction("Primary", throwIfNotFound: true);
         m_Player_Secondary = m_Player.FindAction("Secondary", throwIfNotFound: true);
         m_Player_GUIToggle = m_Player.FindAction("GUIToggle", throwIfNotFound: true);
+        m_Player_GUILeft = m_Player.FindAction("GUILeft", throwIfNotFound: true);
+        m_Player_GUIRight = m_Player.FindAction("GUIRight", throwIfNotFound: true);
         m_Player_RotStableToggle = m_Player.FindAction("RotStableToggle", throwIfNotFound: true);
         m_Player_TransStableToggle = m_Player.FindAction("TransStableToggle", throwIfNotFound: true);
         m_Player_RelativeVelocityToggle = m_Player.FindAction("RelativeVelocityToggle", throwIfNotFound: true);
@@ -1540,6 +1582,8 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Primary;
     private readonly InputAction m_Player_Secondary;
     private readonly InputAction m_Player_GUIToggle;
+    private readonly InputAction m_Player_GUILeft;
+    private readonly InputAction m_Player_GUIRight;
     private readonly InputAction m_Player_RotStableToggle;
     private readonly InputAction m_Player_TransStableToggle;
     private readonly InputAction m_Player_RelativeVelocityToggle;
@@ -1591,6 +1635,14 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/GUIToggle".
         /// </summary>
         public InputAction @GUIToggle => m_Wrapper.m_Player_GUIToggle;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/GUILeft".
+        /// </summary>
+        public InputAction @GUILeft => m_Wrapper.m_Player_GUILeft;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/GUIRight".
+        /// </summary>
+        public InputAction @GUIRight => m_Wrapper.m_Player_GUIRight;
         /// <summary>
         /// Provides access to the underlying input action "Player/RotStableToggle".
         /// </summary>
@@ -1712,6 +1764,12 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @GUIToggle.started += instance.OnGUIToggle;
             @GUIToggle.performed += instance.OnGUIToggle;
             @GUIToggle.canceled += instance.OnGUIToggle;
+            @GUILeft.started += instance.OnGUILeft;
+            @GUILeft.performed += instance.OnGUILeft;
+            @GUILeft.canceled += instance.OnGUILeft;
+            @GUIRight.started += instance.OnGUIRight;
+            @GUIRight.performed += instance.OnGUIRight;
+            @GUIRight.canceled += instance.OnGUIRight;
             @RotStableToggle.started += instance.OnRotStableToggle;
             @RotStableToggle.performed += instance.OnRotStableToggle;
             @RotStableToggle.canceled += instance.OnRotStableToggle;
@@ -1798,6 +1856,12 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @GUIToggle.started -= instance.OnGUIToggle;
             @GUIToggle.performed -= instance.OnGUIToggle;
             @GUIToggle.canceled -= instance.OnGUIToggle;
+            @GUILeft.started -= instance.OnGUILeft;
+            @GUILeft.performed -= instance.OnGUILeft;
+            @GUILeft.canceled -= instance.OnGUILeft;
+            @GUIRight.started -= instance.OnGUIRight;
+            @GUIRight.performed -= instance.OnGUIRight;
+            @GUIRight.canceled -= instance.OnGUIRight;
             @RotStableToggle.started -= instance.OnRotStableToggle;
             @RotStableToggle.performed -= instance.OnRotStableToggle;
             @RotStableToggle.canceled -= instance.OnRotStableToggle;
@@ -2226,6 +2290,20 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnGUIToggle(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "GUILeft" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnGUILeft(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "GUIRight" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnGUIRight(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "RotStableToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>

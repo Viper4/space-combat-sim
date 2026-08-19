@@ -121,20 +121,20 @@ MonoBehaviour:
     x: 695700000
     y: 695700000
     z: 695700000
+  useRealScaleForRadius: 1
+  worldSpaceOnlyRenderers: []
   minScreenPixelSize: 3
+  scaleFactor: 10000000
+  index: -1
   visible: 0
   trackedColliders: []
   trackedRenderers:
   - {fileID: 4653979682324458050}
   scaledSpaceLayer: 3
   inScaledSpace: 1
-  scaleFactor: 10000000
   worldSpaceThreshold: 4900
   scaledSpaceThreshold: 5100
   realRadius: 347850000
-  useRealScaleForRadius: 1
-  index: -1
-  worldSpaceOnlyRenderers: []
 --- !u!114 &8241638172933148449
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -388,7 +388,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584146134346056760
+  _initializedTimestamp: -8584144758221071864
 --- !u!114 &5037673740273060479
 MonoBehaviour:
   m_ObjectHideFlags: 0

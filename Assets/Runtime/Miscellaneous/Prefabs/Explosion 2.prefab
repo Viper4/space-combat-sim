@@ -4911,6 +4911,7 @@ GameObject:
   - component: {fileID: 5084391148424813216}
   - component: {fileID: -2010840397052492759}
   - component: {fileID: -455571254703172873}
+  - component: {fileID: 8817954803417944218}
   m_Layer: 2
   m_Name: Explosion 2
   m_TagString: IgnoreBullets
@@ -9974,7 +9975,11 @@ MonoBehaviour:
     x: 1
     y: 1
     z: 1
+  useRealScaleForRadius: 0
+  worldSpaceOnlyRenderers: []
   minScreenPixelSize: 3
+  scaleFactor: 1000
+  index: -1
   visible: 1
   trackedColliders: []
   trackedRenderers:
@@ -9984,13 +9989,9 @@ MonoBehaviour:
   - {fileID: 7666190120197192276}
   scaledSpaceLayer: 3
   inScaledSpace: 0
-  scaleFactor: 1000
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
   realRadius: 0
-  useRealScaleForRadius: 0
-  index: -1
-  worldSpaceOnlyRenderers: []
 --- !u!54 &-2010840397052492759
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -10053,6 +10054,18 @@ MonoBehaviour:
     y: 0
     z: 0
   collisionDetection: 0
+--- !u!114 &8817954803417944218
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3982350210874365306}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc901283cf9ad8e4da3f2affd3b8a693, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScaledAudio
 --- !u!1 &6714142039488636784
 GameObject:
   m_ObjectHideFlags: 0

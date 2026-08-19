@@ -1,34 +1,33 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using SpaceStuff;
 
 public class CameraSystem : MonoBehaviour
 {
+    [SerializeField] private TargetingSystem targetingSystem;
     [SerializeField] private Transform[] cameraPoints;
     [SerializeField] private float rotateSpeed = 10f;
+    [SerializeField] private Vector2 fovRange = new Vector2(60f, 15f);
     private Camera[] cameras;
 
     [SerializeField] private Transform buttonParent;
     [SerializeField] private GameObject cameraFeedPanel;
 
     [SerializeField] private GameObject buttonPrefab;
+    [SerializeField] private Button setTrackOnButton;
+    [SerializeField] private Button setTrackOffButton;
 
-    [SerializeField] private Button[] camRotationButtons;
     private int rotationAxisHeld = -1;
-    [SerializeField] private Button zoomInButton;
-    [SerializeField] private Button zoomOutButton;
-
+    private float zoom;
     private int selectedCamera;
+    private bool tracking = false;
 
     private void AddButtonListener(Button button, int index)
     {
         button.onClick.AddListener(() => SelectCamera(index));
     }
 
-    void Start()
+    private void Start()
     {
         cameras = new Camera[cameraPoints.Length];
         for (int i = 0; i < cameraPoints.Length; i++)
@@ -40,10 +39,17 @@ public class CameraSystem : MonoBehaviour
             cameraButton.transform.Find("Button Front").Find("Text").GetComponent<TextMeshProUGUI>().text = "CAM" + (i + 1);
             cameras[i].gameObject.SetActive(false);
         }
+        setTrackOnButton.onClick.AddListener(SetTrackOn);
+        setTrackOffButton.onClick.AddListener(SetTrackOff);
     }
 
-    void Update()
+    private void Update()
     {
+        if (tracking && targetingSystem.lockedTarget != null)
+        {
+            
+        }
+
         float pitchInput = 0;
         float yawInput = 0;
 
@@ -52,15 +58,12 @@ public class CameraSystem : MonoBehaviour
             case 0:
                 pitchInput = -1;
                 break;
-
             case 1:
                 pitchInput = 1;
                 break;
-
             case 2:
                 yawInput = -1;
                 break;
-
             case 3:
                 yawInput = 1;
                 break;
@@ -72,16 +75,22 @@ public class CameraSystem : MonoBehaviour
 
             cam.Rotate(Vector3.right, pitchInput * rotateSpeed * Time.deltaTime, Space.Self);
             cam.Rotate(Vector3.up, yawInput * rotateSpeed * Time.deltaTime, Space.Self);
-            cam.localRotation = Quaternion.Euler(Mathf.Clamp(cam.localEulerAngles.x, -90f, 90f), cam.localEulerAngles.y, cam.localEulerAngles.z);
+            cam.localRotation = Quaternion.Euler(Mathf.Clamp(cam.localEulerAngles.x, -89f, 89f), cam.localEulerAngles.y, cam.localEulerAngles.z);
         }
     }
 
     public void SelectCamera(int i)
     {
+        if (selectedCamera == i)
+        {
+            cameraFeedPanel.SetActive(false);
+            DisableCameras();
+            return;
+        }
         DisableCameras();
         selectedCamera = i;
-        buttonParent.parent.gameObject.SetActive(false);
         cameras[i].gameObject.SetActive(true);
+        cameras[i].fieldOfView = Mathf.Lerp(fovRange.x, fovRange.y, zoom);
         cameraFeedPanel.SetActive(true);
     }
 
@@ -102,5 +111,26 @@ public class CameraSystem : MonoBehaviour
     public void OnRotateButtonUp(int axis)
     {
         rotationAxisHeld = -1;
+    }
+
+    public void OnZoomChanged(float value)
+    {
+        zoom = value;
+        if (selectedCamera != -1)
+            cameras[selectedCamera].fieldOfView = Mathf.Lerp(fovRange.x, fovRange.y, zoom);
+    }
+
+    private void SetTrackOn()
+    {
+        tracking = true;
+        setTrackOnButton.gameObject.SetActive(false);
+        setTrackOffButton.gameObject.SetActive(true);
+    }
+
+    private void SetTrackOff()
+    {
+        tracking = false;
+        setTrackOnButton.gameObject.SetActive(true);
+        setTrackOffButton.gameObject.SetActive(false);
     }
 }

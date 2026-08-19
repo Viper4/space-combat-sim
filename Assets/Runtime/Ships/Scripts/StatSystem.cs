@@ -13,9 +13,8 @@ public class StatSystem : MonoBehaviour
 
     [SerializeField] private ParticleSystem damageParticles;
 
-    public UnityEvent onDamage;
-    public UnityEvent onHeal;
-    public UnityEvent<float> onDeath;
+    public UnityEvent<float> OnHealthChanged;
+    public UnityEvent<float> OnDeath;
 
     // Prevent lag from excessive event calls or excessive slider value changes, and allow for smooth animation
     private float lastDamageTime = 0;
@@ -35,7 +34,7 @@ public class StatSystem : MonoBehaviour
 
         if (health <= 0)
         {
-            onDeath?.Invoke(health);
+            OnDeath?.Invoke(health);
             health = 0;
             if (healthIndicator != null)
                 healthIndicator.UpdateUI(health, maxHealth);
@@ -51,7 +50,7 @@ public class StatSystem : MonoBehaviour
         }
         if (healthIndicator != null)
             healthIndicator.UpdateUI(health, maxHealth);
-        onDamage?.Invoke();
+        OnHealthChanged?.Invoke(-amount);
     }
 
     public void Heal(float amount)
@@ -59,7 +58,7 @@ public class StatSystem : MonoBehaviour
         health += amount;
         health = Mathf.Clamp(health, 0, maxHealth);
         healthIndicator.UpdateUI(health, maxHealth);
-        onHeal?.Invoke();
+        OnHealthChanged?.Invoke(amount);
     }
 
     public void DestroyTarget(GameObject GO)

@@ -100,9 +100,10 @@ public class ScaledCollider : MonoBehaviour
         if (scaledTransform == null)
             scaledTransform = scaledRigidbody.GetComponent<ScaledTransform>();
 
-        if (scaledTransform.inScaledSpace && scaledTransform.scaleFactor > 0.0)
+        double scaleFactor = scaledTransform.GetScaleFactor();
+        if (scaledTransform.inScaledSpace && scaleFactor > 0.0)
         {
-            return (float)(realRadius / scaledTransform.scaleFactor);
+            return (float)(realRadius / scaleFactor);
         }
         return (float)realRadius;
     }

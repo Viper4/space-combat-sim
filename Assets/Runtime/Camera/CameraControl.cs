@@ -11,7 +11,8 @@ using UnityEngine.InputSystem;
 public class CameraControl : MonoBehaviour
 {
     [SerializeField] private Transform lockedPoint;
-    [SerializeField] private Transform freePoint;
+    [SerializeField] private Transform[] freePoints;
+    private int currentFreePoint;
 
     // Tracked in the ship's local space so world velocity cannot cause drift.
     [SerializeField] private Transform shipTransform;
@@ -51,6 +52,7 @@ public class CameraControl : MonoBehaviour
     {
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+        currentFreePoint = freePoints.Length / 2;
 
         GameManager.Instance.AddRangedSettingListener("Field of View", OnFOVUpdated);
 
@@ -150,6 +152,16 @@ public class CameraControl : MonoBehaviour
             // settles at that position instead of reverting to center.
             mouseLookTiltOffset = Vector3.Lerp(mouseLookTiltOffset, targetTilt, mouseLookFollowSpeed * Time.deltaTime);
             mouseLookPosOffset  = Vector3.Lerp(mouseLookPosOffset,  targetPos,  mouseLookFollowSpeed * Time.deltaTime);
+
+            if (GameManager.Instance.inputActions.Player.GUILeft.WasPressedThisFrame())
+            {
+                currentFreePoint = Mathf.Max(currentFreePoint-1, 0);
+            }
+
+            if (GameManager.Instance.inputActions.Player.GUIRight.WasPressedThisFrame())
+            {
+                currentFreePoint = Mathf.Min(currentFreePoint+1, freePoints.Length-1);
+            }
         }
         else
         {
@@ -165,7 +177,7 @@ public class CameraControl : MonoBehaviour
         Vector3    targetWorldPos;
         Quaternion targetWorldRot;
         if (guiMode)
-            freePoint.GetPositionAndRotation(out targetWorldPos, out targetWorldRot);
+            freePoints[currentFreePoint].GetPositionAndRotation(out targetWorldPos, out targetWorldRot);
         else
             lockedPoint.GetPositionAndRotation(out targetWorldPos, out targetWorldRot);
 

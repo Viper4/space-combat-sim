@@ -11,14 +11,14 @@ using FishNet.Connection;
 public class Turret : NetworkBehaviour
 {
     [Header("Parts")]
-    public bool active = true;
     public StatSystem statSystem;
-    [SerializeField] private TurretSystem turretSystem;
+    public TurretSystem turretSystem;
     [SerializeField] private Ship ship;
     [SerializeField] private Transform origin;
     public Transform platform;
     public Transform barrel;
     public Transform firePoint;
+    private bool active = true;
 
     [Header("Limits")]
     [SerializeField] protected LayerMask ignoreLayers;
@@ -31,14 +31,19 @@ public class Turret : NetworkBehaviour
     [Header("Shooting")]
     [SerializeField] private int maxAmmo;
     private int ammo;
-    [SerializeField] private SliderIndicator ammoIndicator;
+    private int lastAmmo; // ammo during the last sync
     [SerializeField] private float maxShootDelta = 0.05f;
-    [SerializeField, Tooltip("One bullet per fireRate seconds.")] private float fireRate = 0.15f;
-    private float nextFireTime = 0f;
+    [Tooltip("One bullet per fireRate seconds.")]
+    [SerializeField] private float fireRate = 0.15f;
+    private float fireTimer;
+    [Tooltip("How often to sync ammo count with owner in Hz.")]
+    [SerializeField] private float ammoSyncRate = 2f;
+    private float invSyncRate;
+    private float syncTimer;
     [SerializeField] protected GameObject projectilePrefab;
     [SerializeField] private GameObject shootParticles;
     [SerializeField] protected float projectileSpeed = 50;
-    [SerializeField, Tooltip("0 for no tracer. Otherwise 1 tracer every tracerInterval shots.")] protected int tracerInterval = 3;
+    [SerializeField, Tooltip("-1 for no tracer. Otherwise, one tracer every tracerInterval shots.")] protected int tracerInterval = 3;
     protected int tracerCounter = 0;
 
     [SerializeField] private Transform casingPoint;
@@ -51,6 +56,7 @@ public class Turret : NetworkBehaviour
     private RadarTarget bestOffTarget = null;
     private RadarTarget bestDefTarget = null;
     public RadarTarget currentTarget;
+    public int turnIndex;
 
     [Header("Targeting")]
     [SerializeField, Range(0, 1), Tooltip("0=only use velocity to estimate target arrival time, 1=acceleration dominant estimate of arrival time")] private float accelerationHeuristic = 0.5f;
@@ -59,14 +65,13 @@ public class Turret : NetworkBehaviour
     public float explosionRadius = 20f;
 
     [HideInInspector] public Vector3 aimDirection;
-    public bool shoot {get; private set;} = false;
+    public bool WantsToShoot {get; private set;} = false;
     [SerializeField] protected bool showLines;
     private bool obstructed = false;
 
     public GameObject UIModel;
 
     [Header("Destruction")]
-    public bool destroyed = false;
     [SerializeField, Tooltip("Percent of health lost before enabling damaged particles.")] private float damagedThreshold = 0.5f;
     [SerializeField] private ParticleSystem damagedParticles;
     [SerializeField] private GameObject aliveGameObject;
@@ -81,6 +86,11 @@ public class Turret : NetworkBehaviour
 
     private bool IsOwnerOrOffline => IsOwner || IsOffline;
 
+    public Action<int> OnAmmoChanged;
+    public Action OnActiveChanged;
+    public Action OnTargetChanged;
+    public Action OnWantsToShootChanged;
+
     private void Start()
     {
         statSystem = GetComponent<StatSystem>();
@@ -90,6 +100,7 @@ public class Turret : NetworkBehaviour
             turretSystem.CheckTarget += CheckTarget;
         }
         SetCurrentAmmo(maxAmmo);
+        invSyncRate = 1f / ammoSyncRate;
     }
 
     private void OnDestroy()
@@ -135,8 +146,21 @@ public class Turret : NetworkBehaviour
 
     private void FixedUpdate()
     {
+        fireTimer += Time.deltaTime;
         if (IsServerInitialized && !IsOwner)
-            CheckFire(); // Owner controls rotation of turret
+        {
+            TryFire(); // Owner controls rotation of turret
+            if (syncTimer > invSyncRate)
+            {
+                syncTimer = 0f;
+                if (lastAmmo != ammo)
+                {
+                    SetOwnerAmmoCountTargetRpc(Owner, ammo);
+                    lastAmmo = ammo;
+                }
+            }
+            syncTimer += Time.fixedDeltaTime;
+        }
 
         if (!active || !ship.isStarted || !IsOwnerOrOffline)
             return;
@@ -146,6 +170,7 @@ public class Turret : NetworkBehaviour
             if (!currentTarget.passivelyDetected && !currentTarget.activelyDetected)
             {
                 currentTarget = null;
+                OnTargetChanged?.Invoke();
                 return;
             }
 
@@ -174,8 +199,8 @@ public class Turret : NetworkBehaviour
             var prediction = new KeyValuePair<float, Vector3d>(Time.time + (float)bulletTime, simulatedPos);
             predictions.Enqueue(prediction);
 
-            if (!shoot && !turretSystem.manualControl && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
-                shoot = true;
+            if (!WantsToShoot && !turretSystem.manualControl && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
+                SetShootDesire(true);
         }
 
         bool hasAimDirection = aimDirection.sqrMagnitude > 0.0001f;
@@ -199,28 +224,26 @@ public class Turret : NetworkBehaviour
 
         if (overrideShoot)
         {
-            SetShoot(true);
+            SetShootDesire(true);
         }
         else if (!turretSystem.manualControl)
         {
             if (currentTarget != null && hasAimDirection && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
             {
-                SetShoot(true);
+                SetShootDesire(true);
             }
             else
             {
-                SetShoot(false);
+                SetShootDesire(false);
             }
         }
 
-        CheckFire();
+        TryFire();
     }
 
-    private void CheckFire()
+    private void TryFire()
     {
-        if (Time.fixedTime < nextFireTime)
-            return;
-        if (!obstructed && shoot && ammo > 0)
+        if (WantsToShoot && CanShoot() && turretSystem.RequestToShoot(turnIndex))
         {
             if (IsOffline)
             {
@@ -236,8 +259,13 @@ public class Turret : NetworkBehaviour
                 // Fire visual bullet immediately to avoid perceived lag for owner client
                 FireVisualBullet();
             }
+            fireTimer = 0f;
         }
-        nextFireTime += fireRate;
+    }
+
+    public bool CanShoot()
+    {
+        return active && !obstructed && ammo > 0 && fireTimer > fireRate;
     }
 
     private void ResetTargetSearch()
@@ -250,7 +278,7 @@ public class Turret : NetworkBehaviour
 
     private void CheckTarget(RadarTarget target, bool inKillRadius)
     {
-        if (!IsOwnerOrOffline)
+        if (!IsOwnerOrOffline || turretSystem.manualControl)
             return;
         if (!target.passivelyDetected && !target.activelyDetected)
             return;
@@ -321,14 +349,15 @@ public class Turret : NetworkBehaviour
                 currentTarget.turretsTargeting++;
                 HUDSystem.Instance.SetTurretsTargeting(currentTarget.GetID(), currentTarget.turretsTargeting);
             }
+            OnTargetChanged?.Invoke();
         }
     }
 
     [ServerRpc]
     private void SetShootServerRpc(bool shoot)
     {
-        this.shoot = shoot;
-        if (shoot)
+        WantsToShoot = shoot;
+        if (WantsToShoot)
         {
             // Need to update obstructed bool on server
             GetRaycastHit(out _);
@@ -339,21 +368,21 @@ public class Turret : NetworkBehaviour
     private void SetOwnerAmmoCountTargetRpc(NetworkConnection conn, int ammo)
     {
         this.ammo = ammo;
-        if (ammoIndicator != null)
-            ammoIndicator.UpdateUI(ammo, maxAmmo);
+        OnAmmoChanged?.Invoke(ammo);
     }
 
-    public void SetShoot(bool shoot)
+    public void SetShootDesire(bool shoot)
     {
         if (!IsOwnerOrOffline)
             return;
-        if (this.shoot == shoot)
+        if (WantsToShoot == shoot)
             return;
-        this.shoot = shoot;
-        if (shoot)
+        WantsToShoot = shoot;
+        if (WantsToShoot)
             GetRaycastHit(out _); // Update obstructed
         if (IsOwner)
             SetShootServerRpc(shoot);
+        OnWantsToShootChanged?.Invoke();
     }
 
     /// <summary>
@@ -382,15 +411,15 @@ public class Turret : NetworkBehaviour
         
         if (projectileRB.TryGetComponent<TrailRenderer>(out var trailRenderer))
         {
-            if (tracerCounter >= tracerInterval)
-            {
-                trailRenderer.enabled = true;
-                tracerCounter = 0;
-            }
-            else
+            if (tracerInterval == -1 || tracerCounter < tracerInterval)
             {
                 trailRenderer.enabled = false;
                 tracerCounter++;
+            }
+            else
+            {
+                trailRenderer.enabled = true;
+                tracerCounter = 0;
             }
         }
     }
@@ -447,8 +476,7 @@ public class Turret : NetworkBehaviour
 
         if (IsOwnerOrOffline)
         {
-            if (ammoIndicator != null)
-                ammoIndicator.UpdateUI(ammo, maxAmmo);
+            OnAmmoChanged?.Invoke(ammo);
         }
         else if (IsServerInitialized)
         {
@@ -482,7 +510,6 @@ public class Turret : NetworkBehaviour
     {
         aliveGameObject.SetActive(false);
         destroyedGameObject.SetActive(true);
-        destroyed = true;
     }
 
     public void Repair(float healAmount)
@@ -491,17 +518,11 @@ public class Turret : NetworkBehaviour
         aliveGameObject.SetActive(true);
         destroyedGameObject.SetActive(false);
         TryPlayDamagedParticles();
-        destroyed = false;
     }
 
     public void AddIgnoredCollider(Collider collider)
     {
         ignoreColliders.Add(collider);
-    }
-
-    public void SetFireOffset(int index, int turretCount)
-    {
-        nextFireTime = Time.fixedTime + index * fireRate / turretCount;
     }
 
     public int GetCurrentAmmo()
@@ -517,5 +538,21 @@ public class Turret : NetworkBehaviour
     public int GetMaxAmmo()
     {
         return maxAmmo;
+    }
+
+    public void SetActive(bool active)
+    {
+        this.active = active;
+        OnActiveChanged?.Invoke();
+    }
+
+    public bool GetActive()
+    {
+        return active;
+    }
+
+    public void SetActiveSilent(bool active)
+    {
+        this.active = active;
     }
 }

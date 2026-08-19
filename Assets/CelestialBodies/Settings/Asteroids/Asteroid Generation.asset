@@ -1,27 +1,3 @@
-%YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8f95416c3bab0074b8d81d969793f7ec, type: 3}
-  m_Name: Asteroid Generation
-  m_EditorClassIdentifier: 
-  simple: 0
-  autoGenerate: 1
-  randomShapeGeneration: 0
-  sphere: 0
-  initialAngularVelocityRange:
-  - {x: -0.1, y: -0.1, z: -0.1}
-  - {x: 0.1, y: 0.1, z: 0.1}
-  bodyType: 0
-  scaleRange:
-  - {x: 2.5, y: 2.5, z: 2.5}
-  - {x: 150, y: 150, z: 150}
-  densityRange: {x: 2000, y: 2500}
-  starDistributions: []
+version https://git-lfs.github.com/spec/v1
+oid sha256:0f57ade6f9eb7270c1c4b87d9764624fdf33ee52ae85b47b50ea4e60f4e76e87
+size 687

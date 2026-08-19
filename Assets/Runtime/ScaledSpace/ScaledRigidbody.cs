@@ -478,6 +478,22 @@ public class ScaledRigidbody : MonoBehaviour
         collidersEnabled = value;
     }
 
+    private void OnCollisionStay(Collision collision)
+    {
+        if (_isKinematic || !_active)
+            return;
+
+        // Need to handle collisions between unity colliders and scaled rigidbodies
+        ContactPoint contact = collision.GetContact(0);
+        Vector3d realContactPoint = scaledTransform.TransformRenderPoint(contact.point);
+
+        if (contact.separation < 0)
+        {
+            Vector3d correctionDirection = scaledTransform.realPosition - realContactPoint;
+            scaledTransform.realPosition += correctionDirection.normalized * (contact.separation * 2.0f);
+        }
+    }
+
     private void OnCollisionEnter(Collision collision)
     {
         if (_isKinematic || !_active)

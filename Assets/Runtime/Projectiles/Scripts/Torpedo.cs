@@ -8,44 +8,39 @@ using FishNet.Object;
 [RequireComponent(typeof(ScaledRigidbody), typeof(RadarTarget))]
 public class Torpedo : NetworkBehaviour
 {
-    private ScaledRigidbody scaledRigidbody;
-    private RadarTarget thisRadarTarget;
-
     [Header("Torpedo")]
     [SerializeField] private bool active;
-    private bool canThrust;
     [SerializeField] private float targetEmissionRadius = 2000;
     [SerializeField] private float idleEmissionRadius = 250;
     [SerializeField] private CapsuleCollider _collider;
     [SerializeField] private ScaledCollider detonateTrigger;
     [SerializeField] private float engineForce = 10000f;
     [SerializeField] private float thrusterForce = 100f;
-
     [SerializeField] private float proportionalGain = 16.0f;
     [SerializeField] private float integralGain = 0.0f;
     [SerializeField] private float derivativeGain = 4.0f;
-    private PIDController xPID;
-    private PIDController yPID;
-    private PIDController zPID;
-
     [SerializeField] private GameObject rocketTrail;
-
     [SerializeField, Tooltip("Collisions with a relative speed above this will detonate the torpedo.")] private float collideSpeedThreshold = 100f;
+    [SerializeField, Tooltip("Triggers with a relative speed above this will detonate the torpedo.")] private float triggerSpeedThreshold = 100f;
     [SerializeField] private GameObject explosionPrefab;
     [SerializeField] private float explosionRadius = 15f;
     [SerializeField] private float explosionForce = 100f;
     [SerializeField] private float minDamage = 25f;
     [SerializeField] private float maxDamage = 75f;
-    
     [SerializeField] private LayerMask ignoreLayers;
     [SerializeField] private RadarTarget target;
     [SerializeField] private float navigationConstant = 4f;
     [SerializeField] private float thrusterTorque;
-    private float engineAcceleration;
 
+    private ScaledRigidbody scaledRigidbody;
+    private RadarTarget thisRadarTarget;
+    private float engineAcceleration;
+    private PIDController xPID;
+    private PIDController yPID;
+    private PIDController zPID;
+    private bool canThrust;
     // Need to use this to prevent stack overflows
     private bool detonating = false;
-
     private bool IsServerOrOffline => IsServerInitialized || IsOffline;
 
     private void Awake()
@@ -203,21 +198,27 @@ public class Torpedo : NetworkBehaviour
         }
     }
 
-    public void Activate(RadarTarget target, float delay)
+    public void Activate(RadarTarget target, float delay, ScaledRigidbody parentRB, Collider[] parentColliders)
     {
         if (!IsServerOrOffline)
             return;
         this.target = target;
-        StartCoroutine(ActivateRoutine(delay));
+        StartCoroutine(ActivateRoutine(delay, parentRB, parentColliders));
     }
 
-    private IEnumerator ActivateRoutine(float delay)
+    private IEnumerator ActivateRoutine(float delay, ScaledRigidbody parentRB, Collider[] parentColliders)
     {
+        foreach (Collider parentCollider in parentColliders)
+            Physics.IgnoreCollision(parentCollider, _collider, true);
+        if (parentRB != null)
+            parentRB.IgnoreScaledRigidbody(scaledRigidbody, true);
         active = true;
         yield return new WaitForSeconds(delay);
+        foreach (Collider parentCollider in parentColliders)
+            Physics.IgnoreCollision(parentCollider, _collider, false);
+        if (parentRB != null)
+            parentRB.IgnoreScaledRigidbody(scaledRigidbody, false);
         canThrust = true;
-        // _collider.enabled = true;
-        // scaledRigidbody.EnableScaledColliders(true);
         if (target == null)
         {
             thisRadarTarget.SetEmissionTriggerRadius(idleEmissionRadius);
@@ -265,18 +266,15 @@ public class Torpedo : NetworkBehaviour
 
     private void InstantiateExplosion(Vector3d position, Vector3d hitVelocity, double hitMass)
     {
-        if (scaledRigidbody.scaledTransform.visible)
+        ScaledTransform explosion = Instantiate(explosionPrefab, transform.position, transform.rotation).GetComponent<ScaledTransform>();
+        if (explosion.TryGetComponent<ScaledRigidbody>(out var explosionRB))
         {
-            ScaledTransform explosion = Instantiate(explosionPrefab, transform.position, transform.rotation).GetComponent<ScaledTransform>();
-            if (explosion.TryGetComponent<ScaledRigidbody>(out var explosionRB))
-            {
-                explosionRB.velocity = Vector3d.Lerp(hitVelocity, scaledRigidbody.velocity, scaledRigidbody.mass / (scaledRigidbody.mass + hitMass));
-            }
-            explosion.realPosition = position;
-            if (scaledRigidbody.scaledTransform.inScaledSpace && explosion.TryGetComponent<AudioSource>(out var explosionAudio))
-            {
-                explosionAudio.enabled = false;
-            }
+            explosionRB.velocity = Vector3d.Lerp(hitVelocity, scaledRigidbody.velocity, scaledRigidbody.mass / (scaledRigidbody.mass + hitMass));
+        }
+        explosion.realPosition = position;
+        if (scaledRigidbody.scaledTransform.inScaledSpace && explosion.TryGetComponent<AudioSource>(out var explosionAudio))
+        {
+            explosionAudio.enabled = false;
         }
     }
 
@@ -475,15 +473,17 @@ public class Torpedo : NetworkBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (target == null)
-            return;
-        if (scaledRigidbody.scaledTransform.inScaledSpace || other.isTrigger)
+        if (target == null || scaledRigidbody.scaledTransform.inScaledSpace || other.isTrigger)
             return;
 
-        if (other.transform == target.transform || (other.transform.TryGetComponent<RadarTarget>(out var otherTarget) && otherTarget.GetID() == target.GetID()))
+        if (other.attachedRigidbody == target.scaledRigidbody.attachedRigidbody || (other.attachedRigidbody.TryGetComponent<RadarTarget>(out var otherTarget) && otherTarget.GetID() == target.GetID()))
         {
+            ScaledRigidbody otherDoubleRB = other.attachedRigidbody.GetComponent<ScaledRigidbody>();
+            Vector3d velocityB = otherDoubleRB == null ? other.attachedRigidbody.linearVelocity.ToVector3d() : otherDoubleRB.velocity;
+            if ((velocityB - scaledRigidbody.velocity).sqrMagnitude <= triggerSpeedThreshold * triggerSpeedThreshold)
+                return;
             Debug.Log(GameLog.ObjectLog(this, $"Unity trigger detonate with {other.name}."));
-            Detonate(other.GetComponent<ScaledRigidbody>());
+            Detonate(otherDoubleRB);
         }
     }
 }

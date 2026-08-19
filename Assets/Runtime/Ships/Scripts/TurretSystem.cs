@@ -43,10 +43,14 @@ public class TurretSystem : MonoBehaviour
 
     public Action StartTargetSearch;
     public Action<RadarTarget, bool> CheckTarget;
+    public Action OnManualControlChanged;
 
     private bool triggerHeld;
 
     public bool initialized {get; private set;}
+    private int shootTurn = 0; // index of the turret whose turn it is to shoot next
+    [SerializeField] private float staggerTime = 0.05f;
+    private float lastShotTime = 0f;
 
     private IEnumerator Start()
     {
@@ -80,7 +84,7 @@ public class TurretSystem : MonoBehaviour
         for (int i = 0; i < turretPoints.Length; i++)
         {
             turrets[i] = turretPoints[i].GetChild(0).GetComponent<Turret>();
-            turrets[i].SetFireOffset(i, turrets.Length);
+            turrets[i].turnIndex = i;
             for(int j = 0; j < shipColliders.Length; j++)
             {
                 turrets[i].AddIgnoredCollider(shipColliders[j]);
@@ -167,7 +171,7 @@ public class TurretSystem : MonoBehaviour
             return;
         for (int i = 0; i < turrets.Length; i++)
         {
-            turrets[i].SetShoot(triggerHeld);
+            turrets[i].SetShootDesire(triggerHeld);
         }
     }
 
@@ -180,14 +184,14 @@ public class TurretSystem : MonoBehaviour
             return;
         for (int i = 0; i < turrets.Length; i++)
         {
-            turrets[i].SetShoot(triggerHeld);
+            turrets[i].SetShootDesire(triggerHeld);
         }
     }
 
     private void UpdateTurretOnHUD(int i)
     {
         Turret turret = turrets[i];
-        if (!turret.active)
+        if (!turret.GetActive())
         {
             if (turretCrosshairImages[i].gameObject.activeSelf)
                 turretCrosshairImages[i].gameObject.SetActive(false);
@@ -205,7 +209,7 @@ public class TurretSystem : MonoBehaviour
                 turretCrosshairImages[i].color = turretHoverColor;
                 screenHit = Camera.main.WorldToScreenPoint(turretHit.point);
                 
-                if (turret.shoot)
+                if (turret.WantsToShoot)
                     turretCrosshairImages[i].color = crosshairTriggerColor;
             }
             else
@@ -225,7 +229,7 @@ public class TurretSystem : MonoBehaviour
                 turretCrosshairImages[i].color = Color.clear;
                 return;
             }
-            if (turret.shoot)
+            if (turret.WantsToShoot)
                 turretCrosshairImages[i].color = crosshairTriggerColor;
         }
         
@@ -258,16 +262,17 @@ public class TurretSystem : MonoBehaviour
             for(int i = 0; i < turrets.Length; i++)
             {
                 turrets[i].currentTarget = null;
-                turrets[i].SetShoot(false);
+                turrets[i].SetShootDesire(false);
             }
         }
         else
         {
             for(int i = 0; i < turrets.Length; i++)
             {
-                turrets[i].SetShoot(triggerHeld);
+                turrets[i].SetShootDesire(triggerHeld);
             }
         }
+        OnManualControlChanged?.Invoke();
     }
 
     private void UpdateTotalAmmoIndicator()
@@ -281,5 +286,20 @@ public class TurretSystem : MonoBehaviour
         }
 
         ammoIndicator.UpdateUI(totalAmmo, totalMaxAmmo);
+    }
+
+    public bool RequestToShoot(int index)
+    {
+        if (Time.time - lastShotTime < staggerTime)
+            return false;
+        if (shootTurn != index && turrets[shootTurn].WantsToShoot && turrets[shootTurn].CanShoot())
+            return false;
+
+        shootTurn++;
+        if (shootTurn >= turrets.Length)
+            shootTurn = 0;
+
+        lastShotTime = Time.time;
+        return true;
     }
 }

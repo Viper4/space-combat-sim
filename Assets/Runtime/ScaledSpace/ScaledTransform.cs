@@ -45,27 +45,25 @@ public class ScaledTransform : MonoBehaviour
             _realScale = value;
         }
     }
+    [SerializeField] private bool useRealScaleForRadius = false;
+    [SerializeField] private Renderer[] worldSpaceOnlyRenderers;
     [SerializeField, Tooltip("Tracked colliders/renderers are disabled at screen sizes below this")] private float minScreenPixelSize = 3f;
-    
+    [SerializeField] private double scaleFactor = 1.0;
+
+    [HideInInspector] public int index = -1;
     [HideInInspector] public bool visible = true;
     [HideInInspector] public Collider[] trackedColliders;
     [HideInInspector] public Renderer[] trackedRenderers;
     private int[] originalColliderLayers;
     private int[] originalRendererLayers;
+
     public int scaledSpaceLayer = 3;
-
     public bool inScaledSpace = false;
-    public double scaleFactor = -1.0;
-
     public float worldSpaceThreshold = 3900;
     public float scaledSpaceThreshold = 4100;
-
     public double realRadius = -1.0;
-    [SerializeField] private bool useRealScaleForRadius = false;
 
-    [HideInInspector] public int index = -1;
-
-    [SerializeField] private Renderer[] worldSpaceOnlyRenderers;
+    public Action<double> OnChangeScaleFactor;
 
     private void Awake()
     {
@@ -443,5 +441,16 @@ public class ScaledTransform : MonoBehaviour
         if (inScaledSpace)
             offset /= scaleFactor;
         return transform.position + offset.ToVector3();
+    }
+
+    public double GetScaleFactor()
+    {
+        return scaleFactor;
+    }
+
+    public void SetScaleFactor(double scaleFactor)
+    {
+        this.scaleFactor = scaleFactor;
+        OnChangeScaleFactor?.Invoke(scaleFactor);
     }
 }
