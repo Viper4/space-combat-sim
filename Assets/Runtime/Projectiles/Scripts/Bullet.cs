@@ -51,7 +51,6 @@ public class Bullet : MonoBehaviour
                 }
                 break;
         }
-
         Destroy(gameObject);
     }
 
@@ -77,7 +76,6 @@ public class Bullet : MonoBehaviour
                 }
                 break;
         }
-
         Destroy(gameObject);
     }
 }

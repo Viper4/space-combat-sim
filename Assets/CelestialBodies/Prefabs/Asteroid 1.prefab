@@ -61,19 +61,19 @@ MonoBehaviour:
     x: 1
     y: 1
     z: 1
+  useRealScaleForRadius: 0
+  worldSpaceOnlyRenderers: []
   minScreenPixelSize: 3
+  scaleFactor: 1000
+  index: -1
   visible: 1
   trackedColliders: []
   trackedRenderers: []
   scaledSpaceLayer: 3
   inScaledSpace: 0
-  scaleFactor: 1000
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
   realRadius: 0.5
-  useRealScaleForRadius: 0
-  index: -1
-  worldSpaceOnlyRenderers: []
 --- !u!114 &654691890924152879
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -300,7 +300,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584145743242545083
+  _initializedTimestamp: -8584126245814883076
 --- !u!114 &8419449798854834267
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -330,10 +330,16 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 1847065452805617377}
   keepActiveWhenOffline: 1
   clientAuthoritative: 0
-  sendRate: 10
+  sendRate: 5
   interpolateTransform: 1
   interpolateRigidbody: 0
-  interpolationSpeed: 1
+  interpolationSpeed: 1.5
+  positionChangeThreshold: 0.01
+  rotationChangeThreshold: 0.99
+  velocityChangeThreshold: 0.01
+  snapPositionThreshold: 50
+  snapRotationThreshold: 0.5
   maxAccelerationPositive: {x: 10, y: 10, z: 100}
   maxAccelerationNegative: {x: 10, y: 10, z: 10}
   leniency: 1.5
+  logRejectedUpdates: 0

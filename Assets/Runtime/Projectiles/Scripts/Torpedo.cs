@@ -66,7 +66,6 @@ public class Torpedo : NetworkBehaviour
         scaledRigidbody.OnScaledTriggerEnter -= OnScaledTrigger;
     }
 
-
     public override void OnStartServer()
     {
         base.OnStartServer();

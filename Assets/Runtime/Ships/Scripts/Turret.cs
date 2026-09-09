@@ -6,6 +6,7 @@ using System;
 using Random = UnityEngine.Random;
 using FishNet.Object;
 using FishNet.Connection;
+using FishNet.Transporting;
 
 [RequireComponent(typeof(StatSystem))]
 public class Turret : NetworkBehaviour
@@ -27,6 +28,16 @@ public class Turret : NetworkBehaviour
     [SerializeField] private Vector3 minAngles;
     [SerializeField] private Vector3 maxAngles;
     [SerializeField] private float rotateSpeed = 180f;
+
+    [Header("Rotation sync")]
+    [Tooltip("How many times per second the owner sends its target yaw/pitch to everyone else.")]
+    [SerializeField] private float rotationSyncRate = 10f;
+    [Tooltip("If a non-owner's currentYaw/Pitch differs from a newly received target by more than this many degrees, snap straight to it instead of turning at rotateSpeed.")]
+    [SerializeField] private float snapAngleThreshold = 45f;
+    private float rotationSyncTimer;
+    private float targetYawSynced;
+    private float targetPitchSynced;
+    private bool hasSyncedTarget;
 
     [Header("Shooting")]
     [SerializeField] private int maxAmmo;
@@ -85,6 +96,7 @@ public class Turret : NetworkBehaviour
     [SerializeField] private bool overrideShoot = false;
 
     private bool IsOwnerOrOffline => IsOwner || IsOffline;
+    private bool _hadTarget;
 
     public Action<int> OnAmmoChanged;
     public Action OnActiveChanged;
@@ -163,13 +175,18 @@ public class Turret : NetworkBehaviour
         }
 
         if (!active || !ship.isStarted || !IsOwnerOrOffline)
+        {
+            // Non-owner, non-offline: just turn toward whatever target angles we last received.
+            UpdateNonOwnerRotation();
             return;
+        }
 
         if (currentTarget != null)
         {
             if (!currentTarget.passivelyDetected && !currentTarget.activelyDetected)
             {
                 currentTarget = null;
+                _hadTarget = false;
                 OnTargetChanged?.Invoke();
                 return;
             }
@@ -202,6 +219,11 @@ public class Turret : NetworkBehaviour
             if (!WantsToShoot && !turretSystem.manualControl && (aimDirection - firePoint.forward).sqrMagnitude < maxShootDelta * maxShootDelta)
                 SetShootDesire(true);
         }
+        else if (_hadTarget) // This happens when the target is destroyed while the turret is still targeting it
+        {
+            OnTargetChanged?.Invoke();
+            _hadTarget = false;
+        }
 
         bool hasAimDirection = aimDirection.sqrMagnitude > 0.0001f;
         if (hasAimDirection)
@@ -220,6 +242,8 @@ public class Turret : NetworkBehaviour
 
             platform.localRotation = Quaternion.Euler(0f, currentYaw, 0f);
             barrel.localRotation = Quaternion.Euler(currentPitch, 0f, 0f);
+
+            TrySendRotation(targetYaw, targetPitch);
         }
 
         if (overrideShoot)
@@ -239,6 +263,68 @@ public class Turret : NetworkBehaviour
         }
 
         TryFire();
+    }
+
+    /// <summary>Non-owner clients (and the server, when it's not the owner) don't run the
+    /// targeting math above, so they just keep turning toward the last target angles the
+    /// owner sent - identical MoveTowardsAngle logic, driven by synced targets instead of
+    /// locally-computed ones.</summary>
+    private void UpdateNonOwnerRotation()
+    {
+        if (!hasSyncedTarget)
+            return;
+
+        currentYaw = Mathf.MoveTowardsAngle(currentYaw, targetYawSynced, rotateSpeed * Time.fixedDeltaTime);
+        currentPitch = Mathf.MoveTowardsAngle(currentPitch, targetPitchSynced, rotateSpeed * Time.fixedDeltaTime);
+
+        platform.localRotation = Quaternion.Euler(0f, currentYaw, 0f);
+        barrel.localRotation = Quaternion.Euler(currentPitch, 0f, 0f);
+    }
+
+    /// <summary>Rate-limited send of the owner's target angles. Sending the two target angles
+    /// (what MoveTowardsAngle is turning toward) instead of the turret's current rotation
+    /// keeps this tiny (2 floats vs a Quaternion) and lets everyone else reproduce the same
+    /// smooth turn locally with the same MoveTowardsAngle call, rather than needing to
+    /// interpolate received rotations.</summary>
+    private void TrySendRotation(float targetYaw, float targetPitch)
+    {
+        rotationSyncTimer += Time.fixedDeltaTime;
+        if (rotationSyncTimer < 1f / rotationSyncRate)
+            return;
+        rotationSyncTimer = 0f;
+
+        if (IsServerInitialized)
+            ObserversReceiveRotationRpc(targetYaw, targetPitch);
+        else
+            ServerReceiveRotationRpc(targetYaw, targetPitch);
+    }
+
+    [ServerRpc]
+    private void ServerReceiveRotationRpc(float targetYaw, float targetPitch, Channel channel = Channel.Unreliable)
+    {
+        ObserversReceiveRotationRpc(targetYaw, targetPitch);
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void ObserversReceiveRotationRpc(float targetYaw, float targetPitch, Channel channel = Channel.Unreliable)
+    {
+        if (IsOwnerOrOffline)
+            return;
+
+        // Large gap (turret just spawned, or a big desync) - snap instead of slowly turning into place.
+        if (!hasSyncedTarget
+            || Mathf.Abs(Mathf.DeltaAngle(currentYaw, targetYaw)) > snapAngleThreshold
+            || Mathf.Abs(Mathf.DeltaAngle(currentPitch, targetPitch)) > snapAngleThreshold)
+        {
+            currentYaw = targetYaw;
+            currentPitch = targetPitch;
+            platform.localRotation = Quaternion.Euler(0f, currentYaw, 0f);
+            barrel.localRotation = Quaternion.Euler(currentPitch, 0f, 0f);
+        }
+
+        targetYawSynced = targetYaw;
+        targetPitchSynced = targetPitch;
+        hasSyncedTarget = true;
     }
 
     private void TryFire()
@@ -326,14 +412,17 @@ public class Turret : NetworkBehaviour
         if (bestDefTarget != null)
         {
             currentTarget = bestDefTarget;
+            _hadTarget = true;
         }
         else if (bestOffTarget != null)
         {
             currentTarget = bestOffTarget;
+            _hadTarget = true;
         }
         else
         {
             currentTarget = null;
+            _hadTarget = false;
         }
 
         if (prevTarget != currentTarget)
@@ -422,6 +511,20 @@ public class Turret : NetworkBehaviour
                 tracerCounter = 0;
             }
         }
+
+        if (ship.scaledRigidbody.scaledTransform.visible && shootParticles != null)
+        {
+            Instantiate(shootParticles, firePoint.position, firePoint.rotation, transform).GetComponent<ScaledRigidbody>();
+        }
+
+        if (casingPoint != null && casingPrefab != null)
+        {
+            Vector3d realCasingPoint = ship.scaledRigidbody.scaledTransform.TransformRenderPoint(casingPoint.position);
+            ScaledRigidbody casingRigidbody = Instantiate(casingPrefab, casingPoint.position, casingPoint.rotation).GetComponent<ScaledRigidbody>();
+            casingRigidbody.scaledTransform.realPosition = realCasingPoint;
+            casingRigidbody.angularVelocity = Random.insideUnitSphere * casingRandomness;
+            casingRigidbody.velocity = ship.scaledRigidbody.velocity + ((casingPoint.up + Random.insideUnitSphere * casingRandomness) * casingSpeed).ToVector3d();
+        }
     }
 
     private void FireRealBullet()
@@ -485,9 +588,10 @@ public class Turret : NetworkBehaviour
         }
     }
 
-    [ObserversRpc(ExcludeServer = true)]
-    private void FireVisualBulletObserversRpc()
+    [ObserversRpc(ExcludeServer = true, ExcludeOwner = true)]
+    private void FireVisualBulletObserversRpc(Channel channel = Channel.Unreliable)
     {
+        // Assume Owner already fired a visual bullet so exclude them
         FireVisualBullet();
     }
 

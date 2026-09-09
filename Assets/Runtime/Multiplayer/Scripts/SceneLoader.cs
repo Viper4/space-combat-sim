@@ -41,7 +41,7 @@ public class SceneLoader : DefaultSceneProcessor
         manualOperation = op;
         OnStartSceneLoad?.Invoke();
 
-        while (manualOperation.progress < 1f) // 1f since we want to wait while scene activates
+        while (manualOperation != null && manualOperation.progress < 1f) // 1f since we want to wait while scene activates
         {
             progressIndicator.UpdateUI((manualOperation.progress / 0.9f) * 100f, 100f);
             yield return null;

@@ -8,6 +8,7 @@ using System;
 public class SpaceLight : MonoBehaviour
 {
     public ScaledTransform scaledTransform {get; private set;}
+    private ScaledRigidbody scaledRigidbody;
     private Material materialClone;
 
     [SerializeField] private Light worldLight;
@@ -16,16 +17,20 @@ public class SpaceLight : MonoBehaviour
     [SerializeField] private float gradientMinTemperature = 1000f;
     [SerializeField] private float gradientMaxTemperature = 20000f;
     [SerializeField] private float cellTemperatureOffset = 1000f;
+    [SerializeField] private bool relativisticEffects;
 
+    public float intensity;
+    public float temperature;
     public Color baseColor {get; private set;}
     private Color cellColor;
     private double radius;
     private double luminosity;
-
     private bool initialized = false;
-
-    public float intensity;
-    public float temperature;
+    private float redStd;
+    private float greenStd;
+    private float blueStd;
+    private float violetStd;
+    private float beamingFactor;
 
     private void Awake()
     {
@@ -38,7 +43,16 @@ public class SpaceLight : MonoBehaviour
             return;
         initialized = true;
         scaledTransform = GetComponent<ScaledTransform>();
+        TryGetComponent(out scaledRigidbody);
         materialClone = GetComponent<MeshRenderer>().material;
+        if (relativisticEffects)
+        {
+            redStd = materialClone.GetFloat("_RedStd");
+            greenStd = materialClone.GetFloat("_GreenStd");
+            blueStd = materialClone.GetFloat("_BlueStd");
+            violetStd = materialClone.GetFloat("_VioletStd");
+            beamingFactor = materialClone.GetFloat("_BeamingFactor");
+        }
     }
 
     public void SetTemperature(float temperature, Color tint)
@@ -103,5 +117,110 @@ public class SpaceLight : MonoBehaviour
                 worldLight.enabled = true;
             worldLight.intensity = intensity;
         }
+        if (relativisticEffects)
+        {
+            Vector3d relativeVelocity = scaledRigidbody.velocity - FloatingWorldOrigin.Instance.scaledRigidbody.velocity;
+            Vector3d toStar = FloatingWorldOrigin.Instance.scaledTransform.realPosition - scaledTransform.realPosition;
+            worldLight.color = GetDopplerColor(baseColor, relativeVelocity, toStar.normalized);
+        }
+    }
+
+    private float VisibilityWindow(float wavelength)
+    {
+        // Visible spectrum is from 380nm to 740nm
+        const float MIN_WAVELENGTH = 380.0f;
+        const float MAX_WAVELENGTH = 740.0f;
+        const float VISIBLE_SPECTRUM_EXTRA = 20.0f; // Go a little past the boundaries for a better fade to black+alpha fade
+        const float BUFFER = 50.0f;
+
+        float lowRamp = Mathf.SmoothStep(
+            MIN_WAVELENGTH - VISIBLE_SPECTRUM_EXTRA,
+            MIN_WAVELENGTH + BUFFER,
+            wavelength);
+
+        float highRamp = 1f - Mathf.SmoothStep(
+            MAX_WAVELENGTH - BUFFER,
+            MAX_WAVELENGTH + VISIBLE_SPECTRUM_EXTRA,
+            wavelength);
+
+        return Mathf.Clamp01(lowRamp * highRamp);
+    }
+
+    private static float Gaussian(float wavelength, float center, float std)
+    {
+        float x = (wavelength - center) / Mathf.Max(std, 0.001f);
+        return Mathf.Exp(-0.5f * x * x);
+    }
+
+    private Color GetDopplerColor(Color color, Vector3d relativeVelocity, Vector3d viewDir)
+    {
+        const float RED_WAVELENGTH   = 650.0f;
+        const float GREEN_WAVELENGTH = 540.0f;
+        const float BLUE_WAVELENGTH  = 475.0f;
+        const float VIOLET_WAVELENGTH = 380.0f;
+
+        double relativeSpeedSquared = relativeVelocity.sqrMagnitude;
+
+        double relativeBetaSquared = Math.Min(relativeSpeedSquared / (ScaledSpacePhysics.speedOfLight * ScaledSpacePhysics.speedOfLight), 1.0 - 1e-6);
+
+        double relativeBeta = Math.Sqrt(relativeBetaSquared);
+        double relativeSpeed = Math.Sqrt(relativeSpeedSquared);
+
+        Vector3d relativeVelocityDir = relativeVelocity / Math.Max(relativeSpeed, 1e-6);
+
+        double cosTheta = Vector3d.Dot(relativeVelocityDir, -viewDir);
+
+        // Same formula as the HLSL.
+        double invDopplerFactor = Math.Abs(
+            Math.Sqrt(1.0 - relativeBetaSquared) /
+            (1.0 - relativeBeta * cosTheta));
+
+        float brightness = Mathf.Pow(
+            (float)(1.0 / invDopplerFactor),
+            beamingFactor);
+
+        Vector3 rgb = new Vector3(
+            Mathf.Max(color.r, 0f),
+            Mathf.Max(color.g, 0f),
+            Mathf.Max(color.b, 0f));
+
+        float shiftedR = RED_WAVELENGTH * (float)invDopplerFactor;
+        float shiftedG = GREEN_WAVELENGTH * (float)invDopplerFactor;
+        float shiftedB = BLUE_WAVELENGTH * (float)invDopplerFactor;
+
+        float visR = VisibilityWindow(shiftedR);
+        float visG = VisibilityWindow(shiftedG);
+        float visB = VisibilityWindow(shiftedB);
+
+        float visibility = Mathf.Max(visR, Mathf.Max(visG, visB));
+
+        float r =
+            Gaussian(shiftedR, RED_WAVELENGTH, redStd) * rgb.x +
+            Gaussian(shiftedG, RED_WAVELENGTH, redStd) * rgb.y +
+            Gaussian(shiftedB, RED_WAVELENGTH, redStd) * rgb.z;
+
+        float g =
+            Gaussian(shiftedR, GREEN_WAVELENGTH, greenStd) * rgb.x +
+            Gaussian(shiftedG, GREEN_WAVELENGTH, greenStd) * rgb.y +
+            Gaussian(shiftedB, GREEN_WAVELENGTH, greenStd) * rgb.z;
+
+        float b =
+            Gaussian(shiftedR, BLUE_WAVELENGTH, blueStd) * rgb.x +
+            Gaussian(shiftedG, BLUE_WAVELENGTH, blueStd) * rgb.y +
+            Gaussian(shiftedB, BLUE_WAVELENGTH, blueStd) * rgb.z;
+
+        // Violet contribution.
+        float violet =
+            Gaussian(shiftedR, VIOLET_WAVELENGTH, violetStd) * rgb.x;
+
+        r += violet * 0.2f;
+        b += violet * 1.0f;
+
+        return new Color(
+            Mathf.Max(r, 0f) * brightness,
+            Mathf.Max(g, 0f) * brightness,
+            Mathf.Max(b, 0f) * brightness,
+            color.a * visibility
+        );
     }
 }

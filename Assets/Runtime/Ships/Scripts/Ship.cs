@@ -383,7 +383,7 @@ public class Ship : NetworkBehaviour
             );
         }
 
-        if (finalAngAcc.sqrMagnitude > 0.0001)
+        if (finalAngAcc.sqrMagnitude > double.Epsilon)
         {
             scaledRigidbody.AddRelativeTorque(finalAngAcc, ForceMode.Acceleration);
         }

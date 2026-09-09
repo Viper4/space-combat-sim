@@ -157,7 +157,7 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _ObserverVelocity: {r: -36.337784, g: -0.0010491525, b: 30.712818, a: 0}
+    - _ObserverVelocity: {r: -15.179778, g: 0.0002228329, b: 11.612714, a: 0}
     - _RelativeVelocity: {r: 0, g: 0, b: -52.6, a: 0}
     - _RotationAxis: {r: 0, g: 1, b: 0, a: 0}
     - _SourceVelocity: {r: 0, g: 0, b: 0, a: 0}

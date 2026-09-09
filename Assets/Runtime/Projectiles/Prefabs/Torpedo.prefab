@@ -260,7 +260,11 @@ MonoBehaviour:
     x: 1
     y: 1
     z: 1
+  useRealScaleForRadius: 0
+  worldSpaceOnlyRenderers: []
   minScreenPixelSize: 3
+  scaleFactor: 10
+  index: -1
   visible: 1
   trackedColliders:
   - {fileID: 2688048666450355157}
@@ -269,13 +273,9 @@ MonoBehaviour:
   - {fileID: 1511601194769986097}
   scaledSpaceLayer: 3
   inScaledSpace: 0
-  scaleFactor: 10
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
   realRadius: 5.052269458770752
-  useRealScaleForRadius: 0
-  index: -1
-  worldSpaceOnlyRenderers: []
 --- !u!114 &2821699641902407001
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -428,6 +428,7 @@ MonoBehaviour:
   derivativeGain: 109.9889
   rocketTrail: {fileID: 4901987813079629749}
   collideSpeedThreshold: 100
+  triggerSpeedThreshold: 100
   explosionPrefab: {fileID: 3982350210874365306, guid: 38256d267e02f9045b36a61ca4903a4d, type: 3}
   explosionRadius: 60
   explosionForce: 10000
@@ -527,7 +528,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584145743242545083
+  _initializedTimestamp: -8584126245814883076
 --- !u!114 &8610071851412310716
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -549,9 +550,15 @@ MonoBehaviour:
   interpolateTransform: 1
   interpolateRigidbody: 0
   interpolationSpeed: 1
+  positionChangeThreshold: 0.01
+  rotationChangeThreshold: 0.99
+  velocityChangeThreshold: 0.01
+  snapPositionThreshold: 50
+  snapRotationThreshold: 0.5
   maxAccelerationPositive: {x: 10, y: 10, z: 100}
   maxAccelerationNegative: {x: 10, y: 10, z: 10}
   leniency: 1.5
+  logRejectedUpdates: 0
 --- !u!1 &7891829006686870921
 GameObject:
   m_ObjectHideFlags: 0

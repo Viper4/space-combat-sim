@@ -120,6 +120,7 @@ MonoBehaviour:
   orbitTarget: {fileID: 0}
   tidallyLocked: 1
   overrideRotationAxis: 0
+  initialized: 0
   pauseUpdates: 0
 --- !u!54 &7988712374659034346
 Rigidbody:
@@ -276,7 +277,7 @@ MonoBehaviour:
   <AssetPathHash>k__BackingField: 11235234168432016391
   SceneId: 0
   SerializedTransformProperties:
-    Position: {x: 0, y: 0, z: 0}
+    Position: {x: -9.99998, y: 0.0000006, z: 0.0000066}
     Rotation: {x: 0, y: 0, z: 0, w: 1}
     Scale: {x: 0.000001, y: 0.000001, z: 0.000001}
     IsValid: 1
@@ -300,7 +301,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584144749073054379
+  _initializedTimestamp: -8584126216921651545
 --- !u!114 &-4443559885487207738
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -330,10 +331,16 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 423929763229353203}
   keepActiveWhenOffline: 1
   clientAuthoritative: 0
-  sendRate: 10
+  sendRate: 1
   interpolateTransform: 1
   interpolateRigidbody: 0
   interpolationSpeed: 1
+  positionChangeThreshold: 0.01
+  rotationChangeThreshold: 0.99
+  velocityChangeThreshold: 0.01
+  snapPositionThreshold: 50
+  snapRotationThreshold: 0.5
   maxAccelerationPositive: {x: 10, y: 10, z: 100}
   maxAccelerationNegative: {x: 10, y: 10, z: 10}
   leniency: 1.5
+  logRejectedUpdates: 0

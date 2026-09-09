@@ -301,6 +301,7 @@ public class ScaledRigidbody : MonoBehaviour
         if (_active)
         {
             attachedRigidbody.constraints = RigidbodyConstraints.FreezePosition | constraints;
+            attachedRigidbody.linearVelocity = Vector3.zero;
         }
         else
         {
@@ -465,7 +466,7 @@ public class ScaledRigidbody : MonoBehaviour
     {
         for(int i = scaledColliders.Count - 1; i >= 0; i--)
         {
-            Destroy(scaledColliders[i].gameObject);
+            Destroy(scaledColliders[i]);
         }
     }
 

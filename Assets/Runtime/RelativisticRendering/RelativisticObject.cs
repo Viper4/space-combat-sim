@@ -5,26 +5,26 @@ using System;
 [RequireComponent(typeof(ScaledRigidbody))]
 public class RelativisticObject : MonoBehaviour
 {
-    private ScaledRigidbody scaledRigidbody;
-    private MaterialPropertyBlock block;
+    private ScaledRigidbody _scaledRigidbody;
+    private MaterialPropertyBlock _block;
 
     private void Start()
     {
-        scaledRigidbody = GetComponent<ScaledRigidbody>();
-        block = new MaterialPropertyBlock();
+        _scaledRigidbody = GetComponent<ScaledRigidbody>();
+        _block = new MaterialPropertyBlock();
     }
 
     private void FixedUpdate()
     {
-        if (FloatingWorldOrigin.Instance == null || Camera.main == null || !scaledRigidbody.scaledTransform.visible)
+        if (FloatingWorldOrigin.Instance == null || Camera.main == null || !_scaledRigidbody.scaledTransform.visible)
             return;
 
-        foreach (Renderer renderer in scaledRigidbody.scaledTransform.trackedRenderers)
+        foreach (Renderer renderer in _scaledRigidbody.scaledTransform.trackedRenderers)
         {
-            renderer.GetPropertyBlock(block);
-            block.SetVector(ScaledSpaceVisuals.SourceVelocityID, scaledRigidbody.velocity.ToVector3());
-            block.SetVector(ScaledSpaceVisuals.ObserverVelocityID, FloatingWorldOrigin.Instance.scaledRigidbody.velocity.ToVector3());
-            renderer.SetPropertyBlock(block);
+            renderer.GetPropertyBlock(_block);
+            _block.SetVector(ScaledSpaceVisuals.SourceVelocityID, _scaledRigidbody.velocity.ToVector3());
+            _block.SetVector(ScaledSpaceVisuals.ObserverVelocityID, FloatingWorldOrigin.Instance.scaledRigidbody.velocity.ToVector3());
+            renderer.SetPropertyBlock(_block);
         }
     }
 }

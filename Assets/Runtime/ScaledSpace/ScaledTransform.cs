@@ -198,6 +198,12 @@ public class ScaledTransform : MonoBehaviour
         UpdateTransform();
     }
 
+    private void LateUpdate()
+    {
+        if (inScaledSpace && FloatingWorldOrigin.Instance != null && FloatingWorldOrigin.Instance.scaledTransform != this)
+            UpdateInScaledSpace(FloatingWorldOrigin.Instance.scaledTransform.realPosition);
+    }
+
     private void UpdateTransformEditor()
     {
         // Assume main camera is the origin while in editor
@@ -228,8 +234,11 @@ public class ScaledTransform : MonoBehaviour
         {
             if (sqrDistance < worldSpaceThreshold * worldSpaceThreshold)
                 SwitchToWorldSpace();
-            else
-                UpdateInScaledSpace(originPosition);
+            // Unity retardation causes object render positions to appear to "lag" behind 
+            // when player rotates/moves their camera around with unity rigidbody
+            // so need to do this in LateUpdate instead
+            // else
+            //     UpdateInScaledSpace(originPosition);
         }
         else
         {

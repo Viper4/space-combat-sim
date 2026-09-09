@@ -155,20 +155,20 @@ MonoBehaviour:
     x: 1
     y: 1
     z: 1
+  useRealScaleForRadius: 0
+  worldSpaceOnlyRenderers: []
   minScreenPixelSize: 3
+  scaleFactor: 1000
+  index: -1
   visible: 1
   trackedColliders: []
   trackedRenderers:
   - {fileID: 3904004116624225602}
   scaledSpaceLayer: 3
   inScaledSpace: 0
-  scaleFactor: 1000
   worldSpaceThreshold: 3900
   scaledSpaceThreshold: 4100
   realRadius: 0.041661642491817474
-  useRealScaleForRadius: 0
-  index: -1
-  worldSpaceOnlyRenderers: []
 --- !u!114 &8675818534221068254
 MonoBehaviour:
   m_ObjectHideFlags: 0

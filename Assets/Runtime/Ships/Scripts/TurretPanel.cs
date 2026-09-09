@@ -35,8 +35,6 @@ public class TurretPanel : MonoBehaviour
         void listener(float x) => UpdateState();
         _turret.statSystem.OnDeath.AddListener(listener);
         _updateStateListener = listener;
-        _turret.OnTargetChanged += UpdateTarget;
-        _turret.turretSystem.OnManualControlChanged += UpdateTarget;
 
         _turret.statSystem.healthIndicator = healthIndicator;
         healthIndicator.UpdateUI(turret.statSystem.health, turret.statSystem.maxHealth); // Update indicator immediately
@@ -68,13 +66,12 @@ public class TurretPanel : MonoBehaviour
         _turret.OnActiveChanged -= UpdateState;
         _turret.OnWantsToShootChanged -= UpdateState;
         _turret.statSystem.OnDeath.RemoveListener(_updateStateListener);
-        _turret.OnTargetChanged -= UpdateTarget;
-        _turret.turretSystem.OnManualControlChanged -= UpdateTarget;
         _turret.OnAmmoChanged -= _ammoListener;
     }
 
     private void FixedUpdate()
     {
+        UpdateTarget(); // Updating target UI stuff is cheap enough to run every fixed update
         foreach(Transform platformModel in platformModels)
         {
             platformModel.rotation = _turret.platform.rotation;

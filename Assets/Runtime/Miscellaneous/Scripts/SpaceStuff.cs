@@ -908,6 +908,7 @@ namespace SpaceStuff
 
     public static class SpaceMath
     {
+        public const double gravitation = 6.6743e-11;
         public const double stefanBoltzmann = 5.67e-8; // For luminosity
         public const double kilo = 1e3;
         public const double mega = 1e6;

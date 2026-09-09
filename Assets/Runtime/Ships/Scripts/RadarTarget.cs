@@ -1,6 +1,8 @@
 using UnityEngine;
 using SpaceStuff;
 using FishNet.Object;
+using FishNet.Connection;
+using FishNet.Serializing;
 
 [RequireComponent(typeof(ScaledRigidbody))]
 public class RadarTarget : NetworkBehaviour
@@ -45,6 +47,18 @@ public class RadarTarget : NetworkBehaviour
         }
 
         id = RadarRegistry.Register(this);
+    }
+
+    public override void WritePayload(NetworkConnection connection, Writer writer)
+    {
+        base.WritePayload(connection, writer);
+        writer.WriteString(team);
+    }
+
+    public override void ReadPayload(NetworkConnection connection, Reader reader)
+    {
+        base.ReadPayload(connection, reader);
+        team = reader.ReadStringAllocated();
     }
 
     private void OnDestroy()

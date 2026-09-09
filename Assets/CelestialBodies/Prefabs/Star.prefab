@@ -159,6 +159,7 @@ MonoBehaviour:
   orbitTarget: {fileID: 0}
   tidallyLocked: 0
   overrideRotationAxis: 0
+  initialized: 0
   pauseUpdates: 0
 --- !u!54 &3226591562496017464
 Rigidbody:
@@ -269,6 +270,7 @@ MonoBehaviour:
   gradientMinTemperature: 1000
   gradientMaxTemperature: 20000
   cellTemperatureOffset: -1000
+  relativisticEffects: 1
   intensity: 0
   temperature: 0
 --- !u!114 &448297595236042583
@@ -388,7 +390,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584144758221071864
+  _initializedTimestamp: -8584126216921651545
 --- !u!114 &5037673740273060479
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -418,13 +420,19 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 9185686016837872124}
   keepActiveWhenOffline: 1
   clientAuthoritative: 0
-  sendRate: 10
+  sendRate: 1
   interpolateTransform: 1
   interpolateRigidbody: 0
   interpolationSpeed: 1
+  positionChangeThreshold: 0.01
+  rotationChangeThreshold: 0.99
+  velocityChangeThreshold: 0.01
+  snapPositionThreshold: 50
+  snapRotationThreshold: 0.5
   maxAccelerationPositive: {x: 10, y: 10, z: 100}
   maxAccelerationNegative: {x: 10, y: 10, z: 10}
   leniency: 1.5
+  logRejectedUpdates: 0
 --- !u!1 &7089161551974816913
 GameObject:
   m_ObjectHideFlags: 0

@@ -4,14 +4,12 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityRandom = UnityEngine.Random;
-using SystemRandom = System.Random;
 using FishNet;
 
 [RequireComponent(typeof(ScaledTransform), typeof(ScaledRigidbody))]
 public class CelestialBody : NetworkBehaviour
 {
     private const double v = 4.0 / 3.0 * Math.PI;
-    private const double G = 6.6743e-11;
     private const double solarRadius = 6.957e8;
     private const double solarMass = 1.989e30;
 
@@ -41,7 +39,6 @@ public class CelestialBody : NetworkBehaviour
     private bool orbitSet;
     public bool pauseUpdates = false;
     private bool hasBaryCenter;
-    private Vector3d baryCenter;
 
     private bool IsServerOrOffline => IsServerInitialized || IsOffline;
 
@@ -52,12 +49,22 @@ public class CelestialBody : NetworkBehaviour
         TryGetComponent(out generator);
         TryGetComponent(out spaceLight);
 
-        if (InstanceFinder.IsOffline)
+        if (InstanceFinder.IsOffline || InstanceFinder.IsServerStarted)
             Init();
-        
+
         if (gravitySettings != null && gravitySettings.applyGravity)
         {
             ScaledSpacePhysics.Instance.GravityStep += ApplyGravity;
+        }
+    }
+
+    private void OnEnable()
+    {
+        // Need to start orbit coroutine separate from Init since FishNet disables and reenables GameObjects on network startup
+        if (orbitTarget != null && !orbitSet)
+        {
+            Debug.Log(GameLog.ObjectLog(this, "Started orbit routine"));
+            StartCoroutine(SetOrbitalVelocity());
         }
     }
 
@@ -65,12 +72,16 @@ public class CelestialBody : NetworkBehaviour
     {
         base.OnStartServer();
 
-        Init();
         if (generator != null)
             InitializeObserversRpc(scale.x, scale.y, scale.z, scaledRigidbody.mass, generator.GetSeeds());
         else
             InitializeObserversRpc(scale.x, scale.y, scale.z, scaledRigidbody.mass, null);
         Debug.Log(GameLog.ObjectLog(this, $"Sent init data to observers."));
+    }
+
+    private void OnDestroy()
+    {
+        ScaledSpacePhysics.Instance.GravityStep -= ApplyGravity;
     }
 
     private void Init()
@@ -203,30 +214,17 @@ public class CelestialBody : NetworkBehaviour
 
         initialized = true;
 
-        if(orbitTarget != null)
-        {
-            StartCoroutine(SetOrbitalVelocity());
-        }
-
         Debug.Log(GameLog.ObjectLog(this, $"Initialized locally."));
-    }
-
-    private double RandomRange(double min, double max)
-    {
-        SystemRandom rand = new SystemRandom();
-        return (rand.NextDouble() * (max - min)) + min;
     }
 
     [ObserversRpc(ExcludeServer = true, BufferLast = true)]
     private void InitializeObserversRpc(double scaleX, double scaleY, double scaleZ, double mass, Vector3[] seeds)
     {
-        Debug.Log(GameLog.ObjectLog(this, $"Initializing from server data."));
+        if (IsServerInitialized)
+            return;
+        Debug.Log(GameLog.ObjectLog(this, $"Initializing using server data isServer: {IsServerInitialized}."));
         scaledTransform.realScale = new Vector3d(scaleX, scaleY, scaleZ);
         scaledRigidbody.mass = mass;
-        if (gravitySettings != null && gravitySettings.applyGravity)
-        {
-            ScaledSpacePhysics.Instance.GravityStep += ApplyGravity;
-        }
         if (generator != null)
             generator.Init(seeds);
         initialized = true;
@@ -235,6 +233,8 @@ public class CelestialBody : NetworkBehaviour
     [ObserversRpc(ExcludeServer = true, BufferLast = true)]
     private void SetSpaceLightObserversRpc(float temperature, Color tint)
     {
+        if (IsServerInitialized)
+            return;
         if (spaceLight != null)
             spaceLight.SetTemperature(temperature, tint);
     }
@@ -244,10 +244,9 @@ public class CelestialBody : NetworkBehaviour
         return initialized;
     }
 
-    public void SetBaryCenter(Vector3d baryCenter)
+    public void SetBaryCenter()
     {
         hasBaryCenter = true;
-        this.baryCenter = baryCenter;
     }
 
     public void SetOrbit(CelestialBody toOrbit)
@@ -262,6 +261,7 @@ public class CelestialBody : NetworkBehaviour
     private IEnumerator SetOrbitalVelocity()
     {
         yield return new WaitUntil(orbitTarget.IsInitialized);
+        Debug.Log(GameLog.ObjectLog(this, "Got past init wait"));
 
         Vector3d posA = scaledTransform.realPosition;
         Vector3d posB = orbitTarget.scaledTransform.realPosition;
@@ -270,7 +270,10 @@ public class CelestialBody : NetworkBehaviour
         if (orbitTarget.orbitTarget == this)
         {
             if (orbitSet)
+            {
+                Debug.Log(GameLog.ObjectLog(this, "Already set orbit. Breaking out of routine"));
                 yield break;
+            }
             // Handle binary systems
             double massA = scaledRigidbody.mass;
             double massB = orbitTarget.scaledRigidbody.mass;
@@ -280,19 +283,31 @@ public class CelestialBody : NetworkBehaviour
             Vector3d rB = posB - barycenter;
 
             // orbital plane
-            Vector3d axis = Vector3d.Cross(rA, rB);
-            if (axis.sqrMagnitude < 1e-10)
-                axis = Vector3d.up;
+            Vector3d axis = transform.up.ToVector3d();
+
+            // Make sure axis isn't parallel to the separation vector
+            if (Math.Abs(Vector3d.Dot(axis, toCenter.normalized)) > 0.99)
+                axis = transform.right.ToVector3d();
+
             axis = axis.normalized;
 
             Vector3d dirA = Vector3d.Cross(axis, rA).normalized;
             Vector3d dirB = Vector3d.Cross(axis, rB).normalized;
 
-            double gA = orbitTarget.CalculateGravityAcceleration(posA);
-            double gB = CalculateGravityAcceleration(posB);
+            // Angular velocity of the binary system
+            double omega = Math.Sqrt(
+                SpaceMath.gravitation * (massA + massB) /
+                Math.Pow(distance, 3)
+            );
 
-            double orbitalSpeedA = Math.Sqrt(distance * gA);
-            double orbitalSpeedB = Math.Sqrt(distance * gB);
+            double orbitalSpeedA = omega * rA.magnitude;
+            double orbitalSpeedB = omega * rB.magnitude;
+
+            // double gA = orbitTarget.CalculateGravityAcceleration(posA);
+            // double gB = CalculateGravityAcceleration(posB);
+
+            // double orbitalSpeedA = Math.Sqrt(rA.magnitude * gA);
+            // double orbitalSpeedB = Math.Sqrt(rB.magnitude * gB);
 
             Vector3d vA = dirA * orbitalSpeedA;
             Vector3d vB = dirB * orbitalSpeedB;
@@ -309,8 +324,8 @@ public class CelestialBody : NetworkBehaviour
             }
             orbitSet = true;
             orbitTarget.orbitSet = true;
-            SetBaryCenter(baryCenter);
-            orbitTarget.SetBaryCenter(baryCenter);
+            SetBaryCenter();
+            orbitTarget.SetBaryCenter();
             Debug.Log(GameLog.ObjectLog(this, $"Updated velocity to {scaledRigidbody.velocity} {scaledRigidbody.velocity.magnitude} m/s and {orbitTarget.name}'s velocity to {orbitTarget.scaledRigidbody.velocity} {orbitTarget.scaledRigidbody.velocity.magnitude} m/s to orbit {orbitTarget.name} for a binary system."));
             yield break;
         }
@@ -459,11 +474,6 @@ public class CelestialBody : NetworkBehaviour
         // g = (Gm)/r^2
         // m = mass of body
         // r = distance between centers
-        return G * scaledRigidbody.mass / (scaledTransform.realPosition - point).sqrMagnitude;
-    }
-
-    private void OnDestroy()
-    {
-        ScaledSpacePhysics.Instance.GravityStep -= ApplyGravity;
+        return SpaceMath.gravitation * scaledRigidbody.mass / (scaledTransform.realPosition - point).sqrMagnitude;
     }
 }

@@ -91,7 +91,8 @@ void DopplerColorShift_float(
     float violet = Gaussian(shiftedR, VIOLET_WAVELENGTH, VioletStd) * rgb.r;
     
     // Pure violet is usually (127,0,255) in RGB => 0.5 red and 1.0 blue ratio
-    r += violet * 0.5;
+    // But that has too much red, so decrease the amout of red
+    r += violet * 0.2;
     b += violet * 1.0;
 
     float3 shiftedRGB = float3(r, g, b);
